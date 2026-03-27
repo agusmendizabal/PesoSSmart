@@ -208,7 +208,7 @@ export default function AdvisorScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -216,7 +216,7 @@ export default function AdvisorScreen() {
             <Text variant="label" color={colors.black} style={{ fontSize: 11 }}>PS</Text>
           </View>
           <View>
-            <Text variant="subtitle">Asesor Pesos$mart</Text>
+            <Text variant="subtitle">Asesor SmartPesos</Text>
             <Text variant="caption" color={colors.neon}>IA con contexto financiero real</Text>
           </View>
         </View>

@@ -8,9 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,8 +20,18 @@ import { colors, spacing, layout } from '@/theme';
 import { Text, Card, PressableCard, Button, Input, Badge } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { useExpensesStore } from '@/store/expensesStore';
+import { supabase } from '@/lib/supabase';
 import { formatCurrency, formatDate } from '@/utils/format';
 import type { PaymentMethod, Expense } from '@/types';
+
+type ExtractedExpense = {
+  description: string;
+  amount: number;
+  date: string;
+  classification: 'necessary' | 'disposable' | 'investable';
+  category: string;
+  selected: boolean;
+};
 
 const expenseSchema = z.object({
   description: z.string().min(1, 'Describí el gasto.').max(100),
@@ -62,6 +74,90 @@ export default function ExpensesScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('cash');
+  const [showScreenshotModal, setShowScreenshotModal] = useState(false);
+  const [extractedExpenses, setExtractedExpenses] = useState<ExtractedExpense[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSavingBatch, setIsSavingBatch] = useState(false);
+
+  const pickAndProcessScreenshot = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permiso necesario', 'Necesitamos acceso a tus fotos para importar el screenshot.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      base64: true,
+      quality: 0.5,
+      allowsEditing: false,
+    });
+
+    if (result.canceled || !result.assets[0]?.base64) return;
+
+    const { base64, mimeType } = result.assets[0];
+    setIsProcessing(true);
+    setShowScreenshotModal(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/process-screenshot`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            image_base64: base64,
+            image_type: mimeType ?? 'image/jpeg',
+            user_id: session?.user?.id,
+          }),
+        }
+      );
+
+      const data = await response.json();
+      if (data.expenses && data.expenses.length > 0) {
+        setExtractedExpenses(data.expenses.map((e: Omit<ExtractedExpense, 'selected'>) => ({ ...e, selected: true })));
+      } else {
+        Alert.alert('Sin resultados', `Debug: ${data.debug ?? data.error ?? 'respuesta vacía'}`);
+        setShowScreenshotModal(false);
+      }
+    } catch {
+      Alert.alert('Error', 'No se pudo procesar la imagen. Intentá de nuevo.');
+      setShowScreenshotModal(false);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const saveExtractedExpenses = async () => {
+    if (!user?.id) return;
+    const toSave = extractedExpenses.filter(e => e.selected);
+    if (toSave.length === 0) return;
+
+    setIsSavingBatch(true);
+    try {
+      for (const e of toSave) {
+        await addExpense(user.id, {
+          description: e.description,
+          amount: e.amount,
+          date: e.date,
+          payment_method: 'digital_wallet',
+          notes: null,
+          is_recurring: false,
+        });
+      }
+      setShowScreenshotModal(false);
+      setExtractedExpenses([]);
+      Alert.alert('Listo', `${toSave.length} gasto${toSave.length > 1 ? 's' : ''} guardado${toSave.length > 1 ? 's' : ''}.`);
+    } catch {
+      Alert.alert('Error', 'No se pudieron guardar los gastos.');
+    } finally {
+      setIsSavingBatch(false);
+    }
+  };
 
   const {
     control,
@@ -109,16 +205,24 @@ export default function ExpensesScreen() {
   const classificationFilter = filter.classification;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <Text variant="h4">Mis Gastos</Text>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => setShowAddModal(true)}
-        >
-          <Ionicons name="add" size={22} color={colors.black} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.screenshotBtn}
+            onPress={pickAndProcessScreenshot}
+          >
+            <Ionicons name="image-outline" size={20} color={colors.neon} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => setShowAddModal(true)}
+          >
+            <Ionicons name="add" size={22} color={colors.black} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Resumen */}
@@ -193,6 +297,83 @@ export default function ExpensesScreen() {
           ))
         )}
       </ScrollView>
+
+      {/* Modal screenshot */}
+      <Modal
+        visible={showScreenshotModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => { setShowScreenshotModal(false); setExtractedExpenses([]); }}
+      >
+        <SafeAreaView style={styles.modal}>
+          <View style={styles.modalHeader}>
+            <Text variant="h4">Gastos detectados</Text>
+            <TouchableOpacity onPress={() => { setShowScreenshotModal(false); setExtractedExpenses([]); }}>
+              <Ionicons name="close" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+
+          {isProcessing ? (
+            <View style={styles.processingContainer}>
+              <ActivityIndicator size="large" color={colors.neon} />
+              <Text variant="body" color={colors.text.secondary} style={{ marginTop: spacing[4] }}>
+                Analizando imagen...
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Text variant="caption" color={colors.text.secondary} style={styles.screenshotHint}>
+                Seleccioná los gastos que querés guardar.
+              </Text>
+              <ScrollView contentContainerStyle={styles.extractedList}>
+                {extractedExpenses.map((expense, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.extractedItem, expense.selected && styles.extractedItemSelected]}
+                    onPress={() => {
+                      const updated = [...extractedExpenses];
+                      updated[index].selected = !updated[index].selected;
+                      setExtractedExpenses(updated);
+                    }}
+                  >
+                    <View style={styles.extractedRow}>
+                      <Ionicons
+                        name={expense.selected ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={22}
+                        color={expense.selected ? colors.neon : colors.text.tertiary}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text variant="bodySmall" color={colors.text.primary}>{expense.description}</Text>
+                        <Text variant="caption" color={colors.text.secondary}>{expense.date}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end', gap: spacing[1] }}>
+                        <Text variant="labelMd" color={
+                          expense.classification === 'investable' ? colors.neon :
+                          expense.classification === 'disposable' ? colors.red :
+                          colors.text.primary
+                        }>
+                          {formatCurrency(expense.amount)}
+                        </Text>
+                        <Badge classification={expense.classification} small />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <View style={styles.screenshotFooter}>
+                <Button
+                  label={`GUARDAR ${extractedExpenses.filter(e => e.selected).length} GASTOS`}
+                  variant="neon"
+                  size="lg"
+                  fullWidth
+                  isLoading={isSavingBatch}
+                  onPress={saveExtractedExpenses}
+                />
+              </View>
+            </>
+          )}
+        </SafeAreaView>
+      </Modal>
 
       {/* Modal agregar gasto */}
       <Modal
@@ -402,12 +583,61 @@ const styles = StyleSheet.create({
     paddingTop: spacing[4],
     paddingBottom: spacing[3],
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  screenshotBtn: {
+    width: 40,
+    height: 40,
+    borderWidth: 1,
+    borderColor: colors.neon,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   addBtn: {
     width: 40,
     height: 40,
     backgroundColor: colors.neon,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  processingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  screenshotHint: {
+    paddingHorizontal: layout.screenPadding,
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+  },
+  extractedList: {
+    paddingHorizontal: layout.screenPadding,
+    paddingVertical: spacing[3],
+    gap: spacing[2],
+  },
+  extractedItem: {
+    padding: spacing[4],
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    backgroundColor: colors.bg.card,
+  },
+  extractedItemSelected: {
+    borderColor: colors.neon,
+    backgroundColor: colors.neon + '11',
+  },
+  extractedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+  screenshotFooter: {
+    padding: layout.screenPadding,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle,
   },
   summary: {
     flexDirection: 'row',
@@ -437,7 +667,7 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: layout.screenPadding,
-    paddingBottom: spacing[8],
+    paddingBottom: layout.tabBarHeight + spacing[4],
     gap: spacing[2],
   },
   empty: {

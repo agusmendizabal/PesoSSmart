@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const potentialInvestable = totalInvestable > 0 ? totalInvestable * 0.3 : 0;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: layout.screenPadding,
     paddingTop: spacing[4],
-    paddingBottom: spacing[8],
+    paddingBottom: layout.tabBarHeight + spacing[4],
     gap: spacing[4],
   },
   header: {

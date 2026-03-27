@@ -78,7 +78,7 @@ export default function ProfileScreen() {
     .toUpperCase() ?? '?';
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -197,7 +197,7 @@ export default function ProfileScreen() {
         </Card>
 
         <Text variant="caption" color={colors.text.tertiary} align="center" style={styles.version}>
-          Pesos$mart v1.0.0 · Tu plata, inteligente.
+          SmartPesos v1.0.0 · Tu plata, inteligente.
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: layout.screenPadding,
     paddingTop: spacing[4],
-    paddingBottom: spacing[8],
+    paddingBottom: layout.tabBarHeight + spacing[4],
     gap: spacing[4],
   },
   profileHeader: {

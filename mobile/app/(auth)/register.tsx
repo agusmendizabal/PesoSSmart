@@ -118,8 +118,8 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.brand}>
-            <Text variant="h1" color={colors.neon}>
-              PESOS$MART
+            <Text variant="h1" color={colors.text.primary}>
+              SMART<Text variant="h1" color={colors.neon}>PESOS</Text>
             </Text>
           </View>
 

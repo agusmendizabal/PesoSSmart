@@ -7,7 +7,10 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
 } from 'react-native';
+
+const { width } = Dimensions.get('window');
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -59,9 +62,20 @@ export default function LoginScreen() {
         >
           {/* Logo / Marca */}
           <View style={styles.brand}>
-            <Text variant="h1" color={colors.neon}>
-              PESOS$MART
+            <View style={styles.brandAccent} />
+            <View style={styles.brandRow}>
+              <View style={styles.brandDot} />
+              <Text variant="label" color={colors.neon} style={styles.brandTag}>
+                FINANZAS PERSONALES
+              </Text>
+            </View>
+            <Text variant="h1" color={colors.text.primary} style={styles.brandTitle}>
+              SMART
+              <Text variant="h1" color={colors.neon}>
+                PESOS
+              </Text>
             </Text>
+            <View style={styles.brandDivider} />
             <Text variant="label" color={colors.text.secondary}>
               TU PLATA, INTELIGENTE.
             </Text>
@@ -179,7 +193,35 @@ const styles = StyleSheet.create({
   },
   brand: {
     marginBottom: spacing[12],
-    gap: spacing[1],
+    gap: spacing[2],
+  },
+  brandAccent: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.neon,
+    marginBottom: spacing[2],
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  brandDot: {
+    width: 6,
+    height: 6,
+    backgroundColor: colors.neon,
+  },
+  brandTag: {
+    letterSpacing: 2,
+  },
+  brandTitle: {
+    lineHeight: 52,
+  },
+  brandDivider: {
+    width: width * 0.5,
+    height: 1,
+    backgroundColor: colors.border.default,
+    marginVertical: spacing[1],
   },
   header: {
     marginBottom: spacing[8],
