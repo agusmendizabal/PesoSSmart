@@ -20,6 +20,7 @@ import { colors, spacing, layout } from '@/theme';
 import { Text, Card, PressableCard, Button, Input, Badge } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { useExpensesStore } from '@/store/expensesStore';
+import type { DetectedSubscription } from '@/store/expensesStore';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency, formatDate } from '@/utils/format';
 import type { PaymentMethod, Expense } from '@/types';
@@ -65,11 +66,15 @@ export default function ExpensesScreen() {
     totalDisposable,
     fetchExpenses,
     fetchCategories,
+    fetchSubscriptionsAndProjection,
     addExpense,
     isLoading,
     filter,
     setFilter,
+    subscriptions,
   } = useExpensesStore();
+
+  const [showSubscriptions, setShowSubscriptions] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -179,6 +184,7 @@ export default function ExpensesScreen() {
     if (user?.id) {
       fetchExpenses(user.id);
       fetchCategories();
+      fetchSubscriptionsAndProjection(user.id);
     }
   }, [user?.id, filter]);
 
@@ -273,6 +279,51 @@ export default function ExpensesScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Suscripciones detectadas */}
+      {subscriptions.length > 0 && (
+        <TouchableOpacity
+          style={styles.subsHeader}
+          onPress={() => setShowSubscriptions(!showSubscriptions)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.subsHeaderLeft}>
+            <Ionicons name="repeat-outline" size={16} color={colors.yellow} />
+            <Text variant="label" color={colors.yellow}>
+              {subscriptions.length} SUSCRIPCIÓN{subscriptions.length > 1 ? 'ES' : ''} DETECTADA{subscriptions.length > 1 ? 'S' : ''}
+            </Text>
+          </View>
+          <Ionicons
+            name={showSubscriptions ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={colors.text.secondary}
+          />
+        </TouchableOpacity>
+      )}
+
+      {showSubscriptions && subscriptions.length > 0 && (
+        <View style={styles.subsContainer}>
+          {subscriptions.map((sub) => (
+            <View key={sub.description} style={styles.subRow}>
+              <View style={{ flex: 1 }}>
+                <Text variant="bodySmall" color={colors.text.primary}>{sub.description}</Text>
+                <Text variant="caption" color={colors.text.secondary}>
+                  {sub.occurrences} veces en 90 días
+                </Text>
+              </View>
+              <Text variant="labelMd" color={colors.yellow}>
+                {formatCurrency(sub.averageAmount)}/mes
+              </Text>
+            </View>
+          ))}
+          <View style={styles.subsTotalRow}>
+            <Text variant="label" color={colors.text.secondary}>TOTAL MENSUAL</Text>
+            <Text variant="labelMd" color={colors.red}>
+              {formatCurrency(subscriptions.reduce((s, sub) => s + sub.averageAmount, 0))}/mes
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* Lista */}
       <ScrollView
@@ -680,6 +731,40 @@ const styles = StyleSheet.create({
   expenseLeft: { flex: 1, marginRight: spacing[3], gap: spacing[1] },
   expenseTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   expenseMeta: { flexDirection: 'row', alignItems: 'center' },
+  subsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: layout.screenPadding,
+    paddingVertical: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.yellow + '33',
+    backgroundColor: colors.yellow + '0A',
+  },
+  subsHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  subsContainer: {
+    marginHorizontal: layout.screenPadding,
+    marginBottom: spacing[2],
+    borderWidth: 1,
+    borderColor: colors.yellow + '33',
+    backgroundColor: colors.bg.card,
+  },
+  subRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+  },
+  subsTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+  },
   // Modal
   modal: { flex: 1, backgroundColor: colors.bg.primary },
   modalHeader: {

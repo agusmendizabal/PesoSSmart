@@ -10,6 +10,23 @@ interface ExpensesFilter {
   search: string;
 }
 
+export interface DetectedSubscription {
+  description: string;
+  averageAmount: number;
+  occurrences: number;
+  lastDate: string;
+  category: string | null;
+}
+
+const INCOME_RANGE_MAP: Record<string, number> = {
+  under_150k: 100000,
+  '150k_300k': 225000,
+  '300k_500k': 400000,
+  '500k_800k': 650000,
+  '800k_1500k': 1150000,
+  over_1500k: 2000000,
+};
+
 interface ExpensesState {
   expenses: Expense[];
   categories: ExpenseCategory[];
@@ -22,6 +39,9 @@ interface ExpensesState {
   totalNecessary: number;
   totalDisposable: number;
   totalInvestable: number;
+  subscriptions: DetectedSubscription[];
+  projectedBalance: number | null;
+  estimatedIncome: number | null;
 
   // Actions
   fetchExpenses: (userId: string) => Promise<void>;
@@ -32,6 +52,7 @@ interface ExpensesState {
   setFilter: (filter: Partial<ExpensesFilter>) => void;
   setSelectedExpense: (expense: Expense | null) => void;
   clearError: () => void;
+  fetchSubscriptionsAndProjection: (userId: string) => Promise<void>;
 }
 
 const currentDate = new Date();
@@ -54,6 +75,9 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
   totalNecessary: 0,
   totalDisposable: 0,
   totalInvestable: 0,
+  subscriptions: [],
+  projectedBalance: null,
+  estimatedIncome: null,
 
   fetchExpenses: async (userId) => {
     const { filter } = get();
@@ -201,4 +225,83 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
   setFilter: (filter) => set((s) => ({ filter: { ...s.filter, ...filter } })),
   setSelectedExpense: (expense) => set({ selectedExpense: expense }),
   clearError: () => set({ error: null }),
+
+  fetchSubscriptionsAndProjection: async (userId) => {
+    try {
+      // Traer últimos 90 días de gastos
+      const since = new Date();
+      since.setDate(since.getDate() - 90);
+      const sinceStr = since.toISOString().split('T')[0];
+
+      const { data: recentExpenses } = await supabase
+        .from('expenses')
+        .select('description, amount, date, category_id')
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .gte('date', sinceStr)
+        .order('date', { ascending: false });
+
+      if (!recentExpenses) return;
+
+      // Detectar suscripciones: descripción que aparece en 2+ meses distintos
+      const grouped: Record<string, { amounts: number[]; dates: string[]; category: string | null }> = {};
+      for (const e of recentExpenses) {
+        const key = e.description.toLowerCase().trim();
+        if (!grouped[key]) grouped[key] = { amounts: [], dates: [], category: e.category_id };
+        grouped[key].amounts.push(e.amount);
+        grouped[key].dates.push(e.date);
+      }
+
+      const detected: DetectedSubscription[] = [];
+      for (const [desc, data] of Object.entries(grouped)) {
+        const months = new Set(data.dates.map(d => d.substring(0, 7)));
+        if (months.size >= 2) {
+          const avg = data.amounts.reduce((a, b) => a + b, 0) / data.amounts.length;
+          detected.push({
+            description: recentExpenses.find(e => e.description.toLowerCase().trim() === desc)?.description ?? desc,
+            averageAmount: Math.round(avg),
+            occurrences: data.amounts.length,
+            lastDate: data.dates[0],
+            category: data.category,
+          });
+        }
+      }
+
+      // Proyección del mes siguiente
+      const { data: financialProfile } = await supabase
+        .from('financial_profiles')
+        .select('income_range, fixed_expenses_estimated')
+        .eq('user_id', userId)
+        .single();
+
+      const estimatedIncome = financialProfile?.income_range
+        ? INCOME_RANGE_MAP[financialProfile.income_range] ?? null
+        : null;
+
+      // Promedio mensual de gastos últimos 3 meses
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      const monthlyTotals: Record<string, number> = {};
+      for (const e of recentExpenses) {
+        const month = e.date.substring(0, 7);
+        if (month >= threeMonthsAgo.toISOString().substring(0, 7)) {
+          monthlyTotals[month] = (monthlyTotals[month] ?? 0) + e.amount;
+        }
+      }
+      const months = Object.values(monthlyTotals);
+      const avgMonthlySpend = months.length > 0
+        ? months.reduce((a, b) => a + b, 0) / months.length
+        : 0;
+
+      const subscriptionTotal = detected.reduce((sum, s) => sum + s.averageAmount, 0);
+      const projectedExpenses = Math.max(avgMonthlySpend, subscriptionTotal);
+      const projectedBalance = estimatedIncome !== null
+        ? estimatedIncome - projectedExpenses
+        : null;
+
+      set({ subscriptions: detected, projectedBalance, estimatedIncome });
+    } catch {
+      // Silencioso — no es crítico
+    }
+  },
 }));
