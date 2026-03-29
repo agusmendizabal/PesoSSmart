@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, layout } from '@/theme';
-import { Text, Card, PressableCard, AmountDisplay, Badge } from '@/components/ui';
+import { Text, Card, PressableCard, AmountDisplay, Badge, MonthlyThermometer } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { getGreeting, formatCurrency } from '@/utils/format';
@@ -24,11 +24,18 @@ export default function HomeScreen() {
     totalDisposable,
     totalInvestable,
     fetchExpenses,
+    fetchSubscriptionsAndProjection,
+    projectedBalance,
+    estimatedIncome,
+    subscriptions,
     isLoading,
   } = useExpensesStore();
 
   useEffect(() => {
-    if (user?.id) fetchExpenses(user.id);
+    if (user?.id) {
+      fetchExpenses(user.id);
+      fetchSubscriptionsAndProjection(user.id);
+    }
   }, [user?.id]);
 
   const greeting = getGreeting(profile?.full_name ?? undefined);
@@ -96,6 +103,11 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
+        </Card>
+
+        {/* Termómetro del mes */}
+        <Card variant="default" style={styles.thermometerCard}>
+          <MonthlyThermometer spent={totalThisMonth} budget={estimatedIncome ?? 0} />
         </Card>
 
         {/* Alerta / Insight */}
@@ -202,6 +214,68 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Proyección del mes siguiente */}
+        {projectedBalance !== null && (
+          <Card variant="default" style={styles.projectionCard}>
+            <View style={styles.projectionHeader}>
+              <Ionicons name="trending-up-outline" size={18} color={colors.neon} />
+              <Text variant="label" color={colors.text.secondary}>EL MES QUE VIENE TE QUEDAN</Text>
+            </View>
+            <Text variant="numberLg" color={projectedBalance >= 0 ? colors.neon : colors.red}>
+              {formatCurrency(projectedBalance)}
+            </Text>
+            {projectedBalance > 0 && (
+              <View style={styles.projectionTip}>
+                <Ionicons name="bulb-outline" size={14} color={colors.yellow} />
+                <Text variant="caption" color={colors.text.secondary} style={{ flex: 1 }}>
+                  Si lo ponés en un FCI Money Market (~3% TNA), ganarías{' '}
+                  <Text variant="caption" color={colors.neon}>
+                    {formatCurrency(Math.round(projectedBalance * 0.03 / 12))}
+                  </Text>{' '}en un mes sin hacer nada.
+                </Text>
+              </View>
+            )}
+            <Text variant="caption" color={colors.text.tertiary}>
+              Basado en tus gastos promedio de los últimos 3 meses
+              {estimatedIncome ? ` vs ingreso de ${formatCurrency(estimatedIncome)}` : ''}.
+            </Text>
+          </Card>
+        )}
+
+        {/* Suscripciones detectadas */}
+        {subscriptions.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text variant="label" color={colors.text.secondary}>SUSCRIPCIONES DETECTADAS</Text>
+              <Text variant="label" color={colors.neon}>{subscriptions.length}</Text>
+            </View>
+            <Card style={styles.subscriptionsCard}>
+              {subscriptions.map((sub, i) => (
+                <View
+                  key={sub.description}
+                  style={[styles.subItem, i < subscriptions.length - 1 && styles.subItemBorder]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodySmall" color={colors.text.primary}>{sub.description}</Text>
+                    <Text variant="caption" color={colors.text.secondary}>
+                      {sub.occurrences} veces en 90 días
+                    </Text>
+                  </View>
+                  <Text variant="labelMd" color={colors.yellow}>
+                    {formatCurrency(sub.averageAmount)}/mes
+                  </Text>
+                </View>
+              ))}
+              <View style={styles.subTotal}>
+                <Text variant="label" color={colors.text.secondary}>TOTAL MENSUAL</Text>
+                <Text variant="labelMd" color={colors.red}>
+                  {formatCurrency(subscriptions.reduce((s, sub) => s + sub.averageAmount, 0))}/mes
+                </Text>
+              </View>
+            </Card>
+          </>
+        )}
+
         {/* Simulador promo */}
         <PressableCard
           variant="neon"
@@ -306,6 +380,51 @@ const styles = StyleSheet.create({
   },
   emptyBtn: {
     marginTop: spacing[2],
+  },
+  projectionCard: {
+    padding: spacing[5],
+    gap: spacing[2],
+    borderLeftWidth: 3,
+    borderLeftColor: colors.neon,
+  },
+  projectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  projectionTip: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[2],
+    backgroundColor: colors.yellow + '0F',
+    padding: spacing[3],
+    borderLeftWidth: 2,
+    borderLeftColor: colors.yellow,
+  },
+  subscriptionsCard: {
+    padding: spacing[4],
+  },
+  subItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing[3],
+  },
+  subItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+  },
+  subTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.default,
+    marginTop: spacing[1],
+  },
+  thermometerCard: {
+    padding: spacing[5],
   },
   simulatorPromo: {
     padding: spacing[5],

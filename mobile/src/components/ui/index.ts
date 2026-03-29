@@ -6,3 +6,4 @@ export { Badge } from './Badge';
 export { Divider } from './Divider';
 export { AmountDisplay } from './AmountDisplay';
 export { LoadingScreen } from './LoadingScreen';
+export { MonthlyThermometer } from './MonthlyThermometer';
