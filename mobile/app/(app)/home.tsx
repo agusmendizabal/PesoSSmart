@@ -13,6 +13,8 @@ import { colors, spacing, layout } from '@/theme';
 import { Text, Card, PressableCard, AmountDisplay, Badge, MonthlyThermometer } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { useExpensesStore } from '@/store/expensesStore';
+import { useGoalsStore } from '@/store/goalsStore';
+import { GoalsSection } from '@/components/GoalsSection';
 import { getGreeting, formatCurrency } from '@/utils/format';
 
 export default function HomeScreen() {
@@ -30,11 +32,13 @@ export default function HomeScreen() {
     subscriptions,
     isLoading,
   } = useExpensesStore();
+  const { fetchGoals } = useGoalsStore();
 
   useEffect(() => {
     if (user?.id) {
       fetchExpenses(user.id);
       fetchSubscriptionsAndProjection(user.id);
+      fetchGoals(user.id);
     }
   }, [user?.id]);
 
@@ -160,6 +164,11 @@ export default function HomeScreen() {
             </Text>
           </PressableCard>
         </View>
+
+        {/* Metas de ahorro */}
+        {user?.id && (
+          <GoalsSection userId={user.id} projectedMonthlyFree={projectedBalance} />
+        )}
 
         {/* Últimos gastos */}
         <View style={styles.sectionHeader}>
