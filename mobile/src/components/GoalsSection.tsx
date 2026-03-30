@@ -17,6 +17,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { colors, spacing, layout } from '@/theme';
 import { Text, Card, Input, Button } from '@/components/ui';
 import { useGoalsStore, type SavingsGoal } from '@/store/goalsStore';
+import { notifyGoalReached, notifyGoalHalfway } from '@/lib/notifications';
 import { formatCurrency } from '@/utils/format';
 
 const EMOJIS = ['🎯', '✈️', '🏠', '🚗', '💻', '📱', '🎓', '💍', '🏖️', '💪', '🎸', '🐾'];
@@ -76,7 +77,19 @@ export function GoalsSection({ userId, projectedMonthlyFree }: GoalsSectionProps
     const amount = parseFloat(addFundsAmount.replace(',', '.'));
     if (isNaN(amount) || amount <= 0) return;
     try {
-      await addToGoal(showAddFundsModal.id, amount);
+      const goal = showAddFundsModal;
+      const newAmount = Math.min(goal.current_amount + amount, goal.target_amount);
+      const prevPct = goal.current_amount / goal.target_amount;
+      const newPct = newAmount / goal.target_amount;
+
+      await addToGoal(goal.id, amount);
+
+      if (newPct >= 1) {
+        notifyGoalReached(goal.title).catch(() => {});
+      } else if (prevPct < 0.5 && newPct >= 0.5) {
+        notifyGoalHalfway(goal.title, goal.target_amount - newAmount).catch(() => {});
+      }
+
       setShowAddFundsModal(null);
       setAddFundsAmount('');
     } catch {

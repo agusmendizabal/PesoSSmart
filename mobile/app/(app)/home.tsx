@@ -15,6 +15,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useGoalsStore } from '@/store/goalsStore';
 import { GoalsSection } from '@/components/GoalsSection';
+import { scheduleBudgetAlert } from '@/lib/notifications';
 import { getGreeting, formatCurrency } from '@/utils/format';
 
 export default function HomeScreen() {
@@ -41,6 +42,16 @@ export default function HomeScreen() {
       fetchGoals(user.id);
     }
   }, [user?.id]);
+
+  // Notificaciones basadas en el estado del mes
+  useEffect(() => {
+    if (!estimatedIncome || estimatedIncome <= 0) return;
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysLeft = daysInMonth - now.getDate();
+    const spentPct = totalThisMonth / estimatedIncome;
+    scheduleBudgetAlert(spentPct, estimatedIncome - totalThisMonth, daysLeft).catch(() => {});
+  }, [totalThisMonth, estimatedIncome]);
 
   const greeting = getGreeting(profile?.full_name ?? undefined);
   const recentExpenses = expenses.slice(0, 3);

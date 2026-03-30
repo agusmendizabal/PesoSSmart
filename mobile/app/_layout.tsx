@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/authStore';
 import { colors } from '@/theme';
 import { LoadingScreen } from '@/components/ui';
+import { requestNotificationPermission } from '@/lib/notifications';
 import {
   useFonts,
   BebasNeue_400Regular,
@@ -49,6 +50,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (isReady) {
       SplashScreen.hideAsync().catch(() => {});
+      requestNotificationPermission().catch(() => {});
     }
   }, [isReady]);
 

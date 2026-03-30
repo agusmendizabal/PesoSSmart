@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Expense, ExpenseCategory } from '@/types';
 import { supabase, handleSupabaseError } from '@/lib/supabase';
+import { notifyNewSubscription } from '@/lib/notifications';
 
 interface ExpensesFilter {
   month: number | null;
@@ -298,6 +299,15 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
       const projectedBalance = estimatedIncome !== null
         ? estimatedIncome - projectedExpenses
         : null;
+
+      // Notificar suscripciones nuevas (que no estaban antes)
+      const prev = get().subscriptions;
+      const prevDescriptions = new Set(prev.map(s => s.description.toLowerCase()));
+      for (const sub of detected) {
+        if (!prevDescriptions.has(sub.description.toLowerCase())) {
+          notifyNewSubscription(sub.description, sub.averageAmount).catch(() => {});
+        }
+      }
 
       set({ subscriptions: detected, projectedBalance, estimatedIncome });
     } catch {
