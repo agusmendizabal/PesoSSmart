@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -12,6 +12,7 @@ import { colors, spacing, layout } from '@/theme';
 import { Text, Button, Card } from '@/components/ui';
 import { useOnboardingStore } from '@/store/onboardingStore';
 import { useAuthStore } from '@/store/authStore';
+import { supabase } from '@/lib/supabase';
 import type { IncomeRange, WorkType, FamilyStatus, SelectOption } from '@/types';
 
 // ---- Opciones ----
@@ -58,6 +59,27 @@ export default function FinancialProfileScreen() {
 
   const [currentStep, setCurrentStep] = useState<Step>('income');
 
+  // Pre-cargar valores existentes del perfil financiero
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('financial_profiles')
+      .select('income_range, work_type, family_status, has_savings, has_debt')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setFinancialProfile({
+            income_range: data.income_range ?? null,
+            work_type: data.work_type ?? null,
+            family_status: data.family_status ?? null,
+            has_savings: data.has_savings ?? false,
+            has_debt: data.has_debt ?? false,
+          });
+        }
+      });
+  }, [user?.id]);
+
   const steps: Step[] = ['income', 'work', 'family', 'savings'];
   const stepIndex = steps.indexOf(currentStep);
   const progress = ((stepIndex + 1) / steps.length);
@@ -83,7 +105,7 @@ export default function FinancialProfileScreen() {
     if (!user?.id) return;
     try {
       await saveFinancialProfile(user.id);
-      router.push('/(onboarding)/interests');
+      router.back();
     } catch {
       // error en store
     }

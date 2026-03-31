@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -92,15 +93,24 @@ export default function ExpensesScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      base64: true,
-      quality: 0.7,
+      base64: false,
+      quality: 1,
       allowsEditing: false,
     });
-    if (result.canceled || !result.assets[0]?.base64) return;
+    if (result.canceled || !result.assets[0]?.uri) return;
 
     setIsProcessing(true);
     setShowScreenshotModal(true);
     try {
+      // Redimensionar a 900px de ancho para que el modelo pueda leer el texto
+      const resized = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 900 } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+
+      if (!resized.base64) throw new Error('No se pudo procesar la imagen');
+
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(
         `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/process-screenshot`,
@@ -111,8 +121,8 @@ export default function ExpensesScreen() {
             'Authorization': `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({
-            image_base64: result.assets[0].base64,
-            image_type: result.assets[0].mimeType ?? 'image/jpeg',
+            image_base64: resized.base64,
+            image_type: 'image/jpeg',
           }),
         }
       );
@@ -120,7 +130,7 @@ export default function ExpensesScreen() {
       if (data.expenses && data.expenses.length > 0) {
         setExtractedExpenses(data.expenses.map((e: Omit<ExtractedExpense, 'selected'>) => ({ ...e, selected: true })));
       } else {
-        Alert.alert('Sin resultados', 'No se detectaron gastos en la imagen. Probá con otra captura más clara.');
+        Alert.alert('Sin resultados', data.debug ?? data.error ?? 'El modelo no detectó gastos. Probá con una captura más clara.');
         setShowScreenshotModal(false);
       }
     } catch {
