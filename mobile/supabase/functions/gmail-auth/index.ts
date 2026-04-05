@@ -81,13 +81,18 @@ serve(async (req) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       );
 
-      await supabase.from('gmail_connections').upsert({
+      const { error: upsertErr } = await supabase.from('gmail_connections').upsert({
         user_id: userId,
         gmail_email: userInfo.email,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
-        last_checked_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // revisar desde ayer
+        last_checked_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // revisar últimos 7 días
       }, { onConflict: 'user_id' });
+
+      if (upsertErr) {
+        console.error('[gmail-auth] Error guardando conexión:', upsertErr);
+        throw new Error(`No se pudo guardar la conexión Gmail: ${upsertErr.message}`);
+      }
 
       // Redirigir a la app
       return new Response(null, {

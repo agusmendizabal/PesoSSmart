@@ -252,10 +252,14 @@ serve(async (req) => {
         });
       }
       googleToken = newToken;
-      await supabase.from('gmail_connections')
+      const { error: tokenUpdateErr } = await supabase.from('gmail_connections')
         .update({ access_token: googleToken })
         .eq('user_id', userId);
-      console.log('[gmail-poll] Token de Google refrescado OK');
+      if (tokenUpdateErr) {
+        console.error('[gmail-poll] Error guardando token renovado:', tokenUpdateErr);
+      } else {
+        console.log('[gmail-poll] Token de Google refrescado OK');
+      }
     } else if (!testRes.ok) {
       const probeErr = await testRes.text();
       console.error('[gmail-poll] Google token probe inesperado:', testRes.status, probeErr);
@@ -286,6 +290,7 @@ serve(async (req) => {
     console.log('[gmail-poll] Mensajes encontrados en Gmail:', messages.length);
 
     let newPending = 0;
+    let hadGroqFailure = false;
 
     for (const msg of messages) {
       const { data: existing } = await supabase
@@ -343,11 +348,16 @@ serve(async (req) => {
       // Soportar tanto "es_gasto" (viejo) como "es_movimiento" (nuevo)
       const esValido = result?.es_movimiento === true || result?.es_gasto === true;
       if (!esValido) {
-        console.log('[gmail-poll] Groq descartó el email como no-movimiento:', subject);
+        if (result === null) {
+          hadGroqFailure = true;
+          console.warn('[gmail-poll] Groq falló (API error) para:', subject, '— se reintentará en el próximo poll');
+        } else {
+          console.log('[gmail-poll] Groq descartó el email como no-movimiento:', subject);
+        }
         continue;
       }
 
-      const { error: insertError } = await supabase.from('pending_transactions').insert({
+      const { error: insertError } = await supabase.from('pending_transactions').upsert({
         user_id: userId,
         source: 'gmail',
         amount: result.monto,
@@ -358,7 +368,7 @@ serve(async (req) => {
         transaction_date: result.fecha ?? new Date().toISOString().split('T')[0],
         raw_subject: msg.id,
         status: 'pending',
-      });
+      }, { onConflict: 'user_id,raw_subject', ignoreDuplicates: true });
 
       if (insertError) {
         console.error('[gmail-poll] Error al insertar pending_transaction:', insertError);
@@ -368,10 +378,15 @@ serve(async (req) => {
       }
     }
 
-    // Solo avanzar last_checked_at si procesamos exitosamente
-    await supabase.from('gmail_connections')
-      .update({ last_checked_at: new Date().toISOString() })
-      .eq('user_id', userId);
+    // Solo avanzar last_checked_at si Groq no tuvo fallos — así los emails fallidos se reintentan
+    if (!hadGroqFailure) {
+      await supabase.from('gmail_connections')
+        .update({ last_checked_at: new Date().toISOString() })
+        .eq('user_id', userId);
+      console.log('[gmail-poll] last_checked_at avanzado a now()');
+    } else {
+      console.warn('[gmail-poll] Groq tuvo fallos — last_checked_at NO avanzado para reintentar en el próximo poll');
+    }
 
     console.log('[gmail-poll] Nuevos pendientes:', newPending);
 

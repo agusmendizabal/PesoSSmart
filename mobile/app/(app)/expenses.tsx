@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   View,
   ScrollView,
+  FlatList,
   StyleSheet,
   TouchableOpacity,
   Modal,
@@ -248,7 +249,7 @@ export default function ExpensesScreen() {
       }
       const data = await res.json();
       console.log('[pollGmail] gmail_connected:', data?.gmail_connected, '| new_found:', data?.new_found, '| pending:', data?.pending?.length ?? 0);
-      if (data?.pending?.length > 0) setPendingTxs(data.pending);
+      setPendingTxs(data?.pending ?? []);
     } catch (e) {
       console.log('[pollGmail] fetch error:', e);
     }
@@ -299,8 +300,8 @@ export default function ExpensesScreen() {
 
   const classificationFilter = filter.classification;
 
-  return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+  const listHeader = (
+    <>
       {/* Header */}
       <View style={styles.header}>
         <Text variant="h4">Mis Gastos</Text>
@@ -343,6 +344,7 @@ export default function ExpensesScreen() {
         <View style={{ paddingHorizontal: layout.screenPadding, marginBottom: spacing[4] }}>
           <PendingTransactions
             transactions={pendingTxs}
+            userId={user!.id}
             onConfirmed={() => {
               pollGmail();
               fetchExpenses(user!.id);
@@ -426,13 +428,20 @@ export default function ExpensesScreen() {
           </View>
         </View>
       )}
+    </>
+  );
 
-      {/* Lista */}
-      <ScrollView
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <FlatList
+        style={styles.flatList}
+        data={expenses}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <ExpenseItem expense={item} />}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-      >
-        {expenses.length === 0 ? (
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="wallet-outline" size={48} color={colors.text.tertiary} />
             <Text variant="body" color={colors.text.secondary} align="center">
@@ -444,12 +453,8 @@ export default function ExpensesScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          expenses.map((expense) => (
-            <ExpenseItem key={expense.id} expense={expense} />
-          ))
-        )}
-      </ScrollView>
+        }
+      />
 
       {/* Modal screenshot */}
       <Modal
@@ -802,6 +807,7 @@ function ExpenseItem({ expense }: { expense: Expense }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg.primary },
+  flatList: { flex: 1 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

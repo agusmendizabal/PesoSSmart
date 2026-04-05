@@ -36,6 +36,7 @@ interface EditableTransaction {
 
 interface Props {
   transactions: PendingTransaction[];
+  userId: string;
   onConfirmed: () => void;
 }
 
@@ -63,7 +64,7 @@ function toEditable(tx: PendingTransaction): EditableTransaction {
   };
 }
 
-export function PendingTransactions({ transactions, onConfirmed }: Props) {
+export function PendingTransactions({ transactions, userId, onConfirmed }: Props) {
   const [loadingId,   setLoadingId]   = useState<string | null>(null);
   const [editingTx,   setEditingTx]   = useState<PendingTransaction | null>(null);
   const [editValues,  setEditValues]  = useState<EditableTransaction | null>(null);
@@ -94,12 +95,6 @@ export function PendingTransactions({ transactions, onConfirmed }: Props) {
 
     setIsSaving(true);
     try {
-      const { data: { user }, error: authErr } = await supabase.auth.getUser();
-      if (authErr || !user) {
-        console.error('[PendingTx] getUser falló:', authErr);
-        return;
-      }
-
       const { data: catData, error: catErr } = await supabase
         .from('expense_categories')
         .select('id')
@@ -108,34 +103,43 @@ export function PendingTransactions({ transactions, onConfirmed }: Props) {
 
       if (catErr) console.warn('[PendingTx] Categoría no encontrada:', catErr.message);
 
-      const { error: insertErr } = await supabase.from('expenses').insert({
-        user_id:        user.id,
+      const insertPayload = {
+        user_id:        userId,
         amount,
         description:    editValues.merchant || editValues.description || 'Gasto detectado',
         category_id:    catData?.id ?? null,
         date:           editValues.transaction_date,
-        payment_method: 'digital_wallet',
-        classification: 'necessary',
-        source:         'gmail',
-      });
+        payment_method: 'digital_wallet' as const,
+        classification: 'necessary' as const,
+        is_recurring:   false,
+      };
+      console.log('[PendingTx] INSERT payload:', JSON.stringify(insertPayload));
+
+      const { error: insertErr } = await supabase.from('expenses').insert(insertPayload);
 
       if (insertErr) {
-        console.error('[PendingTx] INSERT expenses falló:', insertErr);
+        console.error('[PendingTx] INSERT expenses falló — code:', insertErr.code, '| message:', insertErr.message, '| details:', insertErr.details);
         throw insertErr;
       }
+      console.log('[PendingTx] INSERT expenses OK');
 
       const { error: updateErr } = await supabase
         .from('pending_transactions')
         .update({ status: 'confirmed' })
         .eq('id', editingTx.id);
 
-      if (updateErr) console.error('[PendingTx] UPDATE pending_transactions falló:', updateErr);
+      if (updateErr) {
+        console.error('[PendingTx] UPDATE pending_transactions falló — code:', updateErr.code, '| message:', updateErr.message);
+      } else {
+        console.log('[PendingTx] UPDATE pending_transactions OK — id:', editingTx.id);
+      }
 
       closeEdit();
       onConfirmed();
-    } catch (err) {
-      console.error('[PendingTx] handleConfirm error:', err);
-      Alert.alert('Error', 'No se pudo registrar el gasto. Intentá de nuevo.');
+    } catch (err: any) {
+      const detail = err?.message ?? err?.code ?? String(err);
+      console.error('[PendingTx] handleConfirm error:', detail);
+      Alert.alert('Error', `No se pudo registrar el gasto.\n\n${detail}`);
     } finally {
       setIsSaving(false);
     }
