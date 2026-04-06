@@ -3,6 +3,7 @@ import {
   View,
   ScrollView,
   FlatList,
+  TextInput,
   StyleSheet,
   TouchableOpacity,
   Modal,
@@ -26,7 +27,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import type { DetectedSubscription } from '@/store/expensesStore';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency, formatDate } from '@/utils/format';
-import type { PaymentMethod, Expense } from '@/types';
+import type { PaymentMethod, Expense, ExpenseClassification } from '@/types';
 import { PendingTransactions } from '@/components/PendingTransactions';
 
 type ExtractedExpense = {
@@ -69,10 +70,15 @@ export default function ExpensesScreen() {
     totalNecessary,
     totalDisposable,
     fetchExpenses,
+    fetchMoreExpenses,
     fetchCategories,
     fetchSubscriptionsAndProjection,
     addExpense,
+    updateExpense,
+    deleteExpense,
     isLoading,
+    isLoadingMore,
+    hasMore,
     filter,
     setFilter,
     subscriptions,
@@ -95,6 +101,17 @@ export default function ExpensesScreen() {
   const [extractedExpenses, setExtractedExpenses] = useState<ExtractedExpense[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSavingBatch, setIsSavingBatch] = useState(false);
+
+  // Estado para editar un gasto confirmado
+  const [editingExpense,     setEditingExpense]     = useState<Expense | null>(null);
+  const [editExpenseValues,  setEditExpenseValues]  = useState<{
+    description: string;
+    amount: string;
+    date: string;
+    classification: ExpenseClassification;
+    category_id: string | null;
+  } | null>(null);
+  const [isSavingEdit,       setIsSavingEdit]       = useState(false);
 
   const pickAndProcessScreenshot = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -179,6 +196,61 @@ export default function ExpensesScreen() {
     }
   };
 
+  const openEditExpense = (expense: Expense) => {
+    setEditingExpense(expense);
+    setEditExpenseValues({
+      description:    expense.description,
+      amount:         String(expense.amount),
+      date:           expense.date,
+      classification: expense.classification ?? 'necessary',
+      category_id:    expense.category_id,
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingExpense || !editExpenseValues) return;
+    const amount = parseFloat(editExpenseValues.amount.replace(',', '.'));
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Monto inválido', 'Ingresá un monto mayor a 0.');
+      return;
+    }
+    setIsSavingEdit(true);
+    try {
+      await updateExpense(editingExpense.id, {
+        description:    editExpenseValues.description,
+        amount,
+        date:           editExpenseValues.date,
+        classification: editExpenseValues.classification,
+        category_id:    editExpenseValues.category_id,
+      });
+      setEditingExpense(null);
+      setEditExpenseValues(null);
+    } catch {
+      Alert.alert('Error', 'No se pudo guardar el cambio.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    Alert.alert('Eliminar gasto', '¿Estás seguro? Esta acción no se puede deshacer.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteExpense(id);
+            setEditingExpense(null);
+            setEditExpenseValues(null);
+          } catch {
+            Alert.alert('Error', 'No se pudo eliminar el gasto.');
+          }
+        },
+      },
+    ]);
+  };
+
   const {
     control,
     handleSubmit,
@@ -196,6 +268,7 @@ export default function ExpensesScreen() {
   });
 
   const [pendingTxs, setPendingTxs] = useState<any[]>([]);
+  const [isPolling,  setIsPolling]  = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -207,10 +280,11 @@ export default function ExpensesScreen() {
   }, [user?.id, filter]);
 
   const pollGmail = async () => {
+    setIsPolling(true);
     const { data: { session: cachedSession } } = await supabase.auth.getSession();
     const token = cachedSession?.access_token;
     console.log('[pollGmail] token:', token ? 'ok' : 'null', '| expires_at:', cachedSession?.expires_at);
-    if (!token) return;
+    if (!token) { setIsPolling(false); return; }
 
     const status = await pollGmailWithToken(token);
 
@@ -219,14 +293,14 @@ export default function ExpensesScreen() {
       console.log('[pollGmail] JWT rechazado, forzando refreshSession...');
       const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
       if (refreshError || !refreshed.session) {
-        // Sesión completamente muerta — no reintentar
         console.log('[pollGmail] Sesión inválida, no se puede refrescar:', refreshError?.message);
+        setIsPolling(false);
         return;
       }
       console.log('[pollGmail] Sesión refrescada OK, reintentando...');
-      // No pasamos el resultado — si falla de nuevo, se loguea y termina
       await pollGmailWithToken(refreshed.session.access_token);
     }
+    setIsPolling(false);
   };
 
   const pollGmailWithToken = async (token: string): Promise<number | undefined> => {
@@ -340,11 +414,12 @@ export default function ExpensesScreen() {
       </View>
 
       {/* Transacciones detectadas en Gmail */}
-      {pendingTxs.length > 0 && (
+      {(pendingTxs.length > 0 || isPolling) && (
         <View style={{ paddingHorizontal: layout.screenPadding, marginBottom: spacing[4] }}>
           <PendingTransactions
             transactions={pendingTxs}
             userId={user!.id}
+            isPolling={isPolling}
             onConfirmed={() => {
               pollGmail();
               fetchExpenses(user!.id);
@@ -383,6 +458,25 @@ export default function ExpensesScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Búsqueda por texto */}
+      <View style={styles.searchRow}>
+        <Ionicons name="search-outline" size={16} color={colors.text.tertiary} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar gastos..."
+          placeholderTextColor={colors.text.tertiary}
+          value={filter.search}
+          onChangeText={(v) => setFilter({ search: v })}
+          returnKeyType="search"
+          autoCorrect={false}
+        />
+        {!!filter.search && (
+          <TouchableOpacity onPress={() => setFilter({ search: '' })}>
+            <Ionicons name="close-circle" size={16} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Suscripciones detectadas */}
       {subscriptions.length > 0 && (
@@ -437,10 +531,13 @@ export default function ExpensesScreen() {
         style={styles.flatList}
         data={expenses}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ExpenseItem expense={item} />}
+        renderItem={({ item }) => <ExpenseItem expense={item} onPress={() => openEditExpense(item)} />}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={listHeader}
+        onEndReached={() => { if (user?.id && hasMore) fetchMoreExpenses(user.id); }}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={isLoadingMore ? <ActivityIndicator size="small" color={colors.neon} style={{ paddingVertical: spacing[4] }} /> : null}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="wallet-outline" size={48} color={colors.text.tertiary} />
@@ -756,13 +853,131 @@ export default function ExpensesScreen() {
           </SafeAreaView>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Modal editar gasto confirmado */}
+      <Modal
+        visible={!!editingExpense}
+        animationType="slide"
+        presentationStyle="formSheet"
+        onRequestClose={() => { setEditingExpense(null); setEditExpenseValues(null); }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <SafeAreaView style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text variant="h4">Editar gasto</Text>
+              <TouchableOpacity onPress={() => { setEditingExpense(null); setEditExpenseValues(null); }}>
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {editExpenseValues && (
+              <ScrollView
+                contentContainerStyle={styles.modalScroll}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <Input
+                  label="DESCRIPCIÓN"
+                  value={editExpenseValues.description}
+                  onChangeText={(v) => setEditExpenseValues((p) => p ? { ...p, description: v } : p)}
+                  autoCapitalize="sentences"
+                />
+
+                <Input
+                  label="MONTO (ARS)"
+                  value={editExpenseValues.amount}
+                  onChangeText={(v) => setEditExpenseValues((p) => p ? { ...p, amount: v } : p)}
+                  keyboardType="decimal-pad"
+                  leftIcon={<Text variant="body" color={colors.text.secondary}>$</Text>}
+                />
+
+                <Input
+                  label="FECHA (YYYY-MM-DD)"
+                  value={editExpenseValues.date}
+                  onChangeText={(v) => setEditExpenseValues((p) => p ? { ...p, date: v } : p)}
+                  keyboardType="numbers-and-punctuation"
+                />
+
+                {/* Clasificación */}
+                <View>
+                  <Text variant="label" color={colors.text.secondary} style={styles.inputLabel}>
+                    CLASIFICACIÓN
+                  </Text>
+                  <View style={styles.classRow}>
+                    {(['necessary', 'disposable', 'investable'] as ExpenseClassification[]).map((cls) => {
+                      const active = editExpenseValues.classification === cls;
+                      const label = cls === 'necessary' ? 'Necesario' : cls === 'disposable' ? 'Prescindible' : 'Invertible';
+                      return (
+                        <TouchableOpacity
+                          key={cls}
+                          style={[styles.classChip, active && styles.classChipActive]}
+                          onPress={() => setEditExpenseValues((p) => p ? { ...p, classification: cls } : p)}
+                        >
+                          <Text variant="caption" color={active ? colors.neon : colors.text.secondary}>{label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Categoría */}
+                <View>
+                  <Text variant="label" color={colors.text.secondary} style={styles.inputLabel}>
+                    CATEGORÍA
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
+                    {categories.map((cat) => (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[styles.categoryChip, editExpenseValues.category_id === cat.id && styles.categoryChipActive]}
+                        onPress={() => setEditExpenseValues((p) => p ? {
+                          ...p,
+                          category_id: p.category_id === cat.id ? null : cat.id,
+                        } : p)}
+                      >
+                        <Text
+                          variant="caption"
+                          color={editExpenseValues.category_id === cat.id ? colors.neon : colors.text.secondary}
+                        >
+                          {cat.name_es}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                <Button
+                  label="GUARDAR CAMBIOS"
+                  variant="neon"
+                  size="lg"
+                  fullWidth
+                  isLoading={isSavingEdit}
+                  onPress={handleSaveEdit}
+                  style={{ marginTop: spacing[4] }}
+                />
+
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => handleDeleteExpense(editingExpense!.id)}
+                >
+                  <Ionicons name="trash-outline" size={16} color={colors.red} />
+                  <Text variant="label" color={colors.red}>ELIMINAR GASTO</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </SafeAreaView>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-function ExpenseItem({ expense }: { expense: Expense }) {
+function ExpenseItem({ expense, onPress }: { expense: Expense; onPress: () => void }) {
   return (
-    <PressableCard style={styles.expenseItem}>
+    <PressableCard style={styles.expenseItem} onPress={onPress}>
       <View style={styles.expenseRow}>
         <View style={styles.expenseLeft}>
           <View style={styles.expenseTitleRow}>
@@ -887,6 +1102,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPadding,
     paddingBottom: spacing[3],
     gap: spacing[2],
+  },
+  searchRow: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               spacing[2],
+    marginHorizontal:  layout.screenPadding,
+    marginBottom:      spacing[3],
+    paddingHorizontal: spacing[3],
+    paddingVertical:   spacing[2],
+    borderWidth:       1,
+    borderColor:       colors.border.default,
+    backgroundColor:   colors.bg.elevated,
+  },
+  searchInput: {
+    flex:       1,
+    color:      colors.text.primary,
+    fontSize:   14,
+    fontFamily: 'DMSans_400Regular',
+    paddingVertical: spacing[1],
   },
   filterChip: {
     paddingHorizontal: spacing[3],
@@ -1026,5 +1260,29 @@ const styles = StyleSheet.create({
     gap: spacing[1],
     marginTop: spacing[1],
     paddingHorizontal: spacing[1],
+  },
+  classRow: {
+    flexDirection: 'row',
+    gap: spacing[2],
+  },
+  classChip: {
+    flex:            1,
+    alignItems:      'center',
+    paddingVertical: spacing[2],
+    borderWidth:     1,
+    borderColor:     colors.border.default,
+  },
+  classChipActive: {
+    borderColor:     colors.neon,
+    backgroundColor: colors.neon + '15',
+  },
+  deleteBtn: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'center',
+    gap:             spacing[2],
+    paddingVertical: spacing[3],
+    borderWidth:     1,
+    borderColor:     colors.red,
   },
 });

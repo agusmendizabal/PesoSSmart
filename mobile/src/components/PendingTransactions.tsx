@@ -21,6 +21,7 @@ interface PendingTransaction {
   currency: string;
   merchant: string | null;
   suggested_category: string | null;
+  suggested_classification: 'necessary' | 'disposable' | 'investable' | null;
   description: string | null;
   transaction_date: string | null;
 }
@@ -32,11 +33,13 @@ interface EditableTransaction {
   description: string;
   transaction_date: string;
   suggested_category: string;
+  classification: 'necessary' | 'disposable' | 'investable';
 }
 
 interface Props {
   transactions: PendingTransaction[];
   userId: string;
+  isPolling?: boolean;
   onConfirmed: () => void;
 }
 
@@ -61,16 +64,24 @@ function toEditable(tx: PendingTransaction): EditableTransaction {
     description:       tx.description ?? '',
     transaction_date:  tx.transaction_date ?? new Date().toISOString().split('T')[0],
     suggested_category: tx.suggested_category ?? 'otros',
+    classification:    tx.suggested_classification ?? 'disposable',
   };
 }
 
-export function PendingTransactions({ transactions, userId, onConfirmed }: Props) {
-  const [loadingId,   setLoadingId]   = useState<string | null>(null);
-  const [editingTx,   setEditingTx]   = useState<PendingTransaction | null>(null);
-  const [editValues,  setEditValues]  = useState<EditableTransaction | null>(null);
-  const [isSaving,    setIsSaving]    = useState(false);
+const INITIAL_VISIBLE = 5;
 
-  if (transactions.length === 0) return null;
+export function PendingTransactions({ transactions, userId, isPolling, onConfirmed }: Props) {
+  const [loadingId,    setLoadingId]    = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [editingTx,    setEditingTx]    = useState<PendingTransaction | null>(null);
+  const [editValues,   setEditValues]   = useState<EditableTransaction | null>(null);
+  const [isSaving,     setIsSaving]     = useState(false);
+  const [showAll,      setShowAll]      = useState(false);
+
+  if (transactions.length === 0 && !isPolling) return null;
+
+  const visible = showAll ? transactions : transactions.slice(0, INITIAL_VISIBLE);
+  const hiddenCount = transactions.length - INITIAL_VISIBLE;
 
   // ── Abre el modal de edición ──────────────────────────────────────────
   const openEdit = (tx: PendingTransaction) => {
@@ -110,7 +121,7 @@ export function PendingTransactions({ transactions, userId, onConfirmed }: Props
         category_id:    catData?.id ?? null,
         date:           editValues.transaction_date,
         payment_method: 'digital_wallet' as const,
-        classification: 'necessary' as const,
+        classification: editValues.classification,
         is_recurring:   false,
       };
       console.log('[PendingTx] INSERT payload:', JSON.stringify(insertPayload));
@@ -145,21 +156,71 @@ export function PendingTransactions({ transactions, userId, onConfirmed }: Props
     }
   };
 
-  // ── Ignora sin editar ─────────────────────────────────────────────────
-  const handleIgnore = async (id: string) => {
-    setLoadingId(id);
-    try {
-      const { error } = await supabase
-        .from('pending_transactions')
-        .update({ status: 'ignored' })
-        .eq('id', id);
-      if (error) console.error('[PendingTx] handleIgnore falló:', error);
-      onConfirmed();
-    } catch (err) {
-      console.error('[PendingTx] handleIgnore error:', err);
-    } finally {
-      setLoadingId(null);
+  // ── Registra directamente sin abrir el modal ──────────────────────────
+  const handleQuickConfirm = async (tx: PendingTransaction) => {
+    const amount = tx.amount;
+    if (!amount || amount <= 0) {
+      openEdit(tx);
+      return;
     }
+    setConfirmingId(tx.id);
+    try {
+      const { data: catData } = await supabase
+        .from('expense_categories')
+        .select('id')
+        .ilike('name_es', `%${tx.suggested_category ?? 'otros'}%`)
+        .single();
+
+      const { error: insertErr } = await supabase.from('expenses').insert({
+        user_id:        userId,
+        amount,
+        description:    tx.merchant || tx.description || 'Gasto detectado',
+        category_id:    catData?.id ?? null,
+        date:           tx.transaction_date ?? new Date().toISOString().split('T')[0],
+        payment_method: 'digital_wallet' as const,
+        classification: (tx.suggested_classification ?? 'disposable') as const,
+        is_recurring:   false,
+      });
+
+      if (insertErr) {
+        console.error('[PendingTx] Quick confirm INSERT falló:', insertErr.message);
+        Alert.alert('Error', `No se pudo registrar el gasto.\n\n${insertErr.message}`);
+        return;
+      }
+
+      await supabase.from('pending_transactions').update({ status: 'confirmed' }).eq('id', tx.id);
+      onConfirmed();
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? String(err));
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
+  // ── Ignora con confirmación ───────────────────────────────────────────
+  const handleIgnore = (id: string) => {
+    Alert.alert('Ignorar gasto', '¿Seguro que querés ignorar este gasto detectado?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Ignorar',
+        style: 'destructive',
+        onPress: async () => {
+          setLoadingId(id);
+          try {
+            const { error } = await supabase
+              .from('pending_transactions')
+              .update({ status: 'ignored' })
+              .eq('id', id);
+            if (error) console.error('[PendingTx] handleIgnore falló:', error);
+            onConfirmed();
+          } catch (err) {
+            console.error('[PendingTx] handleIgnore error:', err);
+          } finally {
+            setLoadingId(null);
+          }
+        },
+      },
+    ]);
   };
 
   // ── Render ────────────────────────────────────────────────────────────
@@ -171,14 +232,20 @@ export function PendingTransactions({ transactions, userId, onConfirmed }: Props
             <Ionicons name="mail-outline" size={16} color={colors.neon} />
             <Text variant="label" color={colors.neon}>DETECTADOS EN TU EMAIL</Text>
           </View>
-          <Text variant="caption" color={colors.text.tertiary}>
-            {transactions.length} pendiente{transactions.length > 1 ? 's' : ''}
-          </Text>
+          <View style={styles.headerRight}>
+            {isPolling && <ActivityIndicator size="small" color={colors.text.tertiary} style={{ marginRight: spacing[2] }} />}
+            {transactions.length > 0 && (
+              <Text variant="caption" color={colors.text.tertiary}>
+                {transactions.length} pendiente{transactions.length > 1 ? 's' : ''}
+              </Text>
+            )}
+          </View>
         </View>
 
-        {transactions.map((tx) => {
-          const emoji     = CATEGORY_MAP[tx.suggested_category ?? 'otros'] ?? '📦';
-          const isLoading = loadingId === tx.id;
+        {visible.map((tx) => {
+          const emoji        = CATEGORY_MAP[tx.suggested_category ?? 'otros'] ?? '📦';
+          const isLoading    = loadingId === tx.id;
+          const isConfirming = confirmingId === tx.id;
 
           return (
             <Card key={tx.id} style={styles.card}>
@@ -210,7 +277,7 @@ export function PendingTransactions({ transactions, userId, onConfirmed }: Props
                 <TouchableOpacity
                   style={styles.ignoreBtn}
                   onPress={() => handleIgnore(tx.id)}
-                  disabled={isLoading}
+                  disabled={isLoading || isConfirming}
                 >
                   <Ionicons name="close" size={16} color={colors.text.tertiary} />
                   <Text variant="caption" color={colors.text.tertiary}>Ignorar</Text>
@@ -220,7 +287,7 @@ export function PendingTransactions({ transactions, userId, onConfirmed }: Props
                 <TouchableOpacity
                   style={styles.editBtn}
                   onPress={() => openEdit(tx)}
-                  disabled={isLoading}
+                  disabled={isLoading || isConfirming}
                 >
                   {isLoading ? (
                     <ActivityIndicator size="small" color={colors.text.secondary} />
@@ -234,10 +301,10 @@ export function PendingTransactions({ transactions, userId, onConfirmed }: Props
 
                 <TouchableOpacity
                   style={styles.confirmBtn}
-                  onPress={() => openEdit(tx)}
-                  disabled={isLoading}
+                  onPress={() => handleQuickConfirm(tx)}
+                  disabled={isLoading || isConfirming}
                 >
-                  {isLoading ? (
+                  {isConfirming ? (
                     <ActivityIndicator size="small" color={colors.black} />
                   ) : (
                     <>
@@ -252,6 +319,22 @@ export function PendingTransactions({ transactions, userId, onConfirmed }: Props
             </Card>
           );
         })}
+
+        {/* Ver más / menos */}
+        {!showAll && hiddenCount > 0 && (
+          <TouchableOpacity style={styles.showMoreBtn} onPress={() => setShowAll(true)}>
+            <Text variant="caption" color={colors.neon}>
+              Ver {hiddenCount} más
+            </Text>
+            <Ionicons name="chevron-down" size={14} color={colors.neon} />
+          </TouchableOpacity>
+        )}
+        {showAll && transactions.length > INITIAL_VISIBLE && (
+          <TouchableOpacity style={styles.showMoreBtn} onPress={() => setShowAll(false)}>
+            <Text variant="caption" color={colors.text.secondary}>Mostrar menos</Text>
+            <Ionicons name="chevron-up" size={14} color={colors.text.secondary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ── Modal de edición / confirmación ────────────────────────────── */}
@@ -343,6 +426,30 @@ export function PendingTransactions({ transactions, userId, onConfirmed }: Props
                     </ScrollView>
                   </View>
 
+                  {/* Clasificación */}
+                  <View>
+                    <Text variant="label" color={colors.text.secondary} style={styles.catLabel}>
+                      CLASIFICACIÓN
+                    </Text>
+                    <View style={styles.classRow}>
+                      {(['necessary', 'disposable', 'investable'] as const).map((cls) => {
+                        const active = editValues.classification === cls;
+                        const label = cls === 'necessary' ? 'Necesario' : cls === 'disposable' ? 'Prescindible' : 'Invertible';
+                        return (
+                          <TouchableOpacity
+                            key={cls}
+                            style={[styles.classChip, active && styles.classChipActive]}
+                            onPress={() => setEditValues((p) => p ? { ...p, classification: cls } : p)}
+                          >
+                            <Text variant="caption" color={active ? colors.neon : colors.text.secondary}>
+                              {label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+
                   <Input
                     label="DESCRIPCIÓN (opcional)"
                     value={editValues.description}
@@ -392,6 +499,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems:    'center',
     gap:           spacing[2],
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems:    'center',
+  },
+  showMoreBtn: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'center',
+    gap:            spacing[1],
+    paddingVertical: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle,
   },
 
   card:    { padding: spacing[4], gap: spacing[3] },
@@ -473,6 +593,21 @@ const styles = StyleSheet.create({
   },
   catLabel:  { marginBottom: spacing[2] },
   catList:   { gap: spacing[2] },
+  classRow: {
+    flexDirection: 'row',
+    gap:           spacing[2],
+  },
+  classChip: {
+    flex:            1,
+    alignItems:      'center',
+    paddingVertical: spacing[2],
+    borderWidth:     1,
+    borderColor:     colors.border.default,
+  },
+  classChipActive: {
+    borderColor:     colors.neon,
+    backgroundColor: colors.neon + '15',
+  },
   catChip: {
     flexDirection:  'row',
     alignItems:     'center',

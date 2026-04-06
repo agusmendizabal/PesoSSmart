@@ -40,6 +40,36 @@ const SUBJECT_KEYWORDS = [
   'transferencia', 'enviada', 'enviado', 'acreditada', 'acreditado',
 ];
 
+// ── Desencriptación AES-GCM (mirror de gmail-auth) ──────────────────────────
+async function decryptToken(encryptedToken: string): Promise<string> {
+  if (!encryptedToken.startsWith('v1:')) {
+    // Token legacy no encriptado — devolver tal cual durante período de transición
+    return encryptedToken;
+  }
+  const rawKey = Deno.env.get('GMAIL_ENCRYPTION_KEY') ?? '';
+  if (rawKey.length < 32) throw new Error('GMAIL_ENCRYPTION_KEY debe tener al menos 32 caracteres');
+  const keyBytes = new TextEncoder().encode(rawKey.slice(0, 32));
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
+  const combined = Uint8Array.from(atob(encryptedToken.slice(3)), c => c.charCodeAt(0));
+  const iv = combined.slice(0, 12);
+  const data = combined.slice(12);
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
+  return new TextDecoder().decode(decrypted);
+}
+
+async function encryptToken(token: string): Promise<string> {
+  const rawKey = Deno.env.get('GMAIL_ENCRYPTION_KEY') ?? '';
+  if (rawKey.length < 32) throw new Error('GMAIL_ENCRYPTION_KEY debe tener al menos 32 caracteres');
+  const keyBytes = new TextEncoder().encode(rawKey.slice(0, 32));
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(token));
+  const combined = new Uint8Array(iv.length + encrypted.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(encrypted), iv.length);
+  return 'v1:' + btoa(String.fromCharCode(...combined));
+}
+
 async function refreshAccessToken(refreshToken: string): Promise<string | null> {
   try {
     const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -111,7 +141,6 @@ async function classifyWithGroq(subject: string, body: string): Promise<any | nu
     return null;
   }
 
-  // PROMPT CORREGIDO: incluye transferencias explícitamente
   const prompt = `Analizá este email bancario argentino. Puede ser una compra, un pago con tarjeta O una transferencia enviada. Todos son movimientos de dinero saliente válidos.
 Respondé ÚNICAMENTE con JSON válido, sin texto adicional ni markdown.
 
@@ -124,6 +153,11 @@ REGLAS:
 - Para compras, usá el nombre del comercio
 - Si el email es solo una notificación informativa sin monto claro, → es_movimiento: false
 
+clasificacion:
+- "necessary": supermercado, farmacia, servicios (luz/gas/agua/internet), alquiler, transporte público, combustible, salud, educación
+- "disposable": restaurant, bar, café, delivery, entretenimiento, ropa, electrónica, viajes, streaming, suscripciones no esenciales
+- "investable": transferencias a brokers/inversiones (Balanz, IOL, PPI, Lemoine), compra de dólares/crypto/cedears, plazo fijo
+
 Formato exacto de respuesta:
 {
   "es_movimiento": true,
@@ -131,6 +165,7 @@ Formato exacto de respuesta:
   "moneda": "ARS",
   "comercio": "Franco Alfredo Ballerini",
   "categoria": "otros",
+  "clasificacion": "disposable",
   "fecha": "2026-04-02",
   "descripcion": "Transferencia enviada a Franco Alfredo Ballerini"
 }
@@ -145,7 +180,7 @@ Si no hay monto saliente claro, respondé: { "es_movimiento": false }`;
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 200,
+        max_tokens: 250,
         temperature: 0.1,
       }),
     });
@@ -229,8 +264,39 @@ serve(async (req) => {
 
     console.log('[gmail-poll] Gmail conectado:', connection.gmail_email, '| last_checked_at:', connection.last_checked_at);
 
+    // Rate limiting: máximo 1 poll cada 60 segundos por usuario
+    const secondsSinceLastCheck = (Date.now() - new Date(connection.last_checked_at).getTime()) / 1000;
+    if (secondsSinceLastCheck < 60) {
+      console.log('[gmail-poll] Rate limit: último poll hace', Math.round(secondsSinceLastCheck), 's — retornando pendientes sin re-escanear');
+      const { data: pendingList } = await supabase
+        .from('pending_transactions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+      return new Response(JSON.stringify({
+        gmail_connected: true,
+        gmail_email: connection.gmail_email,
+        new_found: 0,
+        pending: pendingList ?? [],
+        rate_limited: true,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Desencriptar tokens (soporta tokens legacy sin prefijo v1: durante transición)
+    let googleToken: string;
+    let refreshTokenDecrypted: string;
+    try {
+      googleToken = await decryptToken(connection.access_token);
+      refreshTokenDecrypted = await decryptToken(connection.refresh_token);
+    } catch (decryptErr) {
+      console.error('[gmail-poll] Error desencriptando tokens:', decryptErr);
+      return new Response(JSON.stringify({ error: 'Error de configuración. Reconectá Gmail.' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Intentar con el token guardado; si falla con 401 hacemos refresh
-    let googleToken = connection.access_token;
     const testRes = await fetch(
       'https://gmail.googleapis.com/gmail/v1/users/me/profile',
       { headers: { Authorization: `Bearer ${googleToken}` } },
@@ -239,21 +305,23 @@ serve(async (req) => {
 
     if (testRes.status === 401) {
       console.log('[gmail-poll] Token vencido, refrescando...');
-      if (!connection.refresh_token) {
+      if (!refreshTokenDecrypted) {
         console.error('[gmail-poll] Sin refresh_token almacenado');
         return new Response(JSON.stringify({ error: 'Token de Gmail expirado. Reconectá tu cuenta.' }), {
           status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const newToken = await refreshAccessToken(connection.refresh_token);
+      const newToken = await refreshAccessToken(refreshTokenDecrypted);
       if (!newToken) {
         return new Response(JSON.stringify({ error: 'Token de Gmail expirado. Reconectá tu cuenta.' }), {
           status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       googleToken = newToken;
+      // Guardar nuevo token encriptado
+      const encryptedNew = await encryptToken(googleToken);
       const { error: tokenUpdateErr } = await supabase.from('gmail_connections')
-        .update({ access_token: googleToken })
+        .update({ access_token: encryptedNew })
         .eq('user_id', userId);
       if (tokenUpdateErr) {
         console.error('[gmail-poll] Error guardando token renovado:', tokenUpdateErr);
@@ -357,6 +425,11 @@ serve(async (req) => {
         continue;
       }
 
+      const validClassifications = ['necessary', 'disposable', 'investable'];
+      const classification = validClassifications.includes(result.clasificacion)
+        ? result.clasificacion
+        : 'disposable';
+
       const { error: insertError } = await supabase.from('pending_transactions').upsert({
         user_id: userId,
         source: 'gmail',
@@ -364,6 +437,7 @@ serve(async (req) => {
         currency: result.moneda ?? 'ARS',
         merchant: result.comercio,
         suggested_category: result.categoria,
+        suggested_classification: classification,
         description: result.descripcion,
         transaction_date: result.fecha ?? new Date().toISOString().split('T')[0],
         raw_subject: msg.id,

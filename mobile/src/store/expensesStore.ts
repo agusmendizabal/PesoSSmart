@@ -28,12 +28,17 @@ const INCOME_RANGE_MAP: Record<string, number> = {
   over_1500k: 2000000,
 };
 
+const PAGE_SIZE = 30;
+
 interface ExpensesState {
   expenses: Expense[];
   categories: ExpenseCategory[];
   selectedExpense: Expense | null;
   filter: ExpensesFilter;
   isLoading: boolean;
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  currentPage: number;
   isLoadingCategories: boolean;
   error: string | null;
   totalThisMonth: number;
@@ -48,6 +53,7 @@ interface ExpensesState {
 
   // Actions
   fetchExpenses: (userId: string) => Promise<void>;
+  fetchMoreExpenses: (userId: string) => Promise<void>;
   fetchCategories: () => Promise<void>;
   addExpense: (userId: string, data: Partial<Expense>) => Promise<Expense>;
   updateExpense: (id: string, data: Partial<Expense>) => Promise<void>;
@@ -74,6 +80,9 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
     search: '',
   },
   isLoading: false,
+  isLoadingMore: false,
+  hasMore: false,
+  currentPage: 0,
   isLoadingCategories: false,
   error: null,
   totalThisMonth: 0,
@@ -92,18 +101,18 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
     const now = currentMonthFilter();
     const isDefaultFilter = filter.month === null || filter.year === null;
     const isStaleMonth = filter.month !== now.month || filter.year !== now.year;
-    // Solo auto-corregir si el filtro es el "por defecto" congelado
     if (isStaleMonth && isDefaultFilter) {
       set((s) => ({ filter: { ...s.filter, ...now } }));
     }
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null, currentPage: 0 });
     try {
       let query = supabase
         .from('expenses')
         .select('*, category:expense_categories(*)')
         .eq('user_id', userId)
         .is('deleted_at', null)
-        .order('date', { ascending: false });
+        .order('date', { ascending: false })
+        .range(0, PAGE_SIZE - 1);
 
       if (filter.year && filter.month) {
         const startDate = `${filter.year}-${String(filter.month).padStart(2, '0')}-01`;
@@ -112,41 +121,68 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
         const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
         query = query.gte('date', startDate).lt('date', endDate);
       }
-
-      if (filter.category_id) {
-        query = query.eq('category_id', filter.category_id);
-      }
-
-      if (filter.classification) {
-        query = query.eq('classification', filter.classification);
-      }
-
-      if (filter.search) {
-        query = query.ilike('description', `%${filter.search}%`);
-      }
+      if (filter.category_id) query = query.eq('category_id', filter.category_id);
+      if (filter.classification) query = query.eq('classification', filter.classification);
+      if (filter.search) query = query.ilike('description', `%${filter.search}%`);
 
       const { data, error } = await query;
       if (error) throw error;
 
       const expenses = (data ?? []) as Expense[];
-
-      // Calcular totales
       const totalThisMonth = expenses.reduce((sum, e) => sum + e.amount, 0);
-      const totalNecessary = expenses
-        .filter(e => e.classification === 'necessary')
-        .reduce((sum, e) => sum + e.amount, 0);
-      const totalDisposable = expenses
-        .filter(e => e.classification === 'disposable')
-        .reduce((sum, e) => sum + e.amount, 0);
-      const totalInvestable = expenses
-        .filter(e => e.classification === 'investable')
-        .reduce((sum, e) => sum + e.amount, 0);
+      const totalNecessary = expenses.filter(e => e.classification === 'necessary').reduce((sum, e) => sum + e.amount, 0);
+      const totalDisposable = expenses.filter(e => e.classification === 'disposable').reduce((sum, e) => sum + e.amount, 0);
+      const totalInvestable = expenses.filter(e => e.classification === 'investable').reduce((sum, e) => sum + e.amount, 0);
 
-      set({ expenses, totalThisMonth, totalNecessary, totalDisposable, totalInvestable });
+      set({ expenses, totalThisMonth, totalNecessary, totalDisposable, totalInvestable, hasMore: expenses.length === PAGE_SIZE, currentPage: 0 });
     } catch (err) {
       set({ error: handleSupabaseError(err) });
     } finally {
       set({ isLoading: false });
+    }
+  },
+
+  fetchMoreExpenses: async (userId) => {
+    const { filter, currentPage, isLoadingMore, hasMore } = get();
+    if (isLoadingMore || !hasMore) return;
+    set({ isLoadingMore: true });
+    try {
+      const nextPage = currentPage + 1;
+      const from = nextPage * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase
+        .from('expenses')
+        .select('*, category:expense_categories(*)')
+        .eq('user_id', userId)
+        .is('deleted_at', null)
+        .order('date', { ascending: false })
+        .range(from, to);
+
+      if (filter.year && filter.month) {
+        const startDate = `${filter.year}-${String(filter.month).padStart(2, '0')}-01`;
+        const endMonth = filter.month === 12 ? 1 : filter.month + 1;
+        const endYear = filter.month === 12 ? filter.year + 1 : filter.year;
+        const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01`;
+        query = query.gte('date', startDate).lt('date', endDate);
+      }
+      if (filter.category_id) query = query.eq('category_id', filter.category_id);
+      if (filter.classification) query = query.eq('classification', filter.classification);
+      if (filter.search) query = query.ilike('description', `%${filter.search}%`);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const newExpenses = (data ?? []) as Expense[];
+      set((s) => ({
+        expenses: [...s.expenses, ...newExpenses],
+        hasMore: newExpenses.length === PAGE_SIZE,
+        currentPage: nextPage,
+      }));
+    } catch (err) {
+      set({ error: handleSupabaseError(err) });
+    } finally {
+      set({ isLoadingMore: false });
     }
   },
 

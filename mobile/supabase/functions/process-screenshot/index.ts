@@ -34,8 +34,18 @@ serve(async (req) => {
     const groqApiKey = Deno.env.get('GROQ_API_KEY');
     if (!groqApiKey) throw new Error('GROQ_API_KEY no configurada');
 
-    if (!req.headers.get('Authorization')) {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    // Validar JWT contra Supabase Auth (no solo verificar que el header existe)
+    const authRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/user`, {
+      headers: { 'Authorization': authHeader, 'apikey': Deno.env.get('SUPABASE_ANON_KEY')! },
+    });
+    if (!authRes.ok) {
+      return new Response(JSON.stringify({ error: 'JWT inválido' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

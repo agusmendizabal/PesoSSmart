@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, layout } from '@/theme';
 import { Text, Button, Card } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
+import { supabase } from '@/lib/supabase';
 
 const FEATURES = [
   { icon: 'mail-outline',       text: 'Detectamos pagos y compras automáticamente desde tu email' },
@@ -48,7 +49,11 @@ export default function GmailConnectScreen() {
     if (!user?.id) return;
     setIsConnecting(true);
     try {
-      const res  = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/gmail-auth?action=url&user_id=${user.id}`);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Sesión no disponible');
+      const res  = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/gmail-auth?action=url`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
       const json = await res.json();
       if (!json.url) throw new Error('No se pudo obtener URL de autorización');
 

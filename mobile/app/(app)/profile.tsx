@@ -93,7 +93,12 @@ export default function ProfileScreen() {
     setGmailLoading(true);
     try {
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      const res = await fetch(`${supabaseUrl}/functions/v1/gmail-auth?action=url&user_id=${user.id}`);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Sesión no disponible');
+      // El user_id ya no se pasa como query param — el edge function lo extrae del JWT
+      const res = await fetch(`${supabaseUrl}/functions/v1/gmail-auth?action=url`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
       const json = await res.json();
       if (!json.url) throw new Error('No se pudo obtener URL');
 
