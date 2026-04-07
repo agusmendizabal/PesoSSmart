@@ -21,13 +21,14 @@ import { formatCurrency, formatDate } from '@/utils/format';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type FamilyRole = 'parent' | 'child';
-type ViewState  = 'loading' | 'empty' | 'parent' | 'child';
+type FamilyRole = 'parent' | 'child' | 'partner';
+type ViewState  = 'loading' | 'empty' | 'parent' | 'child' | 'couple';
 
 type GroupData = {
   id:          string;
   name:        string;
   invite_code: string;
+  group_type:  'family' | 'couple';
 };
 
 type MemberData = {
@@ -44,6 +45,17 @@ type ChildExpense = {
   description:       string;
   date:              string;
   classification:    string;
+  expense_categories: { name_es: string } | null;
+};
+
+type CoupleExpense = {
+  id:                string;
+  amount:            number;
+  description:       string;
+  date:              string;
+  classification:    string | null;
+  user_id:           string;
+  is_shared:         boolean;
   expense_categories: { name_es: string } | null;
 };
 
@@ -237,6 +249,55 @@ function ChildExpenseList({
   );
 }
 
+function CoupleExpenseRow({
+  expense,
+  isMe,
+  memberName,
+}: {
+  expense:    CoupleExpense;
+  isMe:       boolean;
+  memberName: string;
+}) {
+  const accentColor =
+    expense.classification === 'investable' ? colors.neon :
+    expense.classification === 'disposable' ? colors.red :
+    colors.text.primary;
+
+  return (
+    <View style={styles.expRow}>
+      {/* Indicador de quién gastó */}
+      <View style={[styles.coupleAvatar, { borderColor: isMe ? colors.neon : colors.info }]}>
+        <Text style={{ fontSize: 10, color: isMe ? colors.neon : colors.info, fontFamily: 'DMSans_600SemiBold' }}>
+          {isMe ? 'VOS' : memberName.split(' ')[0].slice(0, 3).toUpperCase()}
+        </Text>
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+          <Text variant="bodySmall" color={colors.text.primary} numberOfLines={1} style={{ flex: 1 }}>
+            {expense.description}
+          </Text>
+          {expense.is_shared && (
+            <View style={styles.sharedBadge}>
+              <Text style={{ fontSize: 9, color: colors.yellow, fontFamily: 'DMSans_600SemiBold' }}>
+                COMPARTIDO
+              </Text>
+            </View>
+          )}
+        </View>
+        <Text variant="caption" color={colors.text.secondary}>
+          {formatDate(expense.date)}
+          {expense.expense_categories ? ` · ${expense.expense_categories.name_es}` : ''}
+        </Text>
+      </View>
+
+      <Text variant="labelMd" color={accentColor}>
+        {formatCurrency(expense.amount)}
+      </Text>
+    </View>
+  );
+}
+
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function FamilyScreen() {
@@ -247,15 +308,18 @@ export default function FamilyScreen() {
   const [myRole,       setMyRole]       = useState<FamilyRole | null>(null);
   const [members,      setMembers]      = useState<MemberData[]>([]);
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showJoinModal,   setShowJoinModal]   = useState(false);
-  const [groupName,       setGroupName]       = useState('');
-  const [joinCode,        setJoinCode]        = useState('');
-  const [isSubmitting,    setIsSubmitting]    = useState(false);
+  const [showCreateModal,      setShowCreateModal]      = useState(false);
+  const [showJoinModal,        setShowJoinModal]        = useState(false);
+  const [creatingCoupleMode,   setCreatingCoupleMode]   = useState(false);
+  const [groupName,            setGroupName]            = useState('');
+  const [joinCode,             setJoinCode]             = useState('');
+  const [isSubmitting,         setIsSubmitting]         = useState(false);
 
   const [selectedChildId,      setSelectedChildId]      = useState<string | null>(null);
   const [childExpenses,        setChildExpenses]        = useState<ChildExpense[]>([]);
   const [childExpensesLoading, setChildExpensesLoading] = useState(false);
+
+  const [coupleExpenses,       setCoupleExpenses]       = useState<CoupleExpense[]>([]);
 
   // ── Data loading ────────────────────────────────────────────────────────
 
@@ -283,7 +347,7 @@ export default function FamilyScreen() {
     // Info del grupo
     const { data: groupData } = await supabase
       .from('family_groups')
-      .select('id, name, invite_code')
+      .select('id, name, invite_code, group_type')
       .eq('id', membership.group_id)
       .single();
 
@@ -308,6 +372,23 @@ export default function FamilyScreen() {
       full_name:     m.profiles?.full_name ?? 'Sin nombre',
       monthly_total: 0,
     }));
+
+    // Si es pareja → cargar gastos combinados de ambos
+    if (groupData.group_type === 'couple') {
+      const partnerIds = formatted.map((m) => m.user_id);
+      const { data: expData } = await supabase
+        .from('expenses')
+        .select('id, amount, description, date, classification, user_id, is_shared, expense_categories:category_id(name_es)')
+        .in('user_id', partnerIds)
+        .gte('date', currentMonthStart())
+        .is('deleted_at', null)
+        .order('date', { ascending: false });
+
+      setCoupleExpenses((expData ?? []) as CoupleExpense[]);
+      setViewState('couple');
+      setMembers(formatted);
+      return;
+    }
 
     // Si es padre → obtener totales mensuales de los hijos
     if (membership.role === 'parent') {
@@ -346,20 +427,16 @@ export default function FamilyScreen() {
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
-  const handleCreateGroup = async () => {
-    console.log('[Family] handleCreateGroup START | user:', user?.id, '| name:', groupName);
-    if (!user?.id || !groupName.trim()) {
-      console.warn('[Family] Guard falló — user:', user?.id, '| groupName:', groupName);
-      return;
-    }
+  const handleCreateGroup = async (groupType: 'family' | 'couple' = 'family') => {
+    if (!user?.id || !groupName.trim()) return;
     setIsSubmitting(true);
     try {
       const code = generateInviteCode();
-      console.log('[Family] Insertando grupo | name:', groupName.trim(), '| code:', code);
+      const role = groupType === 'couple' ? 'partner' : 'parent';
 
       const { data: newGroup, error: groupErr } = await supabase
         .from('family_groups')
-        .insert({ name: groupName.trim(), invite_code: code })
+        .insert({ name: groupName.trim(), invite_code: code, group_type: groupType })
         .select()
         .single();
 
@@ -372,7 +449,7 @@ export default function FamilyScreen() {
 
       const { error: memberErr } = await supabase
         .from('family_members')
-        .insert({ group_id: newGroup.id, user_id: user.id, role: 'parent' });
+        .insert({ group_id: newGroup.id, user_id: user.id, role });
 
       if (memberErr) {
         console.error('[Family] INSERT family_members falló:', memberErr.code, memberErr.message);
@@ -406,7 +483,7 @@ export default function FamilyScreen() {
     try {
       const { data: targetGroup, error: findErr } = await supabase
         .from('family_groups')
-        .select('id, name')
+        .select('id, name, group_type')
         .eq('invite_code', joinCode.trim().toUpperCase())
         .single();
 
@@ -426,9 +503,10 @@ export default function FamilyScreen() {
         return;
       }
 
+      const joinRole = targetGroup.group_type === 'couple' ? 'partner' : 'child';
       const { error: joinErr } = await supabase
         .from('family_members')
-        .insert({ group_id: targetGroup.id, user_id: user.id, role: 'child' });
+        .insert({ group_id: targetGroup.id, user_id: user.id, role: joinRole });
 
       if (joinErr) {
         if (joinErr.code === '23505') {
@@ -454,10 +532,12 @@ export default function FamilyScreen() {
   };
 
   const handleLeave = () => {
-    const isParent = myRole === 'parent';
+    const isParent  = myRole === 'parent';
+    const isPartner = myRole === 'partner';
+    const isAdmin   = isParent || isPartner;
     Alert.alert(
-      isParent ? 'Disolver grupo' : 'Salir del grupo',
-      isParent
+      isAdmin ? 'Disolver grupo' : 'Salir del grupo',
+      isAdmin
         ? 'Si salís, el grupo se disuelve y todos los miembros quedan sin grupo. ¿Estás seguro?'
         : '¿Seguro que querés salir del grupo familiar?',
       [
@@ -467,7 +547,7 @@ export default function FamilyScreen() {
           style: 'destructive',
           onPress: async () => {
             if (!user?.id || !group?.id) return;
-            if (isParent) {
+            if (isAdmin) {
               // Elimina el grupo → CASCADE borra todos los miembros
               await supabase.from('family_groups').delete().eq('id', group.id);
             } else {
@@ -574,12 +654,21 @@ export default function FamilyScreen() {
             {/* Acciones */}
             <View style={styles.emptyActions}>
               <Button
-                label="CREAR GRUPO"
+                label="MODO PAREJA"
                 variant="neon"
                 size="lg"
                 fullWidth
-                leftIcon={<Ionicons name="add-circle-outline" size={18} color={colors.black} />}
-                onPress={() => setShowCreateModal(true)}
+                leftIcon={<Ionicons name="heart-outline" size={18} color={colors.black} />}
+                onPress={() => { setCreatingCoupleMode(true); setShowCreateModal(true); }}
+              />
+
+              <Button
+                label="GRUPO FAMILIAR"
+                variant="ghost"
+                size="lg"
+                fullWidth
+                leftIcon={<Ionicons name="people-outline" size={18} color={colors.text.primary} />}
+                onPress={() => { setCreatingCoupleMode(false); setShowCreateModal(true); }}
               />
 
               <View style={styles.orDivider}>
@@ -693,6 +782,116 @@ export default function FamilyScreen() {
         )}
 
         {/* ════════════════════════════════════════════════════════════════
+            COUPLE VIEW — modo pareja
+        ════════════════════════════════════════════════════════════════ */}
+        {viewState === 'couple' && group && (() => {
+          const me      = members.find((m) => m.user_id === user?.id);
+          const partner = members.find((m) => m.user_id !== user?.id);
+          const myTotal      = coupleExpenses.filter(e => e.user_id === user?.id).reduce((s, e) => s + e.amount, 0);
+          const partnerTotal = coupleExpenses.filter(e => e.user_id !== user?.id).reduce((s, e) => s + e.amount, 0);
+          const combined     = myTotal + partnerTotal;
+          const myPct        = combined > 0 ? myTotal / combined : 0.5;
+
+          return (
+            <>
+              {/* Header */}
+              <Card variant="neon" style={styles.groupCard}>
+                <View style={styles.groupCardRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="label" color={colors.text.secondary}>MODO PAREJA</Text>
+                    <Text variant="h4" style={{ marginTop: spacing[1] }}>{group.name}</Text>
+                    <Text variant="caption" color={colors.neon} style={{ marginTop: spacing[1] }}>
+                      {members.length === 2 ? '2 PERSONAS CONECTADAS' : 'ESPERANDO A TU PAREJA'}
+                    </Text>
+                  </View>
+                  <View style={styles.parentIcon}>
+                    <Ionicons name="heart" size={26} color={colors.neon} />
+                  </View>
+                </View>
+              </Card>
+
+              {/* Total combinado */}
+              <Card style={styles.combinedCard}>
+                <Text variant="label" color={colors.text.secondary}>TOTAL COMBINADO DEL MES</Text>
+                <Text variant="number" color={colors.text.primary} style={{ marginTop: spacing[1] }}>
+                  {formatCurrency(combined)}
+                </Text>
+
+                {/* Barra de proporción */}
+                {combined > 0 && (
+                  <View style={styles.proportionBar}>
+                    <View style={[styles.proportionFill, { flex: myPct, backgroundColor: colors.neon }]} />
+                    <View style={[styles.proportionFill, { flex: 1 - myPct, backgroundColor: colors.info }]} />
+                  </View>
+                )}
+
+                {/* Breakdown por persona */}
+                <View style={styles.partnerBreakdown}>
+                  <View style={styles.partnerBreakdownItem}>
+                    <View style={[styles.partnerDot, { backgroundColor: colors.neon }]} />
+                    <Text variant="caption" color={colors.text.secondary}>Vos</Text>
+                    <Text variant="labelMd" color={colors.text.primary}>{formatCurrency(myTotal)}</Text>
+                  </View>
+                  {partner && (
+                    <View style={styles.partnerBreakdownItem}>
+                      <View style={[styles.partnerDot, { backgroundColor: colors.info }]} />
+                      <Text variant="caption" color={colors.text.secondary}>
+                        {partner.full_name.split(' ')[0]}
+                      </Text>
+                      <Text variant="labelMd" color={colors.text.primary}>{formatCurrency(partnerTotal)}</Text>
+                    </View>
+                  )}
+                </View>
+              </Card>
+
+              {/* Código de invitación si la pareja aún no se unió */}
+              {members.length < 2 && (
+                <View style={styles.section}>
+                  <Text variant="label" color={colors.text.secondary}>INVITÁ A TU PAREJA</Text>
+                  <InviteCodeCard code={group.invite_code} />
+                </View>
+              )}
+
+              {/* Lista de gastos combinados */}
+              <View style={styles.section}>
+                <Text variant="label" color={colors.text.secondary}>GASTOS DEL MES</Text>
+                {coupleExpenses.length === 0 ? (
+                  <Card>
+                    <Text variant="caption" color={colors.text.tertiary} align="center">
+                      Sin gastos este mes
+                    </Text>
+                  </Card>
+                ) : (
+                  <Card style={{ padding: 0 }}>
+                    {coupleExpenses.map((exp, idx) => (
+                      <View key={exp.id}>
+                        <CoupleExpenseRow
+                          expense={exp}
+                          isMe={exp.user_id === user?.id}
+                          memberName={partner?.full_name ?? ''}
+                        />
+                        {idx < coupleExpenses.length - 1 && <View style={styles.rowDivider} />}
+                      </View>
+                    ))}
+                  </Card>
+                )}
+              </View>
+
+              {/* Salir */}
+              <Button
+                label="DISOLVER MODO PAREJA"
+                variant="ghost"
+                size="md"
+                fullWidth
+                leftIcon={<Ionicons name="exit-outline" size={18} color={colors.red} />}
+                onPress={handleLeave}
+                style={{ borderColor: colors.red + '66' }}
+              />
+            </>
+          );
+        })()}
+
+        {/* ════════════════════════════════════════════════════════════════
             CHILD VIEW — hijo / hija
         ════════════════════════════════════════════════════════════════ */}
         {viewState === 'child' && group && (
@@ -768,7 +967,7 @@ export default function FamilyScreen() {
         >
           <SafeAreaView style={styles.modal}>
             <View style={styles.modalHeader}>
-              <Text variant="h4">Nuevo grupo</Text>
+              <Text variant="h4">{creatingCoupleMode ? 'Modo pareja' : 'Grupo familiar'}</Text>
               <TouchableOpacity onPress={() => setShowCreateModal(false)}>
                 <Ionicons name="close" size={24} color={colors.text.primary} />
               </TouchableOpacity>
@@ -779,12 +978,14 @@ export default function FamilyScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <Text variant="body" color={colors.text.secondary}>
-                Elegí un nombre para tu grupo. Vas a ser el administrador y podrás ver los gastos de tus hijos.
+                {creatingCoupleMode
+                  ? 'Ven los gastos de los dos en un solo lugar. Compartí el código con tu pareja para conectarse.'
+                  : 'Elegí un nombre para tu grupo. Vas a ser el administrador y podrás ver los gastos de tus hijos.'}
               </Text>
 
               <Input
                 label="NOMBRE DEL GRUPO"
-                placeholder="Ej: Familia García"
+                placeholder={creatingCoupleMode ? 'Ej: Agus y Franco' : 'Ej: Familia García'}
                 value={groupName}
                 onChangeText={setGroupName}
                 autoCapitalize="words"
@@ -792,12 +993,17 @@ export default function FamilyScreen() {
               />
 
               <View style={styles.modalHints}>
-                {[
+                {(creatingCoupleMode ? [
+                  'Se genera un código único de invitación',
+                  'Ambos ven los gastos del otro',
+                  'Podés marcar gastos como compartidos',
+                  'Cualquiera puede disolver el grupo',
+                ] : [
                   'Se genera un código único de invitación',
                   'Invitá a tu familia con ese código',
                   'Podés ver los gastos de tus hijos',
                   'Los hijos no ven los gastos ajenos',
-                ].map((t, i) => (
+                ]).map((t, i) => (
                   <View key={i} style={styles.featureRow}>
                     <Ionicons name="checkmark" size={14} color={colors.neon} />
                     <Text variant="caption" color={colors.text.secondary} style={{ flex: 1 }}>{t}</Text>
@@ -806,13 +1012,13 @@ export default function FamilyScreen() {
               </View>
 
               <Button
-                label="CREAR GRUPO"
+                label={creatingCoupleMode ? 'CREAR MODO PAREJA' : 'CREAR GRUPO'}
                 variant="neon"
                 size="lg"
                 fullWidth
                 isLoading={isSubmitting}
                 disabled={!groupName.trim()}
-                onPress={handleCreateGroup}
+                onPress={() => handleCreateGroup(creatingCoupleMode ? 'couple' : 'family')}
               />
             </ScrollView>
           </SafeAreaView>
@@ -1111,5 +1317,48 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.elevated,
     borderWidth:     1,
     borderColor:     colors.border.default,
+  },
+
+  // ── Couple ─────────────────────────────────────────────────────────────
+  combinedCard: {
+    padding: spacing[5],
+    gap:     spacing[4],
+  },
+  proportionBar: {
+    flexDirection:   'row',
+    height:          6,
+    overflow:        'hidden',
+    gap:             2,
+  },
+  proportionFill: {
+    height: 6,
+  },
+  partnerBreakdown: {
+    flexDirection:  'row',
+    justifyContent: 'space-between',
+  },
+  partnerBreakdownItem: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           spacing[2],
+  },
+  partnerDot: {
+    width:  8,
+    height: 8,
+  },
+  coupleAvatar: {
+    width:           36,
+    height:          36,
+    borderWidth:     1,
+    alignItems:      'center',
+    justifyContent:  'center',
+    marginRight:     spacing[3],
+  },
+  sharedBadge: {
+    paddingHorizontal: spacing[2],
+    paddingVertical:   2,
+    borderWidth:       1,
+    borderColor:       colors.yellow + '60',
+    backgroundColor:   colors.yellow + '15',
   },
 });

@@ -267,8 +267,10 @@ export default function ExpensesScreen() {
     },
   });
 
-  const [pendingTxs, setPendingTxs] = useState<any[]>([]);
-  const [isPolling,  setIsPolling]  = useState(false);
+  const [pendingTxs,    setPendingTxs]    = useState<any[]>([]);
+  const [isPolling,     setIsPolling]     = useState(false);
+  const [inCoupleMode,  setInCoupleMode]  = useState(false);
+  const [isShared,      setIsShared]      = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -276,8 +278,18 @@ export default function ExpensesScreen() {
       fetchCategories();
       fetchSubscriptionsAndProjection(user.id);
       pollGmail();
+      checkCoupleMode(user.id);
     }
   }, [user?.id, filter]);
+
+  const checkCoupleMode = async (userId: string) => {
+    const { data } = await supabase
+      .from('family_members')
+      .select('role, family_groups!inner(group_type)')
+      .eq('user_id', userId)
+      .single();
+    setInCoupleMode((data as any)?.family_groups?.group_type === 'couple');
+  };
 
   const pollGmail = async () => {
     setIsPolling(true);
@@ -362,11 +374,13 @@ export default function ExpensesScreen() {
         category_id:    selectedCategory ?? undefined,
         notes:          notesWithFx,
         is_recurring:   false,
+        is_shared:      isShared,
       });
       reset();
       setShowAddModal(false);
       setSelectedCategory(null);
       setCurrency('ARS');
+      setIsShared(false);
     } catch {
       Alert.alert('Error', 'No se pudo guardar el gasto. Intentá de nuevo.');
     }
@@ -840,6 +854,29 @@ export default function ExpensesScreen() {
                 )}
               />
 
+              {/* Toggle gasto compartido — solo si está en modo pareja */}
+              {inCoupleMode && (
+                <TouchableOpacity
+                  style={[styles.sharedToggle, isShared && styles.sharedToggleActive]}
+                  onPress={() => setIsShared(!isShared)}
+                >
+                  <Ionicons
+                    name={isShared ? 'heart' : 'heart-outline'}
+                    size={18}
+                    color={isShared ? colors.neon : colors.text.secondary}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="label" color={isShared ? colors.neon : colors.text.primary}>
+                      GASTO COMPARTIDO
+                    </Text>
+                    <Text variant="caption" color={colors.text.secondary}>
+                      Visible para tu pareja en el resumen conjunto
+                    </Text>
+                  </View>
+                  <View style={[styles.toggleDot, isShared && styles.toggleDotActive]} />
+                </TouchableOpacity>
+              )}
+
               <Button
                 label="GUARDAR GASTO"
                 variant="neon"
@@ -1284,5 +1321,30 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[3],
     borderWidth:     1,
     borderColor:     colors.red,
+  },
+  sharedToggle: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    gap:             spacing[3],
+    padding:         spacing[4],
+    borderWidth:     1,
+    borderColor:     colors.border.default,
+    backgroundColor: colors.bg.elevated,
+  },
+  sharedToggleActive: {
+    borderColor:     colors.neon,
+    backgroundColor: colors.neon + '11',
+  },
+  toggleDot: {
+    width:           20,
+    height:          20,
+    borderRadius:    10,
+    borderWidth:     1,
+    borderColor:     colors.border.default,
+    backgroundColor: colors.bg.primary,
+  },
+  toggleDotActive: {
+    backgroundColor: colors.neon,
+    borderColor:     colors.neon,
   },
 });
