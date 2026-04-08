@@ -94,30 +94,53 @@ export default function ProfileScreen() {
     try {
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('Sesión no disponible');
-      // El user_id ya no se pasa como query param — el edge function lo extrae del JWT
+      if (!session?.access_token) {
+        Alert.alert('Sesión expirada', 'Cerrá sesión y volvé a ingresar.');
+        return;
+      }
+
       const res = await fetch(`${supabaseUrl}/functions/v1/gmail-auth?action=url`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
       const json = await res.json();
-      if (!json.url) throw new Error('No se pudo obtener URL');
 
-      // openAuthSessionAsync cierra el browser automáticamente cuando detecta el deep link
+      if (!res.ok) {
+        console.error('[connectGmail] Error del servidor:', res.status, JSON.stringify(json));
+        if (res.status === 401) {
+          Alert.alert('Error de autenticación', 'Tu sesión no es válida. Cerrá sesión y volvé a ingresar.');
+        } else {
+          Alert.alert('Error', `No se pudo contactar el servidor (${res.status}). Intentá de nuevo.`);
+        }
+        return;
+      }
+
+      if (!json.url) {
+        console.error('[connectGmail] Respuesta sin URL:', JSON.stringify(json));
+        Alert.alert('Error', 'No se pudo obtener el link de autorización. Intentá de nuevo.');
+        return;
+      }
+
       const result = await WebBrowser.openAuthSessionAsync(json.url, 'pesossmart://gmail-connected');
 
       if (result.type === 'success' && result.url) {
-        const match = result.url.match(/email=([^&]+)/);
+        const match    = result.url.match(/email=([^&]+)/);
         const hasError = result.url.includes('error=');
         if (match) {
           const email = decodeURIComponent(match[1]);
           setGmailEmail(email);
           Alert.alert('Gmail conectado', `Tu cuenta ${email} quedó vinculada. Ahora detectamos gastos automáticamente.`);
         } else if (hasError) {
-          Alert.alert('Error', 'No se pudo conectar Gmail. Intentá de nuevo.');
+          const errMatch = result.url.match(/error=([^&]+)/);
+          const errMsg   = errMatch ? decodeURIComponent(errMatch[1]) : 'Error desconocido';
+          console.error('[connectGmail] Error en callback OAuth:', errMsg);
+          Alert.alert('Error', `No se pudo conectar Gmail: ${errMsg}. Intentá de nuevo.`);
         }
+      } else if (result.type === 'cancel' || result.type === 'dismiss') {
+        console.log('[connectGmail] Usuario canceló la autorización de Gmail');
       }
-    } catch {
-      Alert.alert('Error', 'No se pudo iniciar la conexión con Gmail.');
+    } catch (err) {
+      console.error('[connectGmail] Error inesperado:', err);
+      Alert.alert('Error', 'No se pudo iniciar la conexión con Gmail. Verificá tu conexión a internet.');
     } finally {
       setGmailLoading(false);
     }

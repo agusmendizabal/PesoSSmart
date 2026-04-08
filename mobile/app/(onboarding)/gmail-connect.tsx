@@ -51,11 +51,27 @@ export default function GmailConnectScreen() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Sesión no disponible');
+
       const res  = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/gmail-auth?action=url`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
       const json = await res.json();
-      if (!json.url) throw new Error('No se pudo obtener URL de autorización');
+
+      if (!res.ok) {
+        console.error('[handleConnect] Error del servidor:', res.status, JSON.stringify(json));
+        if (res.status === 401) {
+          Alert.alert('Error', 'Tu sesión no es válida. Cerrá sesión y volvé a ingresar.');
+        } else {
+          Alert.alert('Error', `Error del servidor (${res.status}). Podés saltear este paso e intentarlo desde tu perfil.`);
+        }
+        return;
+      }
+
+      if (!json.url) {
+        console.error('[handleConnect] Respuesta sin URL:', JSON.stringify(json));
+        Alert.alert('Error', 'No se pudo obtener el link de autorización. Podés saltear este paso.');
+        return;
+      }
 
       const result = await WebBrowser.openAuthSessionAsync(json.url, 'pesossmart://gmail-connected');
 
@@ -66,10 +82,16 @@ export default function GmailConnectScreen() {
           setGmailEmail(decodeURIComponent(match[1]));
           setConnected(true);
         } else if (hasError) {
+          const errMatch = result.url.match(/error=([^&]+)/);
+          const errMsg   = errMatch ? decodeURIComponent(errMatch[1]) : '';
+          console.error('[handleConnect] Error en callback:', errMsg);
           Alert.alert('Error', 'No se pudo conectar Gmail. Podés intentarlo de nuevo o saltear este paso.');
         }
+      } else if (result.type === 'cancel' || result.type === 'dismiss') {
+        console.log('[handleConnect] Usuario canceló la autorización de Gmail');
       }
-    } catch {
+    } catch (err) {
+      console.error('[handleConnect] Error inesperado:', err);
       Alert.alert('Error', 'No se pudo iniciar la conexión. Verificá tu conexión a internet.');
     } finally {
       setIsConnecting(false);
