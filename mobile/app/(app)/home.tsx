@@ -70,7 +70,7 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={isLoading}
             onRefresh={() => user?.id && fetchExpenses(user.id)}
-            tintColor={colors.neon}
+            tintColor={colors.primary}
           />
         }
       >
@@ -101,7 +101,7 @@ export default function HomeScreen() {
           <View style={styles.mainCardRow}>
             <View style={styles.kpiItem}>
               <Text variant="caption" color={colors.text.secondary}>NECESARIO</Text>
-              <Text variant="labelMd" color={colors.info ?? '#82b1ff'}>
+              <Text variant="labelMd" color={colors.accent}>
                 {formatCurrency(totalNecessary)}
               </Text>
             </View>
@@ -267,7 +267,7 @@ export default function HomeScreen() {
             style={styles.actionCard}
             onPress={() => router.push('/(app)/reports')}
           >
-            <Ionicons name="bar-chart-outline" size={28} color={colors.info ?? '#82b1ff'} />
+            <Ionicons name="bar-chart-outline" size={28} color={colors.accent} />
             <Text variant="bodySmall" color={colors.text.primary} style={styles.actionLabel}>
               Mi informe
             </Text>
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
     padding: spacing[5],
     gap: spacing[2],
     borderLeftWidth: 3,
-    borderLeftColor: colors.neon,
+    borderLeftColor: colors.primary,
   },
   projectionHeader: {
     flexDirection: 'row',

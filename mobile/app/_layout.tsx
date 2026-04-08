@@ -11,18 +11,12 @@ import { requestNotificationPermission } from '@/lib/notifications';
 import { onSessionExpired } from '@/lib/supabase';
 import {
   useFonts,
-  BebasNeue_400Regular,
-} from '@expo-google-fonts/bebas-neue';
-import {
-  SpaceMono_400Regular,
-  SpaceMono_700Bold,
-} from '@expo-google-fonts/space-mono';
-import {
-  DMSans_400Regular,
-  DMSans_500Medium,
-  DMSans_600SemiBold,
-  DMSans_700Bold,
-} from '@expo-google-fonts/dm-sans';
+  Montserrat_400Regular,
+  Montserrat_500Medium,
+  Montserrat_600SemiBold,
+  Montserrat_700Bold,
+  Montserrat_800ExtraBold,
+} from '@expo-google-fonts/montserrat';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -31,13 +25,11 @@ export default function RootLayout() {
   const [authReady, setAuthReady] = useState(false);
 
   const [fontsLoaded, fontError] = useFonts({
-    BebasNeue_400Regular,
-    SpaceMono_400Regular,
-    SpaceMono_700Bold,
-    DMSans_400Regular,
-    DMSans_500Medium,
-    DMSans_600SemiBold,
-    DMSans_700Bold,
+    Montserrat_400Regular,
+    Montserrat_500Medium,
+    Montserrat_600SemiBold,
+    Montserrat_700Bold,
+    Montserrat_800ExtraBold,
   });
 
   useEffect(() => {
@@ -70,7 +62,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar style="light" backgroundColor={colors.bg.primary} />
+        <StatusBar style="dark" backgroundColor={colors.bg.primary} />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />

@@ -28,7 +28,7 @@ export function AmountDisplay({
 }: AmountDisplayProps) {
   const prefix = showSign ? (amount >= 0 ? '+' : '') : '';
   const displayColor = showSign
-    ? amount >= 0 ? colors.neon : colors.red
+    ? amount >= 0 ? colors.primary : colors.red
     : color;
 
   return (

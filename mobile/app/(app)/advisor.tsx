@@ -276,7 +276,8 @@ const styles = StyleSheet.create({
   advisorAvatar: {
     width: 40,
     height: 40,
-    backgroundColor: colors.neon,
+    backgroundColor: colors.primary,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -291,7 +292,8 @@ const styles = StyleSheet.create({
   emptyAvatar: {
     width: 72,
     height: 72,
-    backgroundColor: colors.neon,
+    backgroundColor: colors.primary,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[2],
@@ -304,9 +306,10 @@ const styles = StyleSheet.create({
   suggestedTitle: { marginBottom: spacing[1] },
   suggestedChip: {
     borderWidth: 1,
-    borderColor: colors.neon + '44',
+    borderColor: colors.primary + '44',
+    borderRadius: 8,
     padding: spacing[3],
-    backgroundColor: colors.neon + '08',
+    backgroundColor: colors.primary + '0D',
   },
   messageList: {
     paddingHorizontal: layout.screenPadding,
@@ -323,7 +326,8 @@ const styles = StyleSheet.create({
   avatarAI: {
     width: 28,
     height: 28,
-    backgroundColor: colors.neon,
+    backgroundColor: colors.primary,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -331,14 +335,17 @@ const styles = StyleSheet.create({
   bubble: {
     maxWidth: '78%',
     padding: spacing[4],
+    borderRadius: 12,
   },
   bubbleUser: {
-    backgroundColor: colors.neon,
+    backgroundColor: colors.primary,
+    borderBottomRightRadius: 2,
   },
   bubbleAI: {
     backgroundColor: colors.bg.elevated,
     borderWidth: 1,
     borderColor: colors.border.default,
+    borderBottomLeftRadius: 2,
     minWidth: 60,
     minHeight: 44,
     alignItems: 'center',
@@ -366,6 +373,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[2],
     borderWidth: 1,
     borderColor: colors.border.default,
+    borderRadius: 16,
     maxWidth: 200,
   },
   inputRow: {
@@ -382,6 +390,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.input,
     borderWidth: 1,
     borderColor: colors.border.default,
+    borderRadius: 8,
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[3],
     maxHeight: 100,
@@ -390,7 +399,8 @@ const styles = StyleSheet.create({
   sendBtn: {
     width: 44,
     height: 44,
-    backgroundColor: colors.neon,
+    backgroundColor: colors.primary,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },

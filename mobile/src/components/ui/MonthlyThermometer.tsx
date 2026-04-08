@@ -10,7 +10,7 @@ interface MonthlyThermometerProps {
 }
 
 function getThermometerColor(pct: number): string {
-  if (pct < 0.6) return colors.neon;
+  if (pct < 0.6) return colors.primary;
   if (pct < 0.85) return colors.yellow;
   return colors.red;
 }
@@ -120,9 +120,10 @@ const styles = StyleSheet.create({
   track: {
     height: 8,
     backgroundColor: colors.bg.elevated,
+    borderRadius: 4,
     overflow: 'hidden',
   },
-  fill: { height: '100%' },
+  fill: { height: '100%', borderRadius: 4 },
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -191,7 +191,7 @@ export default function ReportsScreen() {
           </Text>
           <View style={styles.barContainer}>
             {totalNecessary > 0 && (
-              <View style={[styles.bar, { flex: necessaryPct, backgroundColor: '#82b1ff' }]} />
+              <View style={[styles.bar, { flex: necessaryPct, backgroundColor: colors.accent }]} />
             )}
             {totalDisposable > 0 && (
               <View style={[styles.bar, { flex: disposablePct, backgroundColor: colors.red }]} />
@@ -385,6 +385,7 @@ const legendStyles = StyleSheet.create({
   dot: {
     width: 10,
     height: 10,
+    borderRadius: 5,
   },
 });
 
@@ -408,6 +409,7 @@ const styles = StyleSheet.create({
   barContainer: {
     flexDirection: 'row',
     height: 12,
+    borderRadius: 6,
     overflow: 'hidden',
     gap: 2,
   },

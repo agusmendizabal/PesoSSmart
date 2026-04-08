@@ -2,23 +2,22 @@ import { Platform } from 'react-native';
 
 // Font families - se cargan via expo-font en _layout.tsx
 export const fontFamilies = {
-  // Bebas Neue - Títulos impactantes
-  heading: 'BebasNeue_400Regular',
-  // Space Mono - Labels, badges, UI pequeña
-  mono: 'SpaceMono_400Regular',
-  monoBold: 'SpaceMono_700Bold',
-  // DM Sans - Cuerpo, legible
-  body: 'DMSans_400Regular',
-  bodyMedium: 'DMSans_500Medium',
-  bodySemiBold: 'DMSans_600SemiBold',
-  bodyBold: 'DMSans_700Bold',
+  // Montserrat - Títulos
+  heading: 'Montserrat_800ExtraBold',
+  headingBold: 'Montserrat_700Bold',
+  headingSemiBold: 'Montserrat_600SemiBold',
+  // Montserrat - Cuerpo
+  body: 'Montserrat_400Regular',
+  bodyMedium: 'Montserrat_500Medium',
+  bodySemiBold: 'Montserrat_600SemiBold',
+  bodyBold: 'Montserrat_700Bold',
 } as const;
 
 // Fallbacks mientras cargan las fuentes
 export const fontFamiliesFallback = {
   heading: Platform.OS === 'ios' ? 'System' : 'sans-serif-condensed',
-  mono: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  monoBold: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  headingBold: Platform.OS === 'ios' ? 'System' : 'sans-serif-condensed',
+  headingSemiBold: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
   body: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   bodyMedium: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
   bodySemiBold: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
@@ -81,16 +80,16 @@ export const textVariants = {
     letterSpacing: letterSpacings.tight,
   },
   h3: {
-    fontFamily: fontFamilies.heading,
+    fontFamily: fontFamilies.headingBold,
     fontSize: fontSizes['4xl'],
     lineHeight: fontSizes['4xl'] * lineHeights.snug,
   },
   h4: {
-    fontFamily: fontFamilies.heading,
+    fontFamily: fontFamilies.headingBold,
     fontSize: fontSizes['3xl'],
     lineHeight: fontSizes['3xl'] * lineHeights.snug,
   },
-  // Subtítulos con DM Sans
+  // Subtítulos
   subtitle: {
     fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes.xl,
@@ -109,27 +108,27 @@ export const textVariants = {
   },
   // Labels y badges
   label: {
-    fontFamily: fontFamilies.mono,
+    fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.sm,
     lineHeight: fontSizes.sm * lineHeights.normal,
     letterSpacing: letterSpacings.wider,
     textTransform: 'uppercase' as const,
   },
   labelMd: {
-    fontFamily: fontFamilies.mono,
+    fontFamily: fontFamilies.bodySemiBold,
     fontSize: fontSizes.base,
     lineHeight: fontSizes.base * lineHeights.normal,
     letterSpacing: letterSpacings.wide,
   },
-  // Monospace para números/valores financieros
+  // Números/valores financieros
   number: {
-    fontFamily: fontFamilies.mono,
+    fontFamily: fontFamilies.bodyBold,
     fontSize: fontSizes['2xl'],
     lineHeight: fontSizes['2xl'] * lineHeights.tight,
     letterSpacing: letterSpacings.tight,
   },
   numberLg: {
-    fontFamily: fontFamilies.mono,
+    fontFamily: fontFamilies.heading,
     fontSize: fontSizes['4xl'],
     lineHeight: fontSizes['4xl'] * lineHeights.tight,
     letterSpacing: letterSpacings.tighter,

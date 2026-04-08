@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, ViewProps, StyleSheet, TouchableOpacity, TouchableOpacityProps } from 'react-native';
-import { colors, spacing, radius, layout } from '@/theme';
+import { colors, spacing, layout } from '@/theme';
 
 type CardVariant = 'default' | 'elevated' | 'neon' | 'danger';
 
@@ -17,15 +17,15 @@ interface PressableCardProps extends TouchableOpacityProps {
 const variantBorders: Record<CardVariant, string> = {
   default: colors.border.default,
   elevated: colors.border.default,
-  neon: colors.border.neon,
+  neon: colors.border.primary,
   danger: colors.border.error,
 };
 
 const variantBgs: Record<CardVariant, string> = {
   default: colors.bg.card,
   elevated: colors.bg.elevated,
-  neon: colors.bg.card,
-  danger: colors.bg.card,
+  neon: colors.primary + '0D',
+  danger: colors.red + '0D',
 };
 
 export function Card({ variant = 'default', padding = layout.cardPadding, style, children, ...props }: CardProps) {
@@ -70,7 +70,7 @@ export function PressableCard({ variant = 'default', padding = layout.cardPaddin
 const styles = StyleSheet.create({
   base: {
     borderWidth: 1,
-    borderRadius: radius.none, // brutalista
+    borderRadius: 8,
     overflow: 'hidden',
   },
 });

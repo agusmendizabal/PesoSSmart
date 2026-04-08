@@ -32,7 +32,7 @@ export const Input = forwardRef<TextInput, InputProps>(({
   const borderColor = hasError
     ? colors.border.error
     : focused
-    ? colors.white
+    ? colors.primary
     : colors.border.default;
 
   return (
@@ -57,7 +57,7 @@ export const Input = forwardRef<TextInput, InputProps>(({
             leftIcon ? { paddingLeft: 0 } : null,
           ]}
           placeholderTextColor={colors.text.tertiary}
-          selectionColor={colors.neon}
+          selectionColor={colors.primary}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           {...props}
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.bg.input,
     borderWidth: 1,
-    borderRadius: radius.none,
+    borderRadius: 8,
     height: layout.inputHeight,
     paddingHorizontal: spacing[4],
   },

@@ -29,21 +29,12 @@ export default function AppLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: colors.neon,
+        tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.text.secondary,
         tabBarLabelStyle: styles.tabLabel,
         tabBarShowLabel: true,
       }}
     >
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: 'Inicio',
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name="home" focused={focused} color={color} />
-          ),
-        }}
-      />
       <Tabs.Screen
         name="expenses"
         options={{
@@ -63,11 +54,20 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="reports"
+        name="home"
         options={{
-          title: 'Informes',
+          title: 'Inicio',
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon name="bar-chart" focused={focused} color={color} />
+            <TabIcon name="home" focused={focused} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="grupo-familia"
+        options={{
+          title: 'Familia',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="people" focused={focused} color={color} />
           ),
         }}
       />
@@ -78,6 +78,12 @@ export default function AppLayout() {
           tabBarIcon: ({ focused, color }) => (
             <TabIcon name="person" focused={focused} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="reports"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
@@ -98,7 +104,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabLabel: {
-    fontFamily: 'SpaceMono_400Regular',
+    fontFamily: 'Montserrat_500Medium',
     fontSize: 9,
     letterSpacing: 0.5,
     marginTop: 2,

@@ -1077,14 +1077,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderWidth: 1,
-    borderColor: colors.neon,
+    borderColor: colors.primary,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addBtn: {
     width: 40,
     height: 40,
-    backgroundColor: colors.neon,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1108,11 +1110,12 @@ const styles = StyleSheet.create({
     padding: spacing[4],
     borderWidth: 1,
     borderColor: colors.border.default,
+    borderRadius: 8,
     backgroundColor: colors.bg.card,
   },
   extractedItemSelected: {
-    borderColor: colors.neon,
-    backgroundColor: colors.neon + '11',
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '1A',
   },
   extractedRow: {
     flexDirection: 'row',
@@ -1164,10 +1167,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[1],
     borderWidth: 1,
     borderColor: colors.border.default,
+    borderRadius: 20,
   },
   filterChipActive: {
-    borderColor: colors.neon,
-    backgroundColor: colors.neon + '11',
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '1A',
   },
   list: {
     paddingHorizontal: layout.screenPadding,
@@ -1242,10 +1246,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[2],
     borderWidth: 1,
     borderColor: colors.border.default,
+    borderRadius: 20,
   },
   categoryChipActive: {
-    borderColor: colors.neon,
-    backgroundColor: colors.neon + '11',
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + '1A',
   },
   paymentList: { gap: spacing[2] },
   paymentChip: {
@@ -1253,10 +1258,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[2],
     borderWidth: 1,
     borderColor: colors.border.default,
+    borderRadius: 20,
   },
   paymentChipActive: {
-    borderColor: colors.neon,
-    backgroundColor: colors.neon,
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
   },
 
   // Multi-moneda

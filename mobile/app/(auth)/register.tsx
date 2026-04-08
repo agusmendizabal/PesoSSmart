@@ -276,9 +276,10 @@ const styles = StyleSheet.create({
     gap: spacing[4],
   },
   errorBox: {
-    backgroundColor: colors.red + '22',
+    backgroundColor: colors.red + '1A',
     borderWidth: 1,
     borderColor: colors.border.error,
+    borderRadius: 8,
     padding: spacing[3],
   },
   submitBtn: {

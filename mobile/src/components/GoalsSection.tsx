@@ -287,12 +287,12 @@ function GoalCard({
       </View>
 
       <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${Math.round(pct * 100)}%`, backgroundColor: isComplete ? colors.neon : colors.yellow }]} />
+        <View style={[styles.progressFill, { width: `${Math.round(pct * 100)}%`, backgroundColor: isComplete ? colors.primary : colors.accent }]} />
       </View>
 
       <View style={styles.goalAmounts}>
         <Text variant="caption" color={colors.text.secondary}>{formatCurrency(goal.current_amount)} ahorrado</Text>
-        <Text variant="label" color={isComplete ? colors.neon : colors.text.secondary}>{Math.round(pct * 100)}%</Text>
+        <Text variant="label" color={isComplete ? colors.primary : colors.text.secondary}>{Math.round(pct * 100)}%</Text>
         <Text variant="caption" color={colors.text.secondary}>{formatCurrency(goal.target_amount)} total</Text>
       </View>
 
@@ -314,8 +314,8 @@ function GoalCard({
 
       {isComplete && (
         <View style={styles.completeBadge}>
-          <Ionicons name="checkmark-circle" size={16} color={colors.neon} />
-          <Text variant="caption" color={colors.neon}>¡Meta alcanzada!</Text>
+          <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+          <Text variant="caption" color={colors.primary}>¡Meta alcanzada!</Text>
         </View>
       )}
     </Card>
@@ -325,23 +325,23 @@ function GoalCard({
 const styles = StyleSheet.create({
   container: { gap: spacing[3] },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  addBtn: { width: 32, height: 32, backgroundColor: colors.neon, alignItems: 'center', justifyContent: 'center' },
+  addBtn: { width: 32, height: 32, backgroundColor: colors.primary, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   emptyCard: { padding: spacing[6], alignItems: 'center', gap: spacing[3] },
   goalCard: { padding: spacing[4], gap: spacing[3] },
   goalHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   deleteBtn: { padding: spacing[1] },
-  progressTrack: { height: 6, backgroundColor: colors.bg.elevated, overflow: 'hidden' },
-  progressFill: { height: '100%' },
+  progressTrack: { height: 6, backgroundColor: colors.bg.elevated, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3 },
   goalAmounts: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   goalFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  addFundsBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], backgroundColor: colors.neon, paddingHorizontal: spacing[3], paddingVertical: spacing[1] },
+  addFundsBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], backgroundColor: colors.primary, borderRadius: 6, paddingHorizontal: spacing[3], paddingVertical: spacing[1] },
   completeBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   modal: { flex: 1, backgroundColor: colors.bg.primary },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: layout.screenPadding, paddingVertical: spacing[4], borderBottomWidth: 1, borderBottomColor: colors.border.subtle },
   modalScroll: { paddingHorizontal: layout.screenPadding, paddingVertical: spacing[6], gap: spacing[5], paddingBottom: spacing[12] },
   inputLabel: { marginBottom: spacing[2] },
   emojiList: { gap: spacing[2] },
-  emojiBtn: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border.default },
-  emojiBtnActive: { borderColor: colors.neon, backgroundColor: colors.neon + '11' },
+  emojiBtn: { width: 48, height: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border.default },
+  emojiBtnActive: { borderColor: colors.primary, backgroundColor: colors.primary + '1A' },
   addFundsContent: { padding: layout.screenPadding, gap: spacing[5], flex: 1 },
 });

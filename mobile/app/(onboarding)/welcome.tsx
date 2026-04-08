@@ -16,7 +16,7 @@ export default function WelcomeScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <LinearGradient
-        colors={[colors.bg.primary, colors.bg.primary, colors.darkGray]}
+        colors={[colors.bg.primary, colors.bg.secondary, colors.bg.secondary]}
         style={styles.gradient}
       />
 

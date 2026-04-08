@@ -1,66 +1,76 @@
 export const colors = {
   // Base
-  black: '#0a0a0a',
-  blackSoft: '#0d0d0d',
-  darkGray: '#1a1a1a',
-  mediumGray: '#2a2a2a',
-  textSecondary: '#888888',
-  white: '#f2f0ea',
+  black: '#1A1A1A',
+  blackSoft: '#2A2A2A',
+  darkGray: '#4A4A4A',
+  mediumGray: '#9E9E9E',
+  textSecondary: '#666666',
+  white: '#FFFFFF',
 
   // Brand
-  neon: '#00e676',
-  neonDim: '#00c853',
-  red: '#ff3d3d',
-  yellow: '#ffe600',
+  primary: '#00C853',    // Verde vibrante
+  primaryDim: '#00A844',
+  secondary: '#FFFFFF',  // Blanco
+  tertiary: '#7B61FF',   // Violeta
+  accent: '#1978E5',     // Azul seed
+  red: '#E53935',
+  yellow: '#FFB300',
+
+  // Aliases para compatibilidad con screens existentes
+  neon: '#00C853',
+  neonDim: '#00A844',
 
   // Semantic
-  success: '#00e676',
-  error: '#ff3d3d',
-  warning: '#ffe600',
-  info: '#82b1ff',
+  success: '#00C853',
+  error: '#E53935',
+  warning: '#FFB300',
+  info: '#1978E5',
 
-  // Backgrounds
+  // Backgrounds (Light mode)
   bg: {
-    primary: '#0a0a0a',
-    secondary: '#1a1a1a',
-    card: '#1a1a1a',
-    elevated: '#2a2a2a',
-    input: '#1a1a1a',
-    inputFocused: '#2a2a2a',
+    primary: '#FFFFFF',
+    secondary: '#F5F5F5',
+    card: '#FFFFFF',
+    elevated: '#FAFAFA',
+    input: '#F0F0F0',
+    inputFocused: '#E8E8E8',
   },
 
   // Text
   text: {
-    primary: '#f2f0ea',
-    secondary: '#888888',
-    tertiary: '#555555',
-    inverse: '#0a0a0a',
-    neon: '#00e676',
-    error: '#ff3d3d',
-    warning: '#ffe600',
+    primary: '#1A1A1A',
+    secondary: '#666666',
+    tertiary: '#9E9E9E',
+    inverse: '#FFFFFF',
+    accent: '#1978E5',
+    primary_brand: '#00C853',
+    error: '#E53935',
+    warning: '#FFB300',
   },
 
   // Borders
   border: {
-    default: '#2a2a2a',
-    subtle: '#1a1a1a',
-    neon: '#00e676',
-    error: '#ff3d3d',
+    default: '#E0E0E0',
+    subtle: '#F0F0F0',
+    primary: '#00C853',
+    neon: '#00C853',
+    accent: '#1978E5',
+    error: '#E53935',
   },
 
   // Expense classification
   expense: {
-    necessary: '#82b1ff',
-    disposable: '#ff3d3d',
-    investable: '#00e676',
+    necessary: '#1978E5',
+    disposable: '#E53935',
+    investable: '#00C853',
   },
 
   // Transparent
   transparent: 'transparent',
 
   // Overlays
-  overlay: 'rgba(0,0,0,0.7)',
-  overlayLight: 'rgba(0,0,0,0.4)',
+  overlay: 'rgba(0,0,0,0.5)',
+  overlayLight: 'rgba(0,0,0,0.2)',
 } as const;
 
 export type Color = typeof colors;

@@ -24,17 +24,17 @@ interface ButtonProps extends TouchableOpacityProps {
 
 const variantStyles: Record<ButtonVariant, { bg: string; border: string; text: string }> = {
   primary: {
-    bg: colors.white,
-    border: colors.white,
-    text: colors.black,
+    bg: colors.primary,
+    border: colors.primary,
+    text: colors.white,
   },
   neon: {
-    bg: colors.neon,
-    border: colors.neon,
-    text: colors.black,
+    bg: colors.primary,
+    border: colors.primary,
+    text: colors.white,
   },
   secondary: {
-    bg: colors.mediumGray,
+    bg: colors.bg.secondary,
     border: colors.border.default,
     text: colors.text.primary,
   },
@@ -111,7 +111,7 @@ export function Button({
 const styles = StyleSheet.create({
   base: {
     borderWidth: 1,
-    borderRadius: radius.none, // estética brutalista — sin border radius
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
