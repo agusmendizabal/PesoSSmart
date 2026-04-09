@@ -47,7 +47,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="advisor"
         options={{
-          title: 'Asesor IA',
+          title: 'IA Financiero',
           tabBarIcon: ({ focused, color }) => (
             <TabIcon name="chatbubble-ellipses" focused={focused} color={color} />
           ),
@@ -65,7 +65,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="grupo-familia"
         options={{
-          title: 'Familia',
+          title: 'Grupos',
           tabBarIcon: ({ focused, color }) => (
             <TabIcon name="people" focused={focused} color={color} />
           ),
