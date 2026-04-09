@@ -12,6 +12,9 @@ import { colors, spacing, layout } from '@/theme';
 import { Text, Card } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/utils/format';
+import { InflationThermometer } from './InflationThermometer';
+import { InflationHistory } from './InflationHistory';
+import { OpportunityCost } from './OpportunityCost';
 
 const PALETTE = [
   '#00C853', '#1978E5', '#E53935', '#FFB300',
@@ -383,8 +386,27 @@ export function ExpenseAnalysis({ userId }: { userId: string }) {
               />
             ))}
           </Card>
+
+          {/* Termómetro de inflación personal */}
+          <Card style={styles.listCard}>
+            <InflationThermometer
+              userId={userId}
+              year={selectedYear}
+              month={selectedMonth}
+            />
+          </Card>
         </>
       )}
+
+      {/* Historial — siempre visible, no depende del mes seleccionado */}
+      <Card style={styles.listCard}>
+        <InflationHistory userId={userId} monthsBack={6} />
+      </Card>
+
+      {/* Oportunidades de inversión */}
+      <Card style={styles.listCard}>
+        <OpportunityCost userId={userId} monthsBack={3} />
+      </Card>
     </ScrollView>
   );
 }

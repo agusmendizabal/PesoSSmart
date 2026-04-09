@@ -61,6 +61,7 @@ export default function ExpensesScreen() {
     totalThisMonth,
     totalNecessary,
     totalDisposable,
+    totalInvestable,
     fetchExpenses,
     fetchMoreExpenses,
     fetchCategories,
@@ -366,6 +367,34 @@ export default function ExpensesScreen() {
 
   const listHeader = (
     <>
+      {/* Filtros de clasificación */}
+      <View style={styles.filters}>
+        {[
+          { key: null, label: 'Todos' },
+          { key: 'necessary', label: 'Necesario' },
+          { key: 'disposable', label: 'Prescindible' },
+          { key: 'investable', label: 'Invertible' },
+        ].map((f) => (
+          <TouchableOpacity
+            key={f.key ?? 'all'}
+            style={[
+              styles.filterChip,
+              classificationFilter === f.key && styles.filterChipActive,
+            ]}
+            onPress={() => setFilter({ classification: f.key })}
+          >
+            <Text
+              variant="label"
+              style={{ fontSize: 9 }}
+              color={classificationFilter === f.key ? colors.neon : colors.text.secondary}
+              numberOfLines={1}
+            >
+              {f.label.toUpperCase()}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {/* Resumen del mes */}
       <View style={styles.summaryCard}>
         <View style={styles.summaryTop}>
@@ -377,6 +406,7 @@ export default function ExpensesScreen() {
           <View style={styles.compositionBar}>
             {totalNecessary  > 0 && <View style={[styles.barSlice, { flex: totalNecessary,  backgroundColor: colors.accent }]} />}
             {totalDisposable > 0 && <View style={[styles.barSlice, { flex: totalDisposable, backgroundColor: colors.red   }]} />}
+            {totalInvestable > 0 && <View style={[styles.barSlice, { flex: totalInvestable, backgroundColor: colors.neon  }]} />}
           </View>
         )}
         <View style={styles.summaryMetrics}>
@@ -392,6 +422,13 @@ export default function ExpensesScreen() {
             <View>
               <Text variant="caption" color={colors.text.tertiary}>Prescindible</Text>
               <Text variant="labelMd" color={colors.text.primary}>{formatCurrency(totalDisposable)}</Text>
+            </View>
+          </View>
+          <View style={styles.metricItem}>
+            <View style={[styles.metricDot, { backgroundColor: colors.neon }]} />
+            <View>
+              <Text variant="caption" color={colors.text.tertiary}>Invertible</Text>
+              <Text variant="labelMd" color={colors.text.primary}>{formatCurrency(totalInvestable)}</Text>
             </View>
           </View>
         </View>
@@ -411,37 +448,6 @@ export default function ExpensesScreen() {
           />
         </View>
       )}
-
-      {/* Filtros de clasificación */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filters}
-      >
-        {[
-          { key: null, label: 'Todos' },
-          { key: 'necessary', label: 'Necesario' },
-          { key: 'disposable', label: 'Prescindible' },
-          { key: 'investable', label: 'Invertible' },
-        ].map((f) => (
-          <TouchableOpacity
-            key={f.key ?? 'all'}
-            style={[
-              styles.filterChip,
-              classificationFilter === f.key && styles.filterChipActive,
-            ]}
-            onPress={() => setFilter({ classification: f.key })}
-          >
-            <Text
-              variant="label"
-              style={{ fontSize: 10 }}
-              color={classificationFilter === f.key ? colors.neon : colors.text.secondary}
-            >
-              {f.label.toUpperCase()}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
 
       {/* Búsqueda por texto */}
       <View style={styles.searchRow}>
@@ -1108,9 +1114,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   filters: {
+    flexDirection: 'row',
     paddingHorizontal: layout.screenPadding,
     paddingBottom: spacing[3],
-    gap: spacing[2],
+    gap: spacing[1],
   },
   searchRow: {
     flexDirection:     'row',
@@ -1132,7 +1139,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[1],
   },
   filterChip: {
-    paddingHorizontal: spacing[3],
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: spacing[1],
     paddingVertical: spacing[1],
     borderWidth: 1,
     borderColor: colors.border.default,
