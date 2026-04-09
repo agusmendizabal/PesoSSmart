@@ -1,466 +1,544 @@
-import React, { useEffect, useState } from 'react';
-import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+  FlatList,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path, Circle, G } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, layout } from '@/theme';
-import { Text, Card, PressableCard } from '@/components/ui';
+import { Text, Card } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
-import { useExpensesStore } from '@/store/expensesStore';
 import { supabase } from '@/lib/supabase';
-import { formatCurrency, getMonthName, formatPercent } from '@/utils/format';
-import type { MonthlyReport } from '@/types';
+import { formatCurrency } from '@/utils/format';
 
-// Inflación INDEC por categoría (% mensual estimado — se puede actualizar con API)
-// Fuente: IPC Nacional, promedio 2024-2025
-const INDEC_CATEGORY_INFLATION: Record<string, { label: string; rate: number }> = {
-  groceries:       { label: 'Alimentos',        rate: 0.029 },
-  food_dining:     { label: 'Restaurantes',      rate: 0.028 },
-  transport:       { label: 'Transporte',        rate: 0.035 },
-  health:          { label: 'Salud',             rate: 0.032 },
-  entertainment:   { label: 'Recreación',        rate: 0.025 },
-  clothing:        { label: 'Indumentaria',      rate: 0.022 },
-  education:       { label: 'Educación',         rate: 0.034 },
-  home:            { label: 'Vivienda',          rate: 0.031 },
-  technology:      { label: 'Tecnología',        rate: 0.024 },
-  subscriptions:   { label: 'Servicios digitales', rate: 0.020 },
-  travel:          { label: 'Viajes',            rate: 0.030 },
-  other:           { label: 'Otros',             rate: 0.027 },
-};
+// ── Paleta de colores para categorías ────────────────────────────────────────
+const PALETTE = [
+  '#00C853', '#1978E5', '#E53935', '#FFB300',
+  '#7B61FF', '#FF6D00', '#00BCD4', '#E91E63',
+  '#4CAF50', '#795548',
+];
 
-const INDEC_GENERAL = 0.029; // 2.9% promedio mensual
+// ── Tipos ─────────────────────────────────────────────────────────────────────
+interface CategoryRow {
+  id: string | null;
+  name: string;
+  color: string;
+  amount: number;
+  percentage: number;
+  expenses: { id: string; description: string; amount: number; date: string }[];
+}
 
+// ── Pie chart SVG ─────────────────────────────────────────────────────────────
+const SIZE = 220;
+const CX   = SIZE / 2;
+const CY   = SIZE / 2;
+const R    = 88;
+const IR   = 54; // inner radius (donut)
+
+function polarToXY(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = (angleDeg - 90) * (Math.PI / 180);
+  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function slicePath(
+  cx: number, cy: number,
+  outerR: number, innerR: number,
+  startDeg: number, endDeg: number,
+): string {
+  const o1 = polarToXY(cx, cy, outerR, startDeg);
+  const o2 = polarToXY(cx, cy, outerR, endDeg);
+  const i1 = polarToXY(cx, cy, innerR, startDeg);
+  const i2 = polarToXY(cx, cy, innerR, endDeg);
+  const large = endDeg - startDeg > 180 ? 1 : 0;
+  return [
+    `M ${o1.x} ${o1.y}`,
+    `A ${outerR} ${outerR} 0 ${large} 1 ${o2.x} ${o2.y}`,
+    `L ${i2.x} ${i2.y}`,
+    `A ${innerR} ${innerR} 0 ${large} 0 ${i1.x} ${i1.y}`,
+    'Z',
+  ].join(' ');
+}
+
+function DonutChart({
+  data,
+  selectedIndex,
+  onSelect,
+  total,
+}: {
+  data: CategoryRow[];
+  selectedIndex: number | null;
+  onSelect: (i: number) => void;
+  total: number;
+}) {
+  if (data.length === 0) return (
+    <View style={{ width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' }}>
+      <Circle cx={CX} cy={CY} r={R} fill={colors.border.subtle} />
+    </View>
+  );
+
+  let currentDeg = 0;
+  const GAP = data.length > 1 ? 1.5 : 0;
+
+  const segments = data.map((row, i) => {
+    const deg = row.percentage * 360;
+    const start = currentDeg + GAP / 2;
+    const end   = currentDeg + deg - GAP / 2;
+    currentDeg += deg;
+    const scale = selectedIndex === i ? 1.06 : 1;
+    return { path: slicePath(CX, CY, R, IR, start, end), color: row.color, i, scale };
+  });
+
+  const selected = selectedIndex !== null ? data[selectedIndex] : null;
+
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Svg width={SIZE} height={SIZE}>
+        {/* Fondo del donut */}
+        <Circle cx={CX} cy={CY} r={R}    fill={colors.border.subtle} />
+        <Circle cx={CX} cy={CY} r={IR}   fill={colors.bg.primary} />
+        {/* Segmentos */}
+        {segments.map((s) => (
+          <G key={s.i} onPress={() => onSelect(s.i)}>
+            <Path
+              d={s.path}
+              fill={s.color}
+              opacity={selectedIndex !== null && selectedIndex !== s.i ? 0.45 : 1}
+            />
+          </G>
+        ))}
+        {/* Círculo interior blanco */}
+        <Circle cx={CX} cy={CY} r={IR - 2} fill={colors.bg.primary} />
+      </Svg>
+
+      {/* Texto central */}
+      <View style={styles.chartCenter} pointerEvents="none">
+        {selected ? (
+          <>
+            <Text variant="caption" color={colors.text.tertiary} align="center">
+              {selected.name.toUpperCase()}
+            </Text>
+            <Text variant="number" color={selected.color} align="center">
+              {formatCurrency(selected.amount)}
+            </Text>
+            <Text variant="label" color={colors.text.secondary} align="center">
+              {Math.round(selected.percentage * 100)}%
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text variant="caption" color={colors.text.tertiary} align="center">TOTAL MES</Text>
+            <Text variant="number" color={colors.text.primary} align="center">
+              {formatCurrency(total)}
+            </Text>
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ── Fila de categoría ──────────────────────────────────────────────────────────
+function CategoryItem({
+  row,
+  rank,
+  selected,
+  onPress,
+}: {
+  row: CategoryRow;
+  rank: number;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.catRow, selected && { backgroundColor: row.color + '12' }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.catDot, { backgroundColor: row.color }]} />
+      <View style={{ flex: 1, gap: 4 }}>
+        <View style={styles.catRowTop}>
+          <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'DMSans_600SemiBold', flex: 1 }}>
+            {row.name}
+          </Text>
+          <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'DMSans_600SemiBold' }}>
+            {formatCurrency(row.amount)}
+          </Text>
+        </View>
+        {/* Barra de progreso */}
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${Math.round(row.percentage * 100)}%`, backgroundColor: row.color },
+            ]}
+          />
+        </View>
+        <Text variant="caption" color={colors.text.tertiary}>
+          {Math.round(row.percentage * 100)}% del total
+        </Text>
+      </View>
+      <Ionicons
+        name={selected ? 'chevron-up' : 'chevron-down'}
+        size={14}
+        color={colors.text.tertiary}
+        style={{ marginLeft: spacing[2] }}
+      />
+    </TouchableOpacity>
+  );
+}
+
+// ── Screen principal ───────────────────────────────────────────────────────────
 export default function ReportsScreen() {
   const { user } = useAuthStore();
-  const {
-    totalThisMonth,
-    totalNecessary,
-    totalDisposable,
-    totalInvestable,
-  } = useExpensesStore();
-  const [report, setReport] = useState<MonthlyReport | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [categoryData, setCategoryData] = useState<{
-    category: string;
-    currentAmount: number;
-    prevAmount: number;
-    growthRate: number;
-    indecRate: number;
-    label: string;
-  }[]>([]);
 
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth() + 1;
-  const currentYear = currentDate.getFullYear();
-  const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-  const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const [selectedYear,  setSelectedYear]  = useState(now.getFullYear());
+  const [breakdown,     setBreakdown]     = useState<CategoryRow[]>([]);
+  const [total,         setTotal]         = useState(0);
+  const [isLoading,     setIsLoading]     = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [expandedId,    setExpandedId]    = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user?.id) {
-      loadReport();
-      loadCategoryComparison();
-    }
-  }, [user?.id]);
+  const MONTH_NAMES = [
+    'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+    'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
+  ];
 
-  const loadReport = async () => {
+  const { startDate, endDate } = useMemo(() => {
+    const s = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
+    const em = selectedMonth === 12 ? 1 : selectedMonth + 1;
+    const ey = selectedMonth === 12 ? selectedYear + 1 : selectedYear;
+    const e = `${ey}-${String(em).padStart(2, '0')}-01`;
+    return { startDate: s, endDate: e };
+  }, [selectedMonth, selectedYear]);
+
+  const loadData = useCallback(async () => {
     if (!user?.id) return;
     setIsLoading(true);
+    setSelectedIndex(null);
+    setExpandedId(null);
     try {
-      const { data } = await supabase
-        .from('monthly_reports')
-        .select('*')
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('id, amount, description, date, category:expense_categories(id, name_es, color)')
         .eq('user_id', user.id)
-        .eq('year', currentYear)
-        .eq('month', currentMonth)
-        .single();
-      setReport(data);
+        .is('deleted_at', null)
+        .gte('date', startDate)
+        .lt('date', endDate);
+
+      if (error) throw error;
+
+      const map: Record<string, CategoryRow> = {};
+      let sum = 0;
+
+      for (const exp of data ?? []) {
+        const cat    = exp.category as any;
+        const catId  = cat?.id   ?? 'none';
+        const catName= cat?.name_es ?? 'Sin categoría';
+        const catClr = cat?.color  ?? null;
+
+        if (!map[catId]) {
+          const colorIndex = Object.keys(map).length % PALETTE.length;
+          map[catId] = {
+            id:         catId,
+            name:       catName,
+            color:      catClr ?? PALETTE[colorIndex],
+            amount:     0,
+            percentage: 0,
+            expenses:   [],
+          };
+        }
+        map[catId].amount += exp.amount;
+        map[catId].expenses.push({
+          id:          exp.id,
+          description: exp.description,
+          amount:      exp.amount,
+          date:        exp.date,
+        });
+        sum += exp.amount;
+      }
+
+      const rows = Object.values(map)
+        .map((r) => ({ ...r, percentage: sum > 0 ? r.amount / sum : 0 }))
+        .sort((a, b) => b.amount - a.amount);
+
+      setTotal(sum);
+      setBreakdown(rows);
+    } catch (err) {
+      console.error('[Reports] loadData error:', err);
     } finally {
       setIsLoading(false);
     }
+  }, [user?.id, startDate, endDate]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const prevMonth = () => {
+    if (selectedMonth === 1) { setSelectedMonth(12); setSelectedYear(y => y - 1); }
+    else setSelectedMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    const isCurrentMonth = selectedMonth === now.getMonth() + 1 && selectedYear === now.getFullYear();
+    if (isCurrentMonth) return;
+    if (selectedMonth === 12) { setSelectedMonth(1); setSelectedYear(y => y + 1); }
+    else setSelectedMonth(m => m + 1);
+  };
+  const isCurrentMonth = selectedMonth === now.getMonth() + 1 && selectedYear === now.getFullYear();
+
+  const handleChartSelect = (i: number) => {
+    setSelectedIndex(prev => prev === i ? null : i);
+    setExpandedId(breakdown[i]?.id ?? null);
   };
 
-  const loadCategoryComparison = async () => {
-    if (!user?.id) return;
-    try {
-      const currentStart = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
-      const currentEnd = `${currentMonth === 12 ? currentYear + 1 : currentYear}-${String(currentMonth === 12 ? 1 : currentMonth + 1).padStart(2, '0')}-01`;
-      const prevStart = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`;
-      const prevEnd = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
-
-      const [{ data: currentExpenses }, { data: prevExpenses }] = await Promise.all([
-        supabase
-          .from('expenses')
-          .select('amount, category:expense_categories(key)')
-          .eq('user_id', user.id)
-          .is('deleted_at', null)
-          .gte('date', currentStart)
-          .lt('date', currentEnd),
-        supabase
-          .from('expenses')
-          .select('amount, category:expense_categories(key)')
-          .eq('user_id', user.id)
-          .is('deleted_at', null)
-          .gte('date', prevStart)
-          .lt('date', prevEnd),
-      ]);
-
-      const sumByCategory = (items: any[]) => {
-        const map: Record<string, number> = {};
-        for (const e of items ?? []) {
-          const key = (e.category as any)?.key ?? 'other';
-          map[key] = (map[key] ?? 0) + e.amount;
-        }
-        return map;
-      };
-
-      const current = sumByCategory(currentExpenses ?? []);
-      const prev = sumByCategory(prevExpenses ?? []);
-
-      const allKeys = new Set([...Object.keys(current), ...Object.keys(prev)]);
-      const rows = [];
-      for (const key of allKeys) {
-        const cur = current[key] ?? 0;
-        const pre = prev[key] ?? 0;
-        if (pre === 0 || cur === 0) continue;
-        const growthRate = (cur - pre) / pre;
-        const indecInfo = INDEC_CATEGORY_INFLATION[key] ?? INDEC_CATEGORY_INFLATION.other;
-        rows.push({
-          category: key,
-          currentAmount: cur,
-          prevAmount: pre,
-          growthRate,
-          indecRate: indecInfo.rate,
-          label: indecInfo.label,
-        });
-      }
-      rows.sort((a, b) => b.growthRate - a.growthRate);
-      setCategoryData(rows.slice(0, 5));
-    } catch {
-      // silencioso
-    }
+  const handleRowPress = (row: CategoryRow, i: number) => {
+    const isExpanded = expandedId === row.id;
+    setExpandedId(isExpanded ? null : row.id);
+    setSelectedIndex(isExpanded ? null : i);
   };
-
-  const necessaryPct = totalThisMonth > 0 ? totalNecessary / totalThisMonth : 0;
-  const disposablePct = totalThisMonth > 0 ? totalDisposable / totalThisMonth : 0;
-  const investablePct = totalThisMonth > 0 ? totalInvestable / totalThisMonth : 0;
-
-  // Inflación personal ponderada
-  const personalInflation = categoryData.length > 0
-    ? categoryData.reduce((sum, c) => sum + c.growthRate * (c.currentAmount / totalThisMonth), 0)
-    : null;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
         {/* Header */}
         <View style={styles.header}>
-          <Text variant="h4">Informe mensual</Text>
-          <Text variant="label" color={colors.text.secondary}>
-            {getMonthName(currentMonth).toUpperCase()} {currentYear}
-          </Text>
+          <Text variant="h4">Análisis de gastos</Text>
         </View>
 
-        {/* Total del mes */}
-        <Card style={styles.totalCard}>
-          <Text variant="label" color={colors.text.secondary}>GASTASTE EN TOTAL</Text>
-          <Text variant="numberLg" color={colors.text.primary}>{formatCurrency(totalThisMonth)}</Text>
-          {report?.previous_month_total && (
-            <View style={styles.comparisonRow}>
-              <Ionicons
-                name={totalThisMonth > report.previous_month_total ? 'trending-up' : 'trending-down'}
-                size={16}
-                color={totalThisMonth > report.previous_month_total ? colors.red : colors.neon}
+        {/* Selector de mes */}
+        <View style={styles.monthSelector}>
+          <TouchableOpacity style={styles.monthArrow} onPress={prevMonth}>
+            <Ionicons name="chevron-back" size={20} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text variant="subtitle" color={colors.text.primary}>
+            {MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+          </Text>
+          <TouchableOpacity
+            style={[styles.monthArrow, isCurrentMonth && { opacity: 0.3 }]}
+            onPress={nextMonth}
+            disabled={isCurrentMonth}
+          >
+            <Ionicons name="chevron-forward" size={20} color={colors.text.primary} />
+          </TouchableOpacity>
+        </View>
+
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.neon} />
+          </View>
+        ) : breakdown.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="pie-chart-outline" size={52} color={colors.border.default} />
+            <Text variant="body" color={colors.text.tertiary} align="center">
+              No hay gastos para{'\n'}{MONTH_NAMES[selectedMonth - 1]} {selectedYear}
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* Gráfico donut */}
+            <View style={styles.chartContainer}>
+              <DonutChart
+                data={breakdown}
+                selectedIndex={selectedIndex}
+                onSelect={handleChartSelect}
+                total={total}
               />
-              <Text
-                variant="caption"
-                color={totalThisMonth > report.previous_month_total ? colors.red : colors.neon}
-              >
-                {totalThisMonth > report.previous_month_total ? '+' : ''}
-                {formatCurrency(totalThisMonth - report.previous_month_total)} vs mes anterior
-              </Text>
-            </View>
-          )}
-        </Card>
-
-        {/* Breakdown */}
-        <Card style={styles.breakdownCard}>
-          <Text variant="label" color={colors.text.secondary} style={{ marginBottom: spacing[4] }}>
-            COMPOSICIÓN DE GASTOS
-          </Text>
-          <View style={styles.barContainer}>
-            {totalNecessary > 0 && (
-              <View style={[styles.bar, { flex: necessaryPct, backgroundColor: colors.accent }]} />
-            )}
-            {totalDisposable > 0 && (
-              <View style={[styles.bar, { flex: disposablePct, backgroundColor: colors.red }]} />
-            )}
-            {totalInvestable > 0 && (
-              <View style={[styles.bar, { flex: investablePct, backgroundColor: colors.neon }]} />
-            )}
-          </View>
-          <View style={styles.legend}>
-            <LegendItem color="#82b1ff" label="Necesario" amount={totalNecessary} pct={necessaryPct} />
-            <LegendItem color={colors.red} label="Prescindible" amount={totalDisposable} pct={disposablePct} />
-            <LegendItem color={colors.neon} label="Invertible" amount={totalInvestable} pct={investablePct} />
-          </View>
-        </Card>
-
-        {/* Radar de inflación personal */}
-        <Card style={styles.inflationRadarCard}>
-          <View style={styles.inflationRadarHeader}>
-            <Ionicons name="pulse-outline" size={18} color={colors.yellow} />
-            <Text variant="label" color={colors.text.secondary}>RADAR DE INFLACIÓN PERSONAL</Text>
-          </View>
-
-          {categoryData.length > 0 ? (
-            <>
-              {personalInflation != null && (
-                <View style={styles.inflationSummary}>
-                  <View style={styles.inflationSummaryItem}>
-                    <Text variant="caption" color={colors.text.secondary}>TU INFLACIÓN</Text>
-                    <Text
-                      variant="number"
-                      color={personalInflation > INDEC_GENERAL ? colors.red : colors.neon}
-                    >
-                      {formatPercent(personalInflation)}
-                    </Text>
-                  </View>
-                  <View style={styles.inflationSummaryDivider} />
-                  <View style={styles.inflationSummaryItem}>
-                    <Text variant="caption" color={colors.text.secondary}>INDEC GENERAL</Text>
-                    <Text variant="number" color={colors.text.primary}>
-                      {formatPercent(INDEC_GENERAL)}
-                    </Text>
-                  </View>
-                  <View style={styles.inflationSummaryDivider} />
-                  <View style={styles.inflationSummaryItem}>
-                    <Text variant="caption" color={colors.text.secondary}>DIFERENCIA</Text>
-                    <Text
-                      variant="number"
-                      color={personalInflation > INDEC_GENERAL ? colors.red : colors.neon}
-                    >
-                      {personalInflation > INDEC_GENERAL ? '+' : ''}
-                      {formatPercent(personalInflation - INDEC_GENERAL)}
-                    </Text>
-                  </View>
-                </View>
+              {selectedIndex !== null && (
+                <TouchableOpacity
+                  style={styles.clearSelection}
+                  onPress={() => { setSelectedIndex(null); setExpandedId(null); }}
+                >
+                  <Text variant="caption" color={colors.text.tertiary}>Limpiar selección</Text>
+                </TouchableOpacity>
               )}
-              <Text variant="caption" color={colors.text.secondary} style={styles.inflationSubtitle}>
-                TUS CATEGORÍAS VS INDEC
-              </Text>
-              {categoryData.map((row) => (
-                <View key={row.category} style={styles.inflationRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text variant="bodySmall" color={colors.text.primary}>{row.label}</Text>
-                    <Text variant="caption" color={colors.text.secondary}>
-                      {formatCurrency(row.prevAmount)} → {formatCurrency(row.currentAmount)}
-                    </Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                    <Text
-                      variant="labelMd"
-                      color={row.growthRate > row.indecRate ? colors.red : colors.neon}
-                    >
-                      {row.growthRate > 0 ? '+' : ''}{formatPercent(row.growthRate)}
-                    </Text>
-                    <Text variant="caption" color={colors.text.tertiary}>
-                      INDEC {formatPercent(row.indecRate)}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </>
-          ) : (
-            <>
-              <View style={styles.inflationSummary}>
-                <View style={styles.inflationSummaryItem}>
-                  <Text variant="caption" color={colors.text.secondary}>TU INFLACIÓN</Text>
-                  <Text variant="number" color={colors.text.tertiary}>—</Text>
-                </View>
-                <View style={styles.inflationSummaryDivider} />
-                <View style={styles.inflationSummaryItem}>
-                  <Text variant="caption" color={colors.text.secondary}>INDEC GENERAL</Text>
-                  <Text variant="number" color={colors.text.primary}>
-                    {formatPercent(INDEC_GENERAL)}
-                  </Text>
-                </View>
-                <View style={styles.inflationSummaryDivider} />
-                <View style={styles.inflationSummaryItem}>
-                  <Text variant="caption" color={colors.text.secondary}>DIFERENCIA</Text>
-                  <Text variant="number" color={colors.text.tertiary}>—</Text>
-                </View>
-              </View>
-              <Text variant="caption" color={colors.text.secondary} style={styles.inflationSubtitle}>
-                INFLACIÓN INDEC POR CATEGORÍA
-              </Text>
-              {Object.entries(INDEC_CATEGORY_INFLATION).slice(0, 5).map(([key, val]) => (
-                <View key={key} style={styles.inflationRow}>
-                  <Text variant="bodySmall" color={colors.text.secondary} style={{ flex: 1 }}>
-                    {val.label}
-                  </Text>
-                  <Text variant="labelMd" color={colors.text.primary}>
-                    {formatPercent(val.rate)}
-                  </Text>
-                </View>
-              ))}
-              <View style={styles.emptySection}>
-                <Text variant="caption" color={colors.text.tertiary} align="center">
-                  Cargá gastos en 2 meses para ver tu inflación personal vs el INDEC.
-                </Text>
-              </View>
-            </>
-          )}
-
-          <Text variant="caption" color={colors.text.tertiary} style={{ marginTop: spacing[2] }}>
-            Tasas INDEC estimadas por categoría. Datos actualizados mensualmente.
-          </Text>
-        </Card>
-
-        {/* Insights de IA */}
-        {report?.ai_insights && (
-          <Card style={styles.insightsCard}>
-            <View style={styles.insightsHeader}>
-              <Ionicons name="bulb-outline" size={20} color={colors.yellow} />
-              <Text variant="label" color={colors.text.secondary}>HALLAZGOS DEL MES</Text>
             </View>
-            {(report.ai_insights as any).findings?.map((finding: string, i: number) => (
-              <View key={i} style={styles.insightItem}>
-                <Text variant="caption" color={colors.neon}>→</Text>
-                <Text variant="bodySmall" color={colors.text.secondary} style={{ flex: 1 }}>
-                  {finding}
-                </Text>
-              </View>
-            ))}
-          </Card>
+
+            {/* Leyenda compacta */}
+            <View style={styles.legendRow}>
+              {breakdown.slice(0, 5).map((row) => (
+                <View key={row.id} style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: row.color }]} />
+                  <Text variant="caption" color={colors.text.secondary} numberOfLines={1}>
+                    {row.name}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Lista de categorías */}
+            <Card style={styles.listCard}>
+              <Text variant="label" color={colors.text.secondary} style={{ marginBottom: spacing[3] }}>
+                DESGLOSE POR CATEGORÍA
+              </Text>
+
+              {breakdown.map((row, i) => (
+                <View key={row.id ?? i}>
+                  <CategoryItem
+                    row={row}
+                    rank={i + 1}
+                    selected={expandedId === row.id}
+                    onPress={() => handleRowPress(row, i)}
+                  />
+
+                  {/* Gastos individuales de la categoría */}
+                  {expandedId === row.id && (
+                    <View style={styles.expensesList}>
+                      {row.expenses
+                        .sort((a, b) => b.amount - a.amount)
+                        .slice(0, 8)
+                        .map((exp) => (
+                          <View key={exp.id} style={styles.expenseItem}>
+                            <View style={{ flex: 1 }}>
+                              <Text variant="caption" color={colors.text.primary}>
+                                {exp.description}
+                              </Text>
+                              <Text variant="caption" color={colors.text.tertiary}>
+                                {exp.date}
+                              </Text>
+                            </View>
+                            <Text variant="caption" color={colors.text.primary} style={{ fontFamily: 'DMSans_600SemiBold' }}>
+                              {formatCurrency(exp.amount)}
+                            </Text>
+                          </View>
+                        ))}
+                      {row.expenses.length > 8 && (
+                        <Text variant="caption" color={colors.text.tertiary} align="center" style={{ paddingTop: spacing[2] }}>
+                          +{row.expenses.length - 8} gastos más
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+              ))}
+            </Card>
+          </>
         )}
-
-        {/* Simulador promo */}
-        <PressableCard variant="neon" style={styles.simulatorCard}>
-          <View style={styles.simulatorRow}>
-            <View style={{ flex: 1 }}>
-              <Text variant="subtitle" color={colors.neon}>Simulador de inversión</Text>
-              <Text variant="bodySmall" color={colors.text.secondary}>
-                ¿Qué hubiera pasado si esos {formatCurrency(totalInvestable)} los invertías?
-              </Text>
-            </View>
-            <Ionicons name="arrow-forward" size={20} color={colors.neon} />
-          </View>
-        </PressableCard>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function LegendItem({
-  color,
-  label,
-  amount,
-  pct,
-}: {
-  color: string;
-  label: string;
-  amount: number;
-  pct: number;
-}) {
-  return (
-    <View style={legendStyles.item}>
-      <View style={[legendStyles.dot, { backgroundColor: color }]} />
-      <View style={{ flex: 1 }}>
-        <Text variant="bodySmall" color={colors.text.primary}>{label}</Text>
-        <Text variant="caption" color={colors.text.secondary}>{formatCurrency(amount)}</Text>
-      </View>
-      <Text variant="labelMd" color={color}>{formatPercent(pct)}</Text>
-    </View>
-  );
-}
-
-const legendStyles = StyleSheet.create({
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-});
-
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg.primary },
+  safe:   { flex: 1, backgroundColor: colors.bg.primary },
   scroll: {
     paddingHorizontal: layout.screenPadding,
-    paddingTop: spacing[4],
-    paddingBottom: layout.tabBarHeight + spacing[4],
-    gap: spacing[4],
+    paddingTop:        spacing[4],
+    paddingBottom:     layout.tabBarHeight + spacing[8],
+    gap:               spacing[4],
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing[2],
+    marginBottom: spacing[1],
   },
-  totalCard: { padding: spacing[5], gap: spacing[2] },
-  comparisonRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  breakdownCard: { padding: spacing[5], gap: spacing[4] },
-  barContainer: {
-    flexDirection: 'row',
-    height: 12,
-    borderRadius: 6,
-    overflow: 'hidden',
-    gap: 2,
-  },
-  bar: { height: '100%' },
-  legend: { gap: spacing[3] },
-  // Inflation radar
-  inflationRadarCard: { padding: spacing[5], gap: spacing[3] },
-  inflationRadarHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-  },
-  inflationSummary: {
-    flexDirection: 'row',
-    paddingVertical: spacing[3],
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: colors.border.subtle,
-  },
-  inflationSummaryItem: { flex: 1, gap: spacing[1] },
-  inflationSummaryDivider: {
-    width: 1,
-    backgroundColor: colors.border.subtle,
-    marginHorizontal: spacing[2],
-  },
-  inflationSubtitle: { marginTop: spacing[1] },
-  inflationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  monthSelector: {
+    flexDirection:  'row',
+    alignItems:     'center',
     justifyContent: 'space-between',
     paddingVertical: spacing[2],
+    borderTopWidth:    1,
+    borderBottomWidth: 1,
+    borderColor:       colors.border.subtle,
+  },
+  monthArrow: {
+    padding: spacing[2],
+  },
+  loadingContainer: {
+    height:         280,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  emptyContainer: {
+    height:         280,
+    alignItems:     'center',
+    justifyContent: 'center',
+    gap:            spacing[4],
+  },
+  chartContainer: {
+    alignItems: 'center',
+    gap:        spacing[2],
+  },
+  chartCenter: {
+    position:       'absolute',
+    top:            0,
+    left:           0,
+    right:          0,
+    bottom:         0,
+    alignItems:     'center',
+    justifyContent: 'center',
+    gap:            2,
+  },
+  clearSelection: {
+    paddingVertical: spacing[1],
+  },
+  legendRow: {
+    flexDirection:  'row',
+    flexWrap:       'wrap',
+    gap:            spacing[3],
+    justifyContent: 'center',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           spacing[1],
+    maxWidth:      120,
+  },
+  legendDot: {
+    width:        8,
+    height:       8,
+    borderRadius: 4,
+  },
+  listCard: {
+    padding: spacing[4],
+  },
+  catRow: {
+    flexDirection:   'row',
+    alignItems:      'flex-start',
+    gap:             spacing[3],
+    paddingVertical: spacing[3],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
-  insightsCard: { padding: spacing[5], gap: spacing[3] },
-  insightsHeader: {
+  catDot: {
+    width:        12,
+    height:       12,
+    borderRadius: 6,
+    marginTop:    3,
+  },
+  catRowTop: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[3],
-    marginBottom: spacing[2],
+    alignItems:    'center',
+    gap:           spacing[2],
   },
-  insightItem: {
-    flexDirection: 'row',
-    gap: spacing[3],
-    alignItems: 'flex-start',
+  progressTrack: {
+    height:          5,
+    backgroundColor: colors.border.subtle,
+    borderRadius:    3,
+    overflow:        'hidden',
   },
-  emptySection: {
-    alignItems: 'center',
-    paddingVertical: spacing[4],
-    gap: spacing[3],
+  progressFill: {
+    height:       '100%',
+    borderRadius: 3,
   },
-  simulatorCard: { padding: spacing[5] },
-  simulatorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[4] },
+  expensesList: {
+    backgroundColor: colors.bg.secondary,
+    marginLeft:      spacing[6],
+    marginBottom:    spacing[2],
+    padding:         spacing[3],
+    gap:             spacing[2],
+  },
+  expenseItem: {
+    flexDirection:   'row',
+    alignItems:      'flex-start',
+    gap:             spacing[2],
+    paddingVertical: spacing[1],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.subtle,
+  },
 });

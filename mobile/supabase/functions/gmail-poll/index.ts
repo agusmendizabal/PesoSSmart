@@ -260,18 +260,20 @@ serve(async (req) => {
 
     const secondsSinceLastCheck = (Date.now() - new Date(connection.last_checked_at).getTime()) / 1000;
     if (secondsSinceLastCheck < 60) {
-      console.log('[gmail-poll] Rate limit: último poll hace', Math.round(secondsSinceLastCheck), 's');
-      const { data: pendingList } = await supabase
+      console.log('[gmail-poll] Rate limit: último poll hace', Math.round(secondsSinceLastCheck), 's — retornando recientes sin re-escanear');
+      const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: recentList } = await supabase
         .from('pending_transactions')
         .select('*')
         .eq('user_id', userId)
-        .eq('status', 'pending')
+        .eq('status', 'confirmed')
+        .gte('created_at', since24h)
         .order('created_at', { ascending: false });
       return new Response(JSON.stringify({
         gmail_connected: true,
         gmail_email: connection.gmail_email,
         new_found: 0,
-        pending: pendingList ?? [],
+        pending: recentList ?? [],
         rate_limited: true,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -431,6 +433,32 @@ serve(async (req) => {
         ? result.clasificacion
         : 'disposable';
 
+      // Buscar category_id en expense_categories
+      const { data: catData } = await supabase
+        .from('expense_categories')
+        .select('id')
+        .ilike('name_es', `%${result.categoria}%`)
+        .single();
+
+      // Auto-registrar directamente en expenses sin pedir confirmación
+      const { error: expenseInsertError } = await supabase.from('expenses').insert({
+        user_id: userId,
+        amount: result.monto,
+        description: result.comercio || result.descripcion || 'Gasto detectado',
+        category_id: catData?.id ?? null,
+        date: result.fecha ?? new Date().toISOString().split('T')[0],
+        payment_method: 'digital_wallet',
+        classification,
+        is_recurring: false,
+      });
+
+      if (expenseInsertError) {
+        console.error('[gmail-poll] Error auto-insertando en expenses:', expenseInsertError.message, expenseInsertError.code);
+      } else {
+        console.log('[gmail-poll] Auto-registrado en expenses OK:', result.comercio, result.monto);
+      }
+
+      // Guardar en pending_transactions como confirmed (solo para deduplicación)
       const { error: insertError } = await supabase.from('pending_transactions').upsert({
         user_id: userId,
         source: 'gmail',
@@ -442,14 +470,13 @@ serve(async (req) => {
         description: result.descripcion,
         transaction_date: finalDate,
         raw_subject: msg.id,
-        status: 'pending',
+        status: 'confirmed',
       }, { onConflict: 'user_id,raw_subject', ignoreDuplicates: true });
 
       if (insertError) {
         console.error('[gmail-poll] Error al insertar pending_transaction:', insertError);
       } else {
-        console.log('[gmail-poll] Guardado OK:', finalMerchant, finalAmount,
-          preParsed.warnings.length > 0 ? `| warnings: ${preParsed.warnings.join(', ')}` : '');
+        console.log('[gmail-poll] pending_transaction confirmed OK:', result.comercio, result.monto);
         newPending++;
       }
     }
@@ -463,20 +490,23 @@ serve(async (req) => {
       console.warn('[gmail-poll] Groq tuvo fallos — last_checked_at NO avanzado');
     }
 
-    console.log('[gmail-poll] Nuevos pendientes:', newPending);
+    console.log('[gmail-poll] Nuevos auto-registrados:', newPending);
 
-    const { data: pendingList } = await supabase
+    // Retornar gastos auto-registrados en las últimas 24h para mostrar al usuario
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: recentList } = await supabase
       .from('pending_transactions')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'pending')
+      .eq('status', 'confirmed')
+      .gte('created_at', since24h)
       .order('created_at', { ascending: false });
 
     return new Response(JSON.stringify({
       gmail_connected: true,
       gmail_email: connection.gmail_email,
       new_found: newPending,
-      pending: pendingList ?? [],
+      pending: recentList ?? [],
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

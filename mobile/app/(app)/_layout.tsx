@@ -82,9 +82,7 @@ export default function AppLayout() {
       />
       <Tabs.Screen
         name="reports"
-        options={{
-          href: null,
-        }}
+        options={{ href: null }}
       />
     </Tabs>
   );
