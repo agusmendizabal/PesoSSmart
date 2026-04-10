@@ -14,60 +14,62 @@ import {
   periodLabel,
   type Instrument,
 } from '@/lib/investmentData';
+import {
+  getPersonalizedRecommendation,
+  DEFAULT_INVESTMENT_PROFILE,
+  type UserInvestmentProfile,
+  type PersonalizedRecommendation,
+  type RecommendationGoal,
+} from '@/lib/investmentRecommendation';
 import { buildMonthKey } from './inflationCalc';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 export interface WhatIfResult {
-  instrument:     Instrument;
-  initialAmount:  number;
-  finalAmount:    number;
-  returnPct:      number;
-  gainArs:        number;
-  /** true si el rendimiento fue negativo */
-  isLoss:         boolean;
-  monthsCovered:  number;
-  periodLabel:    string;
-  /** true si el instrumento matchea algún interés del usuario */
+  instrument:      Instrument;
+  initialAmount:   number;
+  finalAmount:     number;
+  returnPct:       number;
+  gainArs:         number;
+  isLoss:          boolean;
+  monthsCovered:   number;
+  periodLabel:     string;
   matchesInterest: boolean;
-  /** Frase interpretativa breve */
-  interpretation: string;
+  interpretation:  string;
 }
 
 export interface CategoryOpportunity {
-  categoryNameEs:         string;
-  categoryColor:          string;
-  totalSpent:             number;
-  /** fracción sugerida para invertir (0-1) */
-  investableFraction:     number;
-  /** monto concreto sugerido a invertir */
-  investableAmount:       number;
-  whatIf:                 WhatIfResult[];
-  /** Frase introductoria para la categoría */
-  framing:                string;
+  categoryNameEs:     string;
+  categoryColor:      string;
+  totalSpent:         number;
+  investableFraction: number;
+  investableAmount:   number;
+  whatIf:             WhatIfResult[];
+  framing:            string;
 }
 
 export interface SavingsOpportunity {
-  savingsAmount:    number;
-  whatIf:           WhatIfResult;
-  /** Pérdida mensual estimada por inflación */
-  inflationLossArs: number;
+  savingsAmount:            number;
+  /** WhatIf para el instrumento primario recomendado */
+  whatIf:                   WhatIfResult;
+  /** WhatIf para el instrumento secundario (puede ser null) */
+  secondaryWhatIf:          WhatIfResult | null;
+  inflationLossArs:         number;
   officialMonthlyInflation: number;
+  /** Narrativa personalizada según perfil del usuario */
+  recommendation:           PersonalizedRecommendation;
 }
 
 export interface OpportunityInsights {
-  categoryOpportunities:  CategoryOpportunity[];
-  savingsOpportunity:     SavingsOpportunity | null;
-  /** Meses del rango analizado */
-  fromMonthKey:           string;
-  toMonthKey:             string;
-  monthsAnalyzed:         number;
+  categoryOpportunities: CategoryOpportunity[];
+  savingsOpportunity:    SavingsOpportunity | null;
+  fromMonthKey:          string;
+  toMonthKey:            string;
+  monthsAnalyzed:        number;
 }
 
 // ─── Mapa de categorías "invertibles" ─────────────────────────────────────────
-//
-// Fracción del gasto que podría haber sido ahorro / inversión.
-// Basado en qué tan discrecional es la categoría.
+// Fracción del gasto que podría haber sido ahorro.
 // 0 = todo necesario | 1 = todo discrecional
 
 const INVESTABLE_FRACTION: Record<string, number> = {
@@ -88,13 +90,12 @@ const INVESTABLE_FRACTION: Record<string, number> = {
   'otros':                 0.25,
 };
 
-const MIN_INVESTABLE_ARS  = 20_000;  // monto mínimo para mostrar el insight
-const MIN_FRACTION        = 0.20;    // solo categorías con ≥ 20% discrecional
+const MIN_INVESTABLE_ARS = 20_000;
+const MIN_FRACTION       = 0.20;
 
-/** Devuelve la fracción invertible de una categoría por name_es. */
 function getInvestableFraction(nameEs: string): number {
   const lower = nameEs.toLowerCase().trim();
-  return INVESTABLE_FRACTION[lower] ?? 0.25; // fallback para categorías no mapeadas
+  return INVESTABLE_FRACTION[lower] ?? 0.25;
 }
 
 // ─── Framing copy por categoría ───────────────────────────────────────────────
@@ -118,19 +119,19 @@ function getFramingCopy(nameEs: string): string {
 // ─── Generación de WhatIf ─────────────────────────────────────────────────────
 
 function buildWhatIf(
-  instrument: Instrument,
-  amount:     number,
-  from:       string,
-  to:         string,
+  instrument:   Instrument,
+  amount:       number,
+  from:         string,
+  to:           string,
   interestKeys: string[],
 ): WhatIfResult | null {
   const cumulative = getCumulativeReturn(instrument, from, to);
   if (!cumulative) return null;
 
   const { returnPct, monthsCovered } = cumulative;
-  const gain       = Math.round(amount * returnPct / 100);
-  const finalAmt   = amount + gain;
-  const isLoss     = returnPct < 0;
+  const gain     = Math.round(amount * returnPct / 100);
+  const finalAmt = amount + gain;
+  const isLoss   = returnPct < 0;
   const matchesInterest = instrument.matchInterestKeys.some(k => interestKeys.includes(k));
 
   let interpretation: string;
@@ -141,20 +142,17 @@ function buildWhatIf(
   } else {
     interpretation = `${instrument.shortName} generó un retorno moderado que ayuda a preservar el poder adquisitivo.`;
   }
-
-  if (matchesInterest && !isLoss) {
-    interpretation += ' Alineado con tus intereses.';
-  }
+  if (matchesInterest && !isLoss) interpretation += ' Alineado con tus intereses.';
 
   return {
     instrument,
-    initialAmount:  amount,
-    finalAmount:    finalAmt,
+    initialAmount: amount,
+    finalAmount:   finalAmt,
     returnPct,
-    gainArs:        gain,
+    gainArs:       gain,
     isLoss,
     monthsCovered,
-    periodLabel:    periodLabel(monthsCovered),
+    periodLabel:   periodLabel(monthsCovered),
     matchesInterest,
     interpretation,
   };
@@ -163,13 +161,14 @@ function buildWhatIf(
 // ─── Función principal ────────────────────────────────────────────────────────
 
 /**
- * Construye todos los insights de oportunidad de costo para el usuario.
+ * Construye todos los insights de oportunidad de costo.
  *
- * @param categoryBreakdown - Categorías con su gasto total (resultado de query)
- * @param interestKeys      - interest_key[] del usuario (user_interests table)
- * @param savingsAmount     - Ahorro actual del usuario (financial_profiles.savings_amount)
- * @param officialInflation - Inflación mensual oficial (%) para calcular pérdida en ahorros
+ * @param categoryBreakdown - Categorías con su gasto total
+ * @param interestKeys      - interest_key[] del usuario
+ * @param savingsAmount     - Ahorro actual (financial_profiles.savings_amount)
+ * @param officialInflation - Inflación mensual oficial (%)
  * @param monthsBack        - Cuántos meses analizar (default: 3)
+ * @param userProfile       - Perfil completo para recomendación personalizada (opcional)
  */
 export function buildOpportunityInsights(
   categoryBreakdown: { categoryNameEs: string; categoryColor: string; amount: number }[],
@@ -177,15 +176,15 @@ export function buildOpportunityInsights(
   savingsAmount:     number | null,
   officialInflation: number,
   monthsBack = 3,
+  userProfile?: UserInvestmentProfile,
 ): OpportunityInsights {
   // Rango de meses
-  const now         = new Date();
-  const toDate      = new Date(now.getFullYear(), now.getMonth() - 1, 1); // mes anterior
-  const fromDate    = new Date(toDate.getFullYear(), toDate.getMonth() - (monthsBack - 1), 1);
+  const now          = new Date();
+  const toDate       = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const fromDate     = new Date(toDate.getFullYear(), toDate.getMonth() - (monthsBack - 1), 1);
   const fromMonthKey = buildMonthKey(fromDate.getFullYear(), fromDate.getMonth() + 1);
   const toMonthKey   = buildMonthKey(toDate.getFullYear(),   toDate.getMonth()   + 1);
 
-  // Instrumentos recomendados según intereses
   const instruments = getRecommendedInstruments(interestKeys);
 
   // ── Oportunidades de categoría ─────────────────────────────────────────────
@@ -193,13 +192,10 @@ export function buildOpportunityInsights(
   const qualifying = categoryBreakdown
     .map(cat => ({
       ...cat,
-      fraction:       getInvestableFraction(cat.categoryNameEs),
-      investableAmt:  cat.amount * getInvestableFraction(cat.categoryNameEs),
+      fraction:      getInvestableFraction(cat.categoryNameEs),
+      investableAmt: cat.amount * getInvestableFraction(cat.categoryNameEs),
     }))
-    .filter(cat =>
-      cat.fraction >= MIN_FRACTION &&
-      cat.investableAmt >= MIN_INVESTABLE_ARS
-    )
+    .filter(cat => cat.fraction >= MIN_FRACTION && cat.investableAmt >= MIN_INVESTABLE_ARS)
     .sort((a, b) => b.investableAmt - a.investableAmt)
     .slice(0, 2);
 
@@ -224,32 +220,62 @@ export function buildOpportunityInsights(
   let savingsOpportunity: SavingsOpportunity | null = null;
 
   if (savingsAmount && savingsAmount >= 20_000) {
-    const fciResult = buildWhatIf(INSTRUMENTS.fci_mm, savingsAmount, toMonthKey, toMonthKey, interestKeys);
-    // Para el ahorro: mostrar cuánto generaría en UN MES con FCI
-    const oneMonthReturn = INSTRUMENTS.fci_mm.monthlyReturns[toMonthKey];
-    if (oneMonthReturn !== undefined) {
-      const gain    = Math.round(savingsAmount * oneMonthReturn / 100);
-      const fciWhatIf: WhatIfResult = {
-        instrument:      INSTRUMENTS.fci_mm,
+    // Obtener recomendación personalizada (o fallback)
+    const profile = userProfile ?? {
+      ...DEFAULT_INVESTMENT_PROFILE,
+      interestKeys,
+      officialInflation,
+    };
+    // Elegir objetivo según horizonte: corto = proteger, largo = crecer
+    const goal: RecommendationGoal =
+      profile.horizon === 'long_term' ? 'grow_savings' : 'protect_savings';
+    const recommendation = getPersonalizedRecommendation(profile, goal);
+
+    // WhatIf para instrumento primario (1 mes)
+    const primaryReturn = recommendation.primary.monthlyReturns[toMonthKey];
+    if (primaryReturn !== undefined) {
+      const primaryGain  = Math.round(savingsAmount * primaryReturn / 100);
+      const primaryWhatIf: WhatIfResult = {
+        instrument:      recommendation.primary,
         initialAmount:   savingsAmount,
-        finalAmount:     savingsAmount + gain,
-        returnPct:       oneMonthReturn,
-        gainArs:         gain,
+        finalAmount:     savingsAmount + primaryGain,
+        returnPct:       primaryReturn,
+        gainArs:         primaryGain,
         isLoss:          false,
         monthsCovered:   1,
         periodLabel:     'en 1 mes',
-        matchesInterest: interestKeys.includes('fci'),
-        interpretation:  'El FCI de liquidez es la forma más simple de que tu plata no quede quieta.',
+        matchesInterest: recommendation.primary.matchInterestKeys.some(k => interestKeys.includes(k)),
+        interpretation:  recommendation.rationale,
       };
 
-      // Pérdida estimada por inflación
-      const inflationLossArs = Math.round(savingsAmount * officialInflation / 100);
+      // WhatIf para instrumento secundario (1 mes), si existe
+      let secondaryWhatIf: WhatIfResult | null = null;
+      if (recommendation.secondary) {
+        const secReturn = recommendation.secondary.monthlyReturns[toMonthKey];
+        if (secReturn !== undefined) {
+          const secGain = Math.round(savingsAmount * secReturn / 100);
+          secondaryWhatIf = {
+            instrument:      recommendation.secondary,
+            initialAmount:   savingsAmount,
+            finalAmount:     savingsAmount + secGain,
+            returnPct:       secReturn,
+            gainArs:         secGain,
+            isLoss:          secReturn < 0,
+            monthsCovered:   1,
+            periodLabel:     'en 1 mes',
+            matchesInterest: recommendation.secondary.matchInterestKeys.some(k => interestKeys.includes(k)),
+            interpretation:  `Alternativa complementaria según tu perfil.`,
+          };
+        }
+      }
 
       savingsOpportunity = {
         savingsAmount,
-        whatIf:                  fciWhatIf,
-        inflationLossArs,
+        whatIf:                  primaryWhatIf,
+        secondaryWhatIf,
+        inflationLossArs:        Math.round(savingsAmount * officialInflation / 100),
         officialMonthlyInflation: officialInflation,
+        recommendation,
       };
     }
   }

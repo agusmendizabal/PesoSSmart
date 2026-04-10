@@ -4,14 +4,12 @@
  * "¿Qué podrías haber hecho con esa plata?"
  *
  * Muestra escenarios hipotéticos de inversión basados en los gastos reales
- * del usuario y sus intereses de inversión registrados.
- *
- * Disclaimer: son simulaciones educativas, no asesoramiento financiero.
+ * del usuario, sus intereses y su perfil de riesgo.
  *
  * Subcomponentes internos:
  *   WhatIfRow         – fila por instrumento con resultado hipotético
  *   CategoryCard      – card por categoría de gasto destacada
- *   SavingsCard       – insight si el usuario tiene ahorro parado
+ *   SavingsCard       – insight personalizado para ahorro parado
  *   Disclaimer        – nota legal discreta al pie
  */
 
@@ -23,7 +21,10 @@ import { Text } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/utils/format';
 import { getLatestIndecEntry } from '@/lib/indecData';
+import { deriveHorizon, DEFAULT_INVESTMENT_PROFILE, type UserInvestmentProfile, type ConfidenceLevel } from '@/lib/investmentRecommendation';
 import { buildOpportunityInsights, type OpportunityInsights, type WhatIfResult, type CategoryOpportunity, type SavingsOpportunity } from '@/utils/opportunityCost';
+import { RecommendationComparison } from './RecommendationComparison';
+import type { RiskProfile } from '@/types';
 
 // ─── Colores por nivel de riesgo ──────────────────────────────────────────────
 
@@ -32,32 +33,75 @@ const RISK_BG    = { low: colors.primary + '14', medium: colors.yellow + '16', h
 
 // ─── WhatIfRow ────────────────────────────────────────────────────────────────
 
-function WhatIfRow({ result }: { result: WhatIfResult }) {
-  const rColor  = RISK_COLOR[result.instrument.riskLevel];
-  const rBg     = RISK_BG[result.instrument.riskLevel];
+// ─── Confidence Badge ─────────────────────────────────────────────────────────
+
+const CONFIDENCE_COLOR: Record<ConfidenceLevel, string> = {
+  high:   colors.primary,
+  medium: colors.yellow,
+  low:    colors.text.tertiary,
+};
+
+function ConfidenceBadge({ level, note }: { level: ConfidenceLevel; note: string }) {
+  const color = CONFIDENCE_COLOR[level];
+  const label = level === 'high' ? 'PERSONALIZADA' : level === 'medium' ? 'PARCIAL' : 'GENÉRICA';
+  return (
+    <View style={confStyles.row}>
+      <View style={[confStyles.dot, { backgroundColor: color }]} />
+      <Text variant="caption" color={colors.text.tertiary} style={{ flex: 1, lineHeight: 15 }}>
+        <Text variant="caption" color={color}>{label} · </Text>
+        {note}
+      </Text>
+    </View>
+  );
+}
+
+const confStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems:    'flex-start',
+    gap:           spacing[2],
+  },
+  dot: {
+    width:        6,
+    height:       6,
+    borderRadius: 3,
+    marginTop:    4,
+    flexShrink:   0,
+  },
+});
+
+// ─── WhatIfRow ────────────────────────────────────────────────────────────────
+
+function WhatIfRow({ result, uiLabel, uiColor }: { result: WhatIfResult; uiLabel?: string; uiColor?: string }) {
+  const rColor    = RISK_COLOR[result.instrument.riskLevel];
+  const rBg       = RISK_BG[result.instrument.riskLevel];
   const gainColor = result.isLoss ? colors.red : colors.primary;
 
   return (
     <View style={wifStyles.container}>
-      {/* Header: instrumento + risk badge */}
+      {/* Header: instrumento + badges */}
       <View style={wifStyles.header}>
         <View style={{ flex: 1 }}>
-          <Text
-            variant="bodySmall"
-            color={colors.text.primary}
-            style={{ fontFamily: 'DMSans_600SemiBold' }}
-            numberOfLines={1}
-          >
+          <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'DMSans_600SemiBold' }} numberOfLines={1}>
             {result.instrument.name}
           </Text>
           <Text variant="caption" color={colors.text.tertiary}>
             {result.instrument.description}
           </Text>
         </View>
-        <View style={[wifStyles.riskBadge, { backgroundColor: rBg }]}>
-          <Text variant="caption" color={rColor} style={{ fontSize: 9 }}>
-            {result.instrument.riskLabel.toUpperCase()}
-          </Text>
+        <View style={wifStyles.badges}>
+          {uiLabel && uiColor && (
+            <View style={[wifStyles.riskBadge, { backgroundColor: uiColor + '20' }]}>
+              <Text variant="caption" color={uiColor} style={{ fontSize: 9 }}>
+                {uiLabel.toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <View style={[wifStyles.riskBadge, { backgroundColor: rBg }]}>
+            <Text variant="caption" color={rColor} style={{ fontSize: 9 }}>
+              {result.instrument.riskLabel.toUpperCase()}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -86,11 +130,7 @@ function WhatIfRow({ result }: { result: WhatIfResult }) {
 
       {/* Ganancia/pérdida */}
       <View style={wifStyles.gainRow}>
-        <Text
-          variant="caption"
-          color={gainColor}
-          style={{ fontFamily: 'DMSans_600SemiBold' }}
-        >
+        <Text variant="caption" color={gainColor} style={{ fontFamily: 'DMSans_600SemiBold' }}>
           {result.isLoss ? '−' : '+'}{formatCurrency(Math.abs(result.gainArs))}
           {'  '}({result.isLoss ? '' : '+'}{result.returnPct.toFixed(1)}%)
           {'  '}en {result.periodLabel}
@@ -120,9 +160,16 @@ const wifStyles = StyleSheet.create({
     gap:             spacing[3],
   },
   header: {
-    flexDirection:  'row',
-    alignItems:     'flex-start',
-    gap:            spacing[3],
+    flexDirection: 'row',
+    alignItems:    'flex-start',
+    gap:           spacing[3],
+  },
+  badges: {
+    flexDirection: 'row',
+    gap:           spacing[1],
+    flexShrink:    0,
+    flexWrap:      'wrap',
+    justifyContent: 'flex-end',
   },
   riskBadge: {
     paddingHorizontal: spacing[2],
@@ -132,19 +179,19 @@ const wifStyles = StyleSheet.create({
     flexShrink:        0,
   },
   amounts: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'space-between',
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'space-between',
     paddingVertical: spacing[1],
   },
   gainRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    gap:            spacing[2],
-    flexWrap:       'wrap',
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           spacing[2],
+    flexWrap:      'wrap',
   },
   interestTag: {
-    backgroundColor:  colors.accent + '14',
+    backgroundColor:   colors.accent + '14',
     paddingHorizontal: spacing[2],
     paddingVertical:   2,
     borderRadius:      3,
@@ -155,16 +202,11 @@ const wifStyles = StyleSheet.create({
 
 function CategoryCard({ opportunity, monthsBack }: { opportunity: CategoryOpportunity; monthsBack: number }) {
   const [expanded, setExpanded] = useState(true);
-  const investPct  = Math.round(opportunity.investableFraction * 100);
+  const investPct = Math.round(opportunity.investableFraction * 100);
 
   return (
     <View style={catStyles.card}>
-      {/* Header */}
-      <TouchableOpacity
-        style={catStyles.header}
-        onPress={() => setExpanded(e => !e)}
-        activeOpacity={0.7}
-      >
+      <TouchableOpacity style={catStyles.header} onPress={() => setExpanded(e => !e)} activeOpacity={0.7}>
         <View style={[catStyles.dot, { backgroundColor: opportunity.categoryColor }]} />
         <View style={{ flex: 1 }}>
           <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'DMSans_600SemiBold' }}>
@@ -174,28 +216,19 @@ function CategoryCard({ opportunity, monthsBack }: { opportunity: CategoryOpport
             {formatCurrency(opportunity.totalSpent)} en los últimos {monthsBack} meses
           </Text>
         </View>
-        <Ionicons
-          name={expanded ? 'chevron-up' : 'chevron-down'}
-          size={14}
-          color={colors.text.tertiary}
-        />
+        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.tertiary} />
       </TouchableOpacity>
 
       {expanded && (
         <>
-          {/* Framing */}
           <Text variant="bodySmall" color={colors.text.secondary} style={{ lineHeight: 20 }}>
             {opportunity.framing}
           </Text>
-
-          {/* Monto sugerido */}
           <View style={catStyles.investBox}>
             <Text variant="caption" color={colors.text.tertiary}>
               Si el {investPct}% ({formatCurrency(opportunity.investableAmount)}) fuera a rendimiento...
             </Text>
           </View>
-
-          {/* WhatIf por instrumento */}
           <View style={{ gap: spacing[3] }}>
             {opportunity.whatIf.map(wif => (
               <WhatIfRow key={wif.instrument.id} result={wif} />
@@ -209,16 +242,16 @@ function CategoryCard({ opportunity, monthsBack }: { opportunity: CategoryOpport
 
 const catStyles = StyleSheet.create({
   card: {
-    borderWidth:   1,
-    borderColor:   colors.border.subtle,
-    borderRadius:  12,
-    padding:       spacing[4],
-    gap:           spacing[4],
+    borderWidth:  1,
+    borderColor:  colors.border.subtle,
+    borderRadius: 12,
+    padding:      spacing[4],
+    gap:          spacing[4],
   },
   header: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    gap:            spacing[3],
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           spacing[3],
   },
   dot: {
     width:        10,
@@ -237,23 +270,32 @@ const catStyles = StyleSheet.create({
 // ─── SavingsCard ──────────────────────────────────────────────────────────────
 
 function SavingsCard({ opportunity }: { opportunity: SavingsOpportunity }) {
-  const { savingsAmount, whatIf, inflationLossArs, officialMonthlyInflation } = opportunity;
+  const { savingsAmount, whatIf, secondaryWhatIf, inflationLossArs, officialMonthlyInflation, recommendation } = opportunity;
+  const [expanded, setExpanded] = useState(true);
 
   return (
     <View style={savStyles.card}>
+      {/* Título */}
       <View style={savStyles.titleRow}>
         <Ionicons name="wallet-outline" size={16} color={colors.yellow} />
         <Text variant="label" color={colors.yellow}>PLATA SIN INVERTIR</Text>
       </View>
 
+      {/* Monto ahorrado */}
       <Text variant="bodySmall" color={colors.text.primary} style={{ lineHeight: 20 }}>
         Tenés{' '}
         <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'DMSans_700Bold' }}>
           {formatCurrency(savingsAmount)}
         </Text>
-        {' '}guardados. Si quedan en pesos sin rendimiento, la inflación los va desgastando.
+        {' '}guardados sin rendir.
       </Text>
 
+      {/* Narrativa personalizada */}
+      <Text variant="bodySmall" color={colors.text.secondary} style={{ lineHeight: 20 }}>
+        {recommendation.explanation}
+      </Text>
+
+      {/* Costo de no invertir */}
       <View style={savStyles.lossRow}>
         <Text variant="caption" color={colors.text.secondary}>
           Con inflación de {officialMonthlyInflation.toFixed(1)}% mensual:
@@ -263,7 +305,37 @@ function SavingsCard({ opportunity }: { opportunity: SavingsOpportunity }) {
         </Text>
       </View>
 
-      <WhatIfRow result={whatIf} />
+      {/* Simulaciones */}
+      <TouchableOpacity
+        style={savStyles.expandRow}
+        onPress={() => setExpanded(e => !e)}
+        activeOpacity={0.7}
+      >
+        <Text variant="label" color={colors.text.tertiary} style={{ fontSize: 10 }}>
+          {expanded ? 'OCULTAR SIMULACIONES' : 'VER SIMULACIONES'}
+        </Text>
+        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={12} color={colors.text.tertiary} />
+      </TouchableOpacity>
+
+      {/* Confianza de la sugerencia */}
+      <ConfidenceBadge level={recommendation.confidence.level} note={recommendation.confidence.note} />
+
+      {expanded && (
+        <View style={{ gap: spacing[3] }}>
+          <WhatIfRow
+            result={whatIf}
+            uiLabel={recommendation.primary.uiLabel}
+            uiColor={recommendation.primary.uiColor}
+          />
+          {secondaryWhatIf && recommendation.secondary && (
+            <WhatIfRow
+              result={secondaryWhatIf}
+              uiLabel={recommendation.secondary.uiLabel}
+              uiColor={recommendation.secondary.uiColor}
+            />
+          )}
+        </View>
+      )}
 
       <Text variant="caption" color={colors.text.tertiary}>
         Si cambió tu ahorro, actualizalo en Perfil.
@@ -274,12 +346,12 @@ function SavingsCard({ opportunity }: { opportunity: SavingsOpportunity }) {
 
 const savStyles = StyleSheet.create({
   card: {
-    backgroundColor:  colors.yellow + '10',
-    borderRadius:     12,
-    borderWidth:      1,
-    borderColor:      colors.yellow + '30',
-    padding:          spacing[4],
-    gap:              spacing[4],
+    backgroundColor: colors.yellow + '10',
+    borderRadius:    12,
+    borderWidth:     1,
+    borderColor:     colors.yellow + '30',
+    padding:         spacing[4],
+    gap:             spacing[4],
   },
   titleRow: {
     flexDirection: 'row',
@@ -293,6 +365,11 @@ const savStyles = StyleSheet.create({
     paddingVertical:   spacing[2],
     gap:               3,
   },
+  expandRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           spacing[2],
+  },
 });
 
 // ─── Disclaimer ───────────────────────────────────────────────────────────────
@@ -302,7 +379,11 @@ function Disclaimer() {
     <View style={discStyles.container}>
       <Ionicons name="shield-checkmark-outline" size={12} color={colors.text.tertiary} />
       <Text variant="caption" color={colors.text.tertiary} style={{ flex: 1, lineHeight: 16 }}>
-        Simulaciones con rendimientos históricos aproximados. No son asesoramiento financiero.
+        Simulaciones educativas con rendimientos históricos aproximados.{' '}
+        <Text variant="caption" color={colors.text.tertiary} style={{ fontFamily: 'DMSans_600SemiBold' }}>
+          No son asesoramiento financiero ni recomendación de inversión (CNV).
+        </Text>
+        {' '}Consultá a un asesor registrado antes de invertir.
         Rentabilidades pasadas no garantizan resultados futuros.
       </Text>
     </View>
@@ -311,19 +392,19 @@ function Disclaimer() {
 
 const discStyles = StyleSheet.create({
   container: {
-    flexDirection:    'row',
-    alignItems:       'flex-start',
-    gap:              spacing[2],
-    paddingTop:       spacing[2],
-    borderTopWidth:   1,
-    borderTopColor:   colors.border.subtle,
+    flexDirection:  'row',
+    alignItems:     'flex-start',
+    gap:            spacing[2],
+    paddingTop:     spacing[2],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle,
   },
 });
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 interface OpportunityCostProps {
-  userId:     string;
+  userId:      string;
   monthsBack?: number;
 }
 
@@ -332,11 +413,12 @@ interface FetchedData {
   interestKeys:      string[];
   savingsAmount:     number | null;
   officialInflation: number;
+  userProfile:       UserInvestmentProfile;
 }
 
 export function OpportunityCost({ userId, monthsBack = 3 }: OpportunityCostProps) {
-  const [loading,   setLoading]   = useState(true);
-  const [insights,  setInsights]  = useState<OpportunityInsights | null>(null);
+  const [loading,  setLoading]  = useState(true);
+  const [insights, setInsights] = useState<OpportunityInsights | null>(null);
 
   useEffect(() => { load(); }, [userId]);
 
@@ -350,6 +432,7 @@ export function OpportunityCost({ userId, monthsBack = 3 }: OpportunityCostProps
         data.savingsAmount,
         data.officialInflation,
         monthsBack,
+        data.userProfile,
       ));
     } catch {
       setInsights(null);
@@ -373,11 +456,10 @@ export function OpportunityCost({ userId, monthsBack = 3 }: OpportunityCostProps
     insights &&
     (insights.categoryOpportunities.length > 0 || insights.savingsOpportunity !== null);
 
-  if (!hasContent) return null; // No mostrar nada si no hay datos relevantes
+  if (!hasContent) return null;
 
   return (
     <View style={s.container}>
-      {/* Título */}
       <View style={s.titleRow}>
         <Text variant="label" color={colors.text.tertiary}>💡  ¿QUÉ PODRÍAS HABER HECHO CON ESA PLATA?</Text>
       </View>
@@ -386,20 +468,14 @@ export function OpportunityCost({ userId, monthsBack = 3 }: OpportunityCostProps
         Sin culpas — solo para ver las posibilidades.
       </Text>
 
-      {/* Cards de categorías */}
       {insights.categoryOpportunities.length > 0 && (
         <View style={{ gap: spacing[4] }}>
           {insights.categoryOpportunities.map(opp => (
-            <CategoryCard
-              key={opp.categoryNameEs}
-              opportunity={opp}
-              monthsBack={monthsBack}
-            />
+            <CategoryCard key={opp.categoryNameEs} opportunity={opp} monthsBack={monthsBack} />
           ))}
         </View>
       )}
 
-      {/* Card de ahorro parado */}
       {insights.savingsOpportunity && (
         <SavingsCard opportunity={insights.savingsOpportunity} />
       )}
@@ -412,7 +488,6 @@ export function OpportunityCost({ userId, monthsBack = 3 }: OpportunityCostProps
 // ─── Fetch de datos ───────────────────────────────────────────────────────────
 
 async function fetchAllData(userId: string, monthsBack: number): Promise<FetchedData> {
-  // Rango de fechas: últimos monthsBack meses completos
   const now      = new Date();
   const toDate   = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const fromDate = new Date(toDate.getFullYear(), toDate.getMonth() - (monthsBack - 1), 1);
@@ -420,7 +495,7 @@ async function fetchAllData(userId: string, monthsBack: number): Promise<Fetched
   const lastDay  = new Date(toDate.getFullYear(), toDate.getMonth() + 1, 0).getDate();
   const to       = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}-${lastDay}`;
 
-  const [expensesRes, interestsRes, profileRes] = await Promise.all([
+  const [expensesRes, interestsRes, profileRes, riskRes] = await Promise.all([
     supabase
       .from('expenses')
       .select('amount, expense_categories ( name_es, color )')
@@ -437,6 +512,12 @@ async function fetchAllData(userId: string, monthsBack: number): Promise<Fetched
     supabase
       .from('financial_profiles')
       .select('savings_amount')
+      .eq('user_id', userId)
+      .maybeSingle(),
+
+    supabase
+      .from('risk_profiles')
+      .select('profile, answers')
       .eq('user_id', userId)
       .maybeSingle(),
   ]);
@@ -456,11 +537,24 @@ async function fetchAllData(userId: string, monthsBack: number): Promise<Fetched
   const savingsAmount   = (profileRes.data as any)?.savings_amount ?? null;
   const officialInflation = getLatestIndecEntry().general;
 
+  // Construir perfil de inversión desde risk_profiles
+  const riskData = riskRes.data as any;
+  const riskProfile: RiskProfile = riskData?.profile ?? 'conservative';
+  const riskAnswers: Record<string, string> = riskData?.answers ?? {};
+
+  const userProfile: UserInvestmentProfile = {
+    riskProfile,
+    horizon:           deriveHorizon(riskAnswers),
+    interestKeys,
+    officialInflation,
+  };
+
   return {
     categoryBreakdown: Object.values(grouped).filter(c => c.amount > 0),
     interestKeys,
     savingsAmount,
     officialInflation,
+    userProfile,
   };
 }
 

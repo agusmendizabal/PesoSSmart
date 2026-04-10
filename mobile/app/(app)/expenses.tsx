@@ -372,7 +372,7 @@ export default function ExpensesScreen() {
         {[
           { key: null, label: 'Todos' },
           { key: 'necessary', label: 'Necesario' },
-          { key: 'disposable', label: 'Prescindible' },
+          { key: 'disposable', label: 'Prescind.' },
           { key: 'investable', label: 'Invertible' },
         ].map((f) => (
           <TouchableOpacity
