@@ -236,6 +236,73 @@ export interface FeatureUsageLog {
   metadata: Json | null;
 }
 
+// ---- Grupo Familiar / Pareja ----
+
+export type GroupType = 'family' | 'couple';
+
+export type MemberRole =
+  | 'parent'
+  | 'child'
+  | 'partner'
+  | 'guardian'
+  | 'other_adult';
+
+export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
+  parent: 'Padre / Madre',
+  child: 'Hijo / Hija',
+  partner: 'Pareja',
+  guardian: 'Tutor/a',
+  other_adult: 'Otro adulto',
+};
+
+export const MEMBER_ROLE_ICONS: Record<MemberRole, string> = {
+  parent: 'person',
+  child: 'happy-outline',
+  partner: 'heart-outline',
+  guardian: 'shield-outline',
+  other_adult: 'person-outline',
+};
+
+/** Roles considerados "adultos responsables" — pueden ver gastos de hijos */
+export const ADULT_ROLES: MemberRole[] = ['parent', 'guardian', 'other_adult'];
+
+/** Roles considerados "menores" — no ven gastos de adultos */
+export const MINOR_ROLES: MemberRole[] = ['child'];
+
+export interface FamilyGroup {
+  id: string;
+  name: string;
+  invite_code: string;
+  group_type: GroupType;
+  owner_id: string | null;
+  created_at: string;
+}
+
+export interface FamilyMember {
+  id: string;
+  group_id: string;
+  user_id: string;
+  role: MemberRole;
+  joined_at: string;
+  // joined
+  profile?: Pick<Profile, 'id' | 'full_name' | 'email' | 'avatar_url'>;
+}
+
+export interface GroupTransfer {
+  id: string;
+  group_id: string;
+  from_user_id: string;
+  to_user_id: string;
+  amount: number;
+  currency: string;
+  note: string | null;
+  transfer_date: string;
+  created_at: string;
+  // joined
+  from_profile?: Pick<Profile, 'id' | 'full_name'>;
+  to_profile?: Pick<Profile, 'id' | 'full_name'>;
+}
+
 export interface UserAlert {
   id: string;
   user_id: string;
