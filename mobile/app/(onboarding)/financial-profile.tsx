@@ -18,12 +18,12 @@ import type { IncomeRange, WorkType, FamilyStatus, SelectOption } from '@/types'
 // ---- Opciones ----
 
 const incomeOptions: SelectOption<IncomeRange>[] = [
-  { label: 'Menos de $150.000', value: 'under_150k', description: 'Ingresos bajos' },
-  { label: '$150.000 – $300.000', value: '150k_300k', description: 'Ingresos medios bajos' },
-  { label: '$300.000 – $500.000', value: '300k_500k', description: 'Ingresos medios' },
-  { label: '$500.000 – $800.000', value: '500k_800k', description: 'Ingresos medios altos' },
-  { label: '$800.000 – $1.500.000', value: '800k_1500k', description: 'Ingresos altos' },
-  { label: 'Más de $1.500.000', value: 'over_1500k', description: 'Ingresos muy altos' },
+  { label: 'Menos de $500.000', value: 'under_150k', description: 'Ingresos bajos' },
+  { label: '$500.000 – $1.000.000', value: '150k_300k', description: 'Ingresos medios bajos' },
+  { label: '$1.000.000 – $2.000.000', value: '300k_500k', description: 'Ingresos medios' },
+  { label: '$2.000.000 – $3.500.000', value: '500k_800k', description: 'Ingresos medios altos' },
+  { label: '$3.500.000 – $6.000.000', value: '800k_1500k', description: 'Ingresos altos' },
+  { label: 'Más de $6.000.000', value: 'over_1500k', description: 'Ingresos muy altos' },
 ];
 
 const workOptions: SelectOption<WorkType>[] = [

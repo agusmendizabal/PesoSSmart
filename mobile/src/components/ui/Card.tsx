@@ -70,7 +70,13 @@ export function PressableCard({ variant = 'default', padding = layout.cardPaddin
 const styles = StyleSheet.create({
   base: {
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
+    // Sombra sutil y consistente
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
   },
 });

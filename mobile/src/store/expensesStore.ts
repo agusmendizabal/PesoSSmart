@@ -20,12 +20,12 @@ export interface DetectedSubscription {
 }
 
 const INCOME_RANGE_MAP: Record<string, number> = {
-  under_150k: 100000,
-  '150k_300k': 225000,
-  '300k_500k': 400000,
-  '500k_800k': 650000,
-  '800k_1500k': 1150000,
-  over_1500k: 2000000,
+  under_150k:   300000,   // < $500k → punto medio ~$300k
+  '150k_300k':  750000,   // $500k–$1M → $750k
+  '300k_500k':  1500000,  // $1M–$2M → $1.5M
+  '500k_800k':  2750000,  // $2M–$3.5M → $2.75M
+  '800k_1500k': 4750000,  // $3.5M–$6M → $4.75M
+  over_1500k:   8000000,  // > $6M → $8M
 };
 
 const PAGE_SIZE = 30;
