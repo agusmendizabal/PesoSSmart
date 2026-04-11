@@ -824,10 +824,25 @@ export default function ReportsScreen() {
           <View style={s.loading}><ActivityIndicator size="large" color={colors.primary} /></View>
         ) : displayTotal === 0 ? (
           <View style={s.empty}>
-            <Ionicons name="bar-chart-outline" size={48} color={colors.border.default} />
-            <Text variant="body" color={colors.text.tertiary} align="center">
-              No hay gastos para{'\n'}{MONTH_NAMES[month - 1]} {year}
+            <View style={s.emptyIconWrap}>
+              <Ionicons name="bar-chart-outline" size={40} color={colors.text.tertiary} />
+            </View>
+            <Text variant="subtitle" color={colors.text.primary} align="center">
+              Sin datos para {MONTH_NAMES[month - 1]} {year}
             </Text>
+            <Text variant="body" color={colors.text.secondary} align="center" style={{ lineHeight: 22 }}>
+              Cargá gastos para ver tu informe, salud financiera y oportunidades de ahorro.
+            </Text>
+            <TouchableOpacity
+              style={s.emptyBtn}
+              onPress={() => router.push('/(app)/expenses')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={16} color={colors.black} />
+              <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: colors.black }}>
+                Ir a cargar gastos
+              </Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <>
@@ -851,7 +866,9 @@ export default function ReportsScreen() {
 const s = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: colors.bg.primary },
   scroll:  { paddingHorizontal: layout.screenPadding, paddingTop: spacing[4], paddingBottom: layout.tabBarHeight + spacing[8], gap: spacing[4] },
-  loading: { height: 280, alignItems: 'center', justifyContent: 'center' },
-  empty:   { height: 280, alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
-  section: { padding: spacing[5] },
+  loading:      { height: 280, alignItems: 'center', justifyContent: 'center' },
+  empty:        { alignItems: 'center', justifyContent: 'center', gap: spacing[4], paddingVertical: spacing[10] },
+  emptyIconWrap:{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.bg.elevated, alignItems: 'center', justifyContent: 'center' },
+  emptyBtn:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: colors.neon, borderRadius: 10, paddingHorizontal: spacing[5], paddingVertical: spacing[3] },
+  section:      { padding: spacing[5] },
 });

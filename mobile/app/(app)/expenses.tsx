@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -52,6 +52,104 @@ const paymentMethods: { value: PaymentMethod; label: string; icon: string }[] = 
   { value: 'other', label: 'Otro', icon: 'ellipsis-horizontal-outline' },
 ];
 
+// ─── BarChart — reemplaza al donut ────────────────────────────────────────────
+
+function CategoryBarChart({ rows, total }: {
+  rows: { name: string; color: string; amount: number; pct: number }[];
+  total: number;
+}) {
+  const maxAmount = rows[0]?.amount ?? 1;
+  return (
+    <View style={detStyles.barChart}>
+      {/* Resumen total */}
+      <View style={detStyles.totalRow}>
+        <Text variant="label" color={colors.text.tertiary}>TOTAL DEL MES</Text>
+        <Text variant="labelMd" color={colors.text.primary}>{formatCurrency(total)}</Text>
+      </View>
+
+      {/* Barra stacked de composición */}
+      <View style={detStyles.stackBar}>
+        {rows.map((row, i) => (
+          <View
+            key={i}
+            style={[
+              detStyles.stackSlice,
+              { flex: row.amount, backgroundColor: row.color },
+              i === 0 && { borderTopLeftRadius: 4, borderBottomLeftRadius: 4 },
+              i === rows.length - 1 && { borderTopRightRadius: 4, borderBottomRightRadius: 4 },
+            ]}
+          />
+        ))}
+      </View>
+
+      {/* Filas de barras horizontales */}
+      <View style={detStyles.barList}>
+        {rows.map((row, i) => (
+          <View key={i} style={detStyles.barRow}>
+            {/* Label row */}
+            <View style={detStyles.barLabelRow}>
+              <View style={[detStyles.barDot, { backgroundColor: row.color }]} />
+              <Text style={detStyles.barName} numberOfLines={1}>{row.name}</Text>
+              <Text style={[detStyles.barPct, { color: row.color }]}>
+                {Math.round(row.pct * 100)}%
+              </Text>
+              <Text style={detStyles.barAmount}>{formatCurrency(row.amount)}</Text>
+            </View>
+            {/* Barra proporcional al máximo */}
+            <View style={detStyles.barTrack}>
+              <View style={[
+                detStyles.barFill,
+                { width: `${(row.amount / maxAmount) * 100}%`, backgroundColor: row.color },
+              ]} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ─── Estilos del card de detalles ─────────────────────────────────────────────
+
+const detStyles = StyleSheet.create({
+  card: {
+    marginHorizontal: layout.screenPadding,
+    marginTop:        spacing[1],
+    marginBottom:     spacing[2],
+    paddingVertical:  spacing[5],
+    paddingHorizontal: spacing[5],
+    backgroundColor:  colors.bg.card,
+    borderWidth:      1,
+    borderColor:      colors.border.default,
+    borderRadius:     12,
+    gap:              spacing[5],
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           spacing[2],
+  },
+  barChart:   { gap: spacing[4] },
+  totalRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
+  // Stacked bar
+  stackBar:   { height: 8, flexDirection: 'row', borderRadius: 4, overflow: 'hidden', backgroundColor: colors.border.subtle },
+  stackSlice: { height: '100%' },
+
+  // Bar list
+  barList:   { gap: spacing[4] },
+  barRow:    { gap: spacing[1] },
+  barLabelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: 4 },
+  barDot:    { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  barName:   { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 13, color: colors.text.primary },
+  barPct:    { fontFamily: 'Montserrat_700Bold', fontSize: 12, minWidth: 32, textAlign: 'right' },
+  barAmount: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: colors.text.secondary, minWidth: 72, textAlign: 'right' },
+  barTrack:  { height: 6, backgroundColor: colors.border.subtle, borderRadius: 3, overflow: 'hidden' },
+  barFill:   { height: '100%', borderRadius: 3 },
+});
+
+// ─── Screen ────────────────────────────────────────────────────────────────────
+
 export default function ExpensesScreen() {
   const { user } = useAuthStore();
   const {
@@ -80,6 +178,27 @@ export default function ExpensesScreen() {
   // dolarLabels viene del hook pero también exportamos DOLAR_LABELS directamente
 
   const [showSubscriptions, setShowSubscriptions] = useState(false);
+  const [activeTab, setActiveTab] = useState<'gastos' | 'stats'>('gastos');
+
+  // Agrupar gastos del mes actual por categoría para el resumen de detalles
+  const categoryRows = useMemo(() => {
+    const now   = new Date();
+    const ymKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const map: Record<string, { name: string; color: string; icon: string; amount: number }> = {};
+    for (const e of expenses) {
+      if (!e.date.startsWith(ymKey)) continue;
+      const key   = e.category_id ?? '__none__';
+      const name  = e.category?.name_es ?? 'Sin categoría';
+      const color = e.category?.color ?? '#78909c';
+      const icon  = e.category?.icon ?? 'help-circle-outline';
+      if (!map[key]) map[key] = { name, color, icon, amount: 0 };
+      map[key].amount += e.amount;
+    }
+    const total = Object.values(map).reduce((s, r) => s + r.amount, 0);
+    return Object.values(map)
+      .map(r => ({ ...r, pct: total > 0 ? r.amount / total : 0 }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [expenses]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -403,41 +522,36 @@ export default function ExpensesScreen() {
 
       {/* Resumen del mes */}
       <View style={styles.summaryCard}>
-        <View style={styles.summaryTop}>
-          <Text variant="caption" color={colors.text.tertiary}>TOTAL ESTE MES</Text>
-          <Text variant="numberLg" color={colors.text.primary}>{formatCurrency(totalThisMonth)}</Text>
-        </View>
-        {/* Barra de composición */}
+        <Text variant="caption" color={colors.text.tertiary}>TOTAL ESTE MES</Text>
+        <Text variant="numberLg" color={colors.text.primary}>{formatCurrency(totalThisMonth)}</Text>
+
         {totalThisMonth > 0 && (
-          <View style={styles.compositionBar}>
-            {totalNecessary  > 0 && <View style={[styles.barSlice, { flex: totalNecessary,  backgroundColor: colors.accent }]} />}
-            {totalDisposable > 0 && <View style={[styles.barSlice, { flex: totalDisposable, backgroundColor: colors.red   }]} />}
-            {totalInvestable > 0 && <View style={[styles.barSlice, { flex: totalInvestable, backgroundColor: colors.neon  }]} />}
-          </View>
+          <>
+            {/* Barra de composición */}
+            <View style={styles.compositionBar}>
+              {totalNecessary  > 0 && <View style={[styles.barSlice, { flex: totalNecessary,  backgroundColor: colors.accent }]} />}
+              {totalDisposable > 0 && <View style={[styles.barSlice, { flex: totalDisposable, backgroundColor: colors.red   }]} />}
+              {totalInvestable > 0 && <View style={[styles.barSlice, { flex: totalInvestable, backgroundColor: colors.neon  }]} />}
+            </View>
+
+            {/* Métricas en fila */}
+            <View style={styles.summaryMetrics}>
+              {[
+                { label: 'Necesario',    amount: totalNecessary,  color: colors.accent },
+                { label: 'Prescindible', amount: totalDisposable, color: colors.red    },
+                { label: 'Invertible',   amount: totalInvestable, color: colors.neon   },
+              ].map((m) => (
+                <View key={m.label} style={styles.metricItem}>
+                  <View style={[styles.metricDot, { backgroundColor: m.color }]} />
+                  <View style={{ gap: 1 }}>
+                    <Text variant="caption" color={colors.text.tertiary}>{m.label}</Text>
+                    <Text variant="labelMd" color={colors.text.primary}>{formatCurrency(m.amount)}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
         )}
-        <View style={styles.summaryMetrics}>
-          <View style={styles.metricItem}>
-            <View style={[styles.metricDot, { backgroundColor: colors.accent }]} />
-            <View>
-              <Text variant="caption" color={colors.text.tertiary}>Necesario</Text>
-              <Text variant="labelMd" color={colors.text.primary}>{formatCurrency(totalNecessary)}</Text>
-            </View>
-          </View>
-          <View style={styles.metricItem}>
-            <View style={[styles.metricDot, { backgroundColor: colors.red }]} />
-            <View>
-              <Text variant="caption" color={colors.text.tertiary}>Prescindible</Text>
-              <Text variant="labelMd" color={colors.text.primary}>{formatCurrency(totalDisposable)}</Text>
-            </View>
-          </View>
-          <View style={styles.metricItem}>
-            <View style={[styles.metricDot, { backgroundColor: colors.neon }]} />
-            <View>
-              <Text variant="caption" color={colors.text.tertiary}>Invertible</Text>
-              <Text variant="labelMd" color={colors.text.primary}>{formatCurrency(totalInvestable)}</Text>
-            </View>
-          </View>
-        </View>
       </View>
 
       {/* Aviso: token de Gmail vencido */}
@@ -557,7 +671,58 @@ export default function ExpensesScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Segmented control */}
+        <View style={styles.segTrack}>
+          {([
+            { key: 'gastos', label: 'Gastos',       icon: 'list-outline' },
+            { key: 'stats',  label: 'Distribución', icon: 'pie-chart-outline' },
+          ] as const).map(tab => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.segPill, activeTab === tab.key && styles.segPillActive]}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <Ionicons
+                name={tab.icon}
+                size={13}
+                color={activeTab === tab.key ? colors.text.primary : colors.text.tertiary}
+              />
+              <Text
+                variant="label"
+                style={{ fontSize: 11 }}
+                color={activeTab === tab.key ? colors.text.primary : colors.text.tertiary}
+              >
+                {tab.label.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
+
+      {/* ── Vista Estadísticas ── */}
+      {activeTab === 'stats' ? (
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: layout.tabBarHeight + spacing[8], paddingTop: spacing[3] }}
+          showsVerticalScrollIndicator={false}
+        >
+          {categoryRows.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingTop: spacing[10], gap: spacing[4] }}>
+              <Ionicons name="bar-chart-outline" size={48} color={colors.border.default} />
+              <Text variant="body" color={colors.text.tertiary} align="center">
+                Sin gastos este mes para mostrar.
+              </Text>
+            </View>
+          ) : (
+            <View style={detStyles.card}>
+              <View style={detStyles.cardHeader}>
+                <Ionicons name="bar-chart-outline" size={14} color={colors.text.secondary} />
+                <Text variant="label" color={colors.text.secondary}>DISTRIBUCIÓN POR CATEGORÍA</Text>
+              </View>
+              <CategoryBarChart rows={categoryRows} total={totalThisMonth} />
+            </View>
+          )}
+        </ScrollView>
+      ) : (
 
       <FlatList
         style={styles.flatList}
@@ -579,6 +744,7 @@ export default function ExpensesScreen() {
           </View>
         }
       />
+      )}
 
       {/* ── FAB agregar gasto ── */}
       <TouchableOpacity style={styles.fab} onPress={() => setShowAddModal(true)}>
@@ -1086,14 +1252,18 @@ const styles = StyleSheet.create({
     marginHorizontal: layout.screenPadding,
     marginTop:        spacing[3],
     marginBottom:     spacing[2],
-    padding:          spacing[4],
+    padding:          spacing[5],
     backgroundColor:  colors.bg.card,
     borderWidth:      1,
-    borderColor:      colors.border.subtle,
+    borderColor:      colors.border.default,
     borderRadius:     12,
     gap:              spacing[3],
+    shadowColor:      '#000',
+    shadowOffset:     { width: 0, height: 1 },
+    shadowOpacity:    0.05,
+    shadowRadius:     3,
+    elevation:        1,
   },
-  summaryTop: { gap: 2 },
   gmailExpiredBanner: {
     flexDirection:   'row',
     alignItems:      'flex-start',

@@ -471,12 +471,11 @@ const styles = StyleSheet.create({
   avatarBtn: { padding: spacing[1] },
   mainCard: {
     padding: spacing[5],
-    gap: spacing[3],
+    gap: spacing[4],
   },
   mainCardRow: {
     flexDirection: 'row',
-    marginTop: spacing[2],
-    paddingTop: spacing[3],
+    paddingTop: spacing[4],
     borderTopWidth: 1,
     borderTopColor: colors.border.subtle,
   },
@@ -493,9 +492,9 @@ const styles = StyleSheet.create({
   },
   insightRow: { flexDirection: 'row', alignItems: 'flex-start' },
   lossCard: {
-    backgroundColor: colors.bg.secondary,
+    backgroundColor: colors.bg.card,
     borderWidth: 1,
-    borderColor: colors.red + '55',
+    borderColor: colors.red + '40',
     borderLeftWidth: 3,
     borderLeftColor: colors.red,
     borderRadius: 12,
@@ -503,14 +502,13 @@ const styles = StyleSheet.create({
     gap: spacing[3],
   },
   lossTop:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  lossTitle: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: colors.red, flex: 1 },
+  lossTitle: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: colors.red, flex: 1 },
   lossBtn:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], alignSelf: 'flex-start', backgroundColor: colors.neon, borderRadius: 8, paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
-  lossBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: colors.black },
+  lossBtnText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: colors.black },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing[2],
   },
   quickActions: {
     flexDirection: 'row',

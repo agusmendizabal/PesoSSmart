@@ -154,16 +154,34 @@ function CategoryGridItem({
 // ─── PendingTransactions ──────────────────────────────────────────────────────
 
 export function PendingTransactions({ transactions, userId, isPolling, categories, onConfirmed }: Props) {
-  const [updatingId,   setUpdatingId]   = useState<string | null>(null);
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
-  const [showAll,      setShowAll]      = useState(false);
-  const [modalTxId,    setModalTxId]    = useState<string | null>(null);
+  const [updatingId,  setUpdatingId]  = useState<string | null>(null);
+  const [showAll,     setShowAll]     = useState(false);
+  const [modalTxId,   setModalTxId]   = useState<string | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
-  const active      = transactions.filter(tx => !dismissedIds.has(tx.id));
-  const visible     = showAll ? active : active.slice(0, INITIAL_VISIBLE);
-  const hiddenCount = active.length - INITIAL_VISIBLE;
+  const visible     = showAll ? transactions : transactions.slice(0, INITIAL_VISIBLE);
+  const hiddenCount = transactions.length - INITIAL_VISIBLE;
 
-  if (active.length === 0 && !isPolling) return null;
+  // Cuántas tienen categoría sugerida válida (la IA ya las clasificó)
+  const withSuggestion = transactions.filter(
+    tx => tx.suggested_category && categories.some(c => c.name === tx.suggested_category)
+  );
+
+  if (transactions.length === 0 && !isPolling) return null;
+
+  const handleBulkConfirm = async () => {
+    if (bulkLoading || withSuggestion.length === 0) return;
+    setBulkLoading(true);
+    try {
+      for (const tx of withSuggestion) {
+        const cat = categories.find(c => c.name === tx.suggested_category);
+        if (!cat) continue;
+        await handleCategorySelect(tx, cat);
+      }
+    } finally {
+      setBulkLoading(false);
+    }
+  };
 
   const handleCategorySelect = async (tx: PendingTransaction, cat: ExpenseCategory) => {
     if (updatingId !== null) return;
@@ -228,13 +246,34 @@ export function PendingTransactions({ transactions, userId, isPolling, categorie
         </View>
         <View style={styles.headerRight}>
           {isPolling && <ActivityIndicator size="small" color={colors.text.tertiary} />}
-          {active.length > 0 && (
+          {transactions.length > 0 && (
             <Text variant="caption" color={colors.text.tertiary}>
-              {active.length} nuevo{active.length > 1 ? 's' : ''}
+              {transactions.length} nuevo{transactions.length > 1 ? 's' : ''}
             </Text>
           )}
         </View>
       </View>
+
+      {/* ── Bulk confirm ── */}
+      {withSuggestion.length >= 2 && (
+        <TouchableOpacity
+          style={[styles.bulkBtn, bulkLoading && { opacity: 0.6 }]}
+          onPress={handleBulkConfirm}
+          disabled={bulkLoading}
+          activeOpacity={0.8}
+        >
+          {bulkLoading
+            ? <ActivityIndicator size="small" color={colors.black} />
+            : <Ionicons name="checkmark-done-outline" size={15} color={colors.black} />
+          }
+          <Text style={styles.bulkBtnText}>
+            {bulkLoading
+              ? 'Confirmando...'
+              : `Confirmar ${withSuggestion.length} con categoría sugerida`
+            }
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* ── Cards ── */}
       {visible.map((tx) => {
@@ -364,7 +403,7 @@ export function PendingTransactions({ transactions, userId, isPolling, categorie
           <Ionicons name="chevron-down" size={14} color={colors.neon} />
         </TouchableOpacity>
       )}
-      {showAll && active.length > INITIAL_VISIBLE && (
+      {showAll && transactions.length > INITIAL_VISIBLE && (
         <TouchableOpacity style={styles.showMoreBtn} onPress={() => setShowAll(false)}>
           <Text variant="caption" color={colors.text.secondary}>Mostrar menos</Text>
           <Ionicons name="chevron-up" size={14} color={colors.text.secondary} />
@@ -437,6 +476,22 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 11,
     flexShrink: 1,
+  },
+  bulkBtn: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               spacing[2],
+    backgroundColor:   colors.primary,
+    borderRadius:      10,
+    paddingHorizontal: spacing[4],
+    paddingVertical:   spacing[3],
+    alignSelf:         'stretch',
+    justifyContent:    'center',
+  },
+  bulkBtnText: {
+    fontFamily: 'DMSans_600SemiBold',
+    fontSize:   13,
+    color:      colors.black,
   },
   cardRight: {
     alignItems: 'flex-end',
