@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   FlatList,
@@ -16,6 +16,7 @@ import { colors, spacing, layout, textVariants } from '@/theme';
 import { Text } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
+import { useLocalSearchParams } from 'expo-router';
 
 interface ChatMessage {
   id: string;
@@ -36,10 +37,20 @@ const SUGGESTED_QUESTIONS = [
 
 export default function AdvisorScreen() {
   const { user, profile } = useAuthStore();
+  const { initialContext } = useLocalSearchParams<{ initialContext?: string }>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const contextSentRef = useRef(false);
+
+  // Si viene con contexto del Informe, enviarlo automáticamente como primer mensaje
+  useEffect(() => {
+    if (initialContext && !contextSentRef.current && user?.id) {
+      contextSentRef.current = true;
+      sendMessage(initialContext);
+    }
+  }, [initialContext, user?.id]);
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || !user?.id || isThinking) return;

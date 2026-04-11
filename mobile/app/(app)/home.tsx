@@ -240,6 +240,40 @@ export default function HomeScreen() {
           </Card>
         )}
 
+        {/* "Estás perdiendo X" — oportunidad de inversión */}
+        {totalDisposable > 20000 && (() => {
+          const fciReturn    = Math.round(totalDisposable * 0.5 * 0.02);  // mitad de prescindibles al 2%/mes
+          const cedearReturn = Math.round(totalDisposable * 0.5 * 0.035);
+          const investCtx = [
+            `Tengo ${formatCurrency(totalDisposable)} en gastos prescindibles este mes.`,
+            `Si invirtiese la mitad (${formatCurrency(Math.round(totalDisposable * 0.5))}), ¿en qué me conviene meterlo en Argentina hoy?`,
+            `¿Cuánto podría generar por mes con eso? Contame opciones concretas.`,
+          ].join(' ');
+          return (
+            <TouchableOpacity
+              activeOpacity={0.88}
+              style={styles.lossCard}
+              onPress={() => router.push({ pathname: '/(app)/advisor', params: { initialContext: investCtx } } as any)}
+            >
+              <View style={styles.lossTop}>
+                <Ionicons name="trending-down" size={18} color={colors.red} />
+                <Text style={styles.lossTitle}>Estás dejando ir {formatCurrency(totalDisposable)}/mes</Text>
+              </View>
+              <Text variant="caption" color={colors.text.secondary} style={{ lineHeight: 18 }}>
+                Si invertís la mitad de tus prescindibles podés generar entre{' '}
+                <Text variant="caption" color={colors.neon}>{formatCurrency(fciReturn)}</Text>
+                {' '}(FCI) y{' '}
+                <Text variant="caption" color={colors.neon}>{formatCurrency(cedearReturn)}</Text>
+                {' '}(CEDEARs) por mes sin hacer nada más.
+              </Text>
+              <View style={styles.lossBtn}>
+                <Text style={styles.lossBtnText}>¿En qué invierto?</Text>
+                <Ionicons name="arrow-forward" size={13} color={colors.black} />
+              </View>
+            </TouchableOpacity>
+          );
+        })()}
+
         {/* Quick Actions */}
         <View style={styles.sectionHeader}>
           <Text variant="label" color={colors.text.secondary}>ACCIONES RÁPIDAS</Text>
@@ -458,6 +492,20 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.yellow,
   },
   insightRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  lossCard: {
+    backgroundColor: colors.bg.secondary,
+    borderWidth: 1,
+    borderColor: colors.red + '55',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.red,
+    borderRadius: 12,
+    padding: spacing[4],
+    gap: spacing[3],
+  },
+  lossTop:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  lossTitle: { fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: colors.red, flex: 1 },
+  lossBtn:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], alignSelf: 'flex-start', backgroundColor: colors.neon, borderRadius: 8, paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
+  lossBtnText: { fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: colors.black },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

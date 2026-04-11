@@ -153,6 +153,11 @@ INSERT INTO public.expense_categories (name, name_es, icon, color) VALUES
   ('pets', 'Mascotas', 'paw-outline', '#8d6e63'),
   ('beauty', 'Cuidado personal', 'sparkles-outline', '#f48fb1'),
   ('sports', 'Deporte y gym', 'barbell-outline', '#9ccc65'),
+  ('leisure', 'Ocio y salidas', 'beer-outline', '#ffa726'),
+  ('beauty_salon', 'Peluquería y estética', 'cut-outline', '#ec407a'),
+  ('gifts', 'Regalos', 'gift-outline', '#ef9a9a'),
+  ('insurance', 'Seguros', 'shield-outline', '#b0bec5'),
+  ('kids', 'Niños y bebés', 'happy-outline', '#80deea'),
   ('other', 'Otros', 'ellipsis-horizontal-outline', '#888888')
 ON CONFLICT DO NOTHING;
 

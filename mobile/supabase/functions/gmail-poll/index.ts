@@ -299,14 +299,18 @@ serve(async (req) => {
     if (testRes.status === 401) {
       console.log('[gmail-poll] Token vencido, refrescando...');
       if (!refreshTokenDecrypted) {
-        return new Response(JSON.stringify({ error: 'Token de Gmail expirado. Reconectá tu cuenta.' }), {
-          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        // 200 intencionalmente: es un error de Gmail, no de sesión Supabase.
+        // Un 401 acá dispararía un refreshSession innecesario en el cliente.
+        await supabase.from('gmail_connections').update({ token_expired: true }).eq('user_id', userId);
+        return new Response(JSON.stringify({ error: 'Token de Gmail expirado. Reconectá tu cuenta.', code: 'GMAIL_TOKEN_EXPIRED' }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       const newToken = await refreshAccessToken(refreshTokenDecrypted);
       if (!newToken) {
-        return new Response(JSON.stringify({ error: 'Token de Gmail expirado. Reconectá tu cuenta.' }), {
-          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        await supabase.from('gmail_connections').update({ token_expired: true }).eq('user_id', userId);
+        return new Response(JSON.stringify({ error: 'Token de Gmail expirado. Reconectá tu cuenta.', code: 'GMAIL_TOKEN_EXPIRED' }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       googleToken = newToken;

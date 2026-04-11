@@ -45,11 +45,11 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="advisor"
+        name="reports"
         options={{
-          title: 'IA Financiero',
+          title: 'Informe',
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon name="chatbubble-ellipses" focused={focused} color={color} />
+            <TabIcon name="bar-chart" focused={focused} color={color} />
           ),
         }}
       />
@@ -63,7 +63,7 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="grupo-familia"
+        name="family"
         options={{
           title: 'Grupos',
           tabBarIcon: ({ focused, color }) => (
@@ -80,10 +80,8 @@ export default function AppLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="reports"
-        options={{ href: null }}
-      />
+      <Tabs.Screen name="advisor"       options={{ href: null }} />
+      <Tabs.Screen name="grupo-familia" options={{ href: null }} />
     </Tabs>
   );
 }

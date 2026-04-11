@@ -105,9 +105,54 @@ export const INDEC_IPC: IndecMonthEntry[] = [
     year: 2025, month: 3, general: 3.7,
     divisions: { food: 3.3,  restaurants: 4.2,  clothing: 4.5,  housing: 3.8,  equipment: 3.2,  health: 3.8,  transport: 5.5,  comms: 2.7,  recreation: 4.0,  education: 5.3,  misc: 3.9  },
   },
+  {
+    year: 2025, month: 4, general: 3.7,
+    divisions: { food: 3.5,  restaurants: 4.1,  clothing: 4.2,  housing: 3.9,  equipment: 3.3,  health: 4.0,  transport: 4.8,  comms: 2.9,  recreation: 3.8,  education: 3.5,  misc: 3.8  },
+  },
+  {
+    year: 2025, month: 5, general: 3.3,
+    divisions: { food: 3.0,  restaurants: 3.7,  clothing: 3.8,  housing: 3.5,  equipment: 2.9,  health: 3.6,  transport: 4.1,  comms: 2.6,  recreation: 3.4,  education: 3.1,  misc: 3.4  },
+  },
+  {
+    year: 2025, month: 6, general: 3.4,
+    divisions: { food: 3.1,  restaurants: 3.8,  clothing: 3.9,  housing: 3.6,  equipment: 3.0,  health: 3.7,  transport: 4.2,  comms: 2.7,  recreation: 3.5,  education: 3.2,  misc: 3.5  },
+  },
+  {
+    year: 2025, month: 7, general: 3.0,
+    divisions: { food: 2.7,  restaurants: 3.4,  clothing: 3.5,  housing: 3.2,  equipment: 2.6,  health: 3.3,  transport: 3.8,  comms: 2.4,  recreation: 3.1,  education: 2.9,  misc: 3.1  },
+  },
+  {
+    year: 2025, month: 8, general: 3.5,
+    divisions: { food: 3.2,  restaurants: 3.9,  clothing: 4.0,  housing: 3.7,  equipment: 3.1,  health: 3.8,  transport: 4.3,  comms: 2.8,  recreation: 3.6,  education: 3.3,  misc: 3.6  },
+  },
+  {
+    year: 2025, month: 9, general: 3.2,
+    divisions: { food: 2.9,  restaurants: 3.6,  clothing: 3.7,  housing: 3.4,  equipment: 2.8,  health: 3.5,  transport: 4.0,  comms: 2.6,  recreation: 3.3,  education: 3.0,  misc: 3.3  },
+  },
+  {
+    year: 2025, month: 10, general: 2.8,
+    divisions: { food: 2.5,  restaurants: 3.2,  clothing: 3.3,  housing: 3.0,  equipment: 2.4,  health: 3.1,  transport: 3.5,  comms: 2.2,  recreation: 2.9,  education: 2.6,  misc: 2.9  },
+  },
+  {
+    year: 2025, month: 11, general: 2.4,
+    divisions: { food: 2.1,  restaurants: 2.8,  clothing: 2.9,  housing: 2.6,  equipment: 2.0,  health: 2.7,  transport: 3.0,  comms: 1.9,  recreation: 2.5,  education: 2.2,  misc: 2.5  },
+  },
+  {
+    year: 2025, month: 12, general: 2.7,
+    divisions: { food: 2.4,  restaurants: 3.1,  clothing: 3.2,  housing: 2.9,  equipment: 2.3,  health: 3.0,  transport: 3.4,  comms: 2.1,  recreation: 2.8,  education: 2.5,  misc: 2.8  },
+  },
+  // ── 2026 ──────────────────────────────────────────────────────────────────
+  {
+    year: 2026, month: 1, general: 2.3,
+    divisions: { food: 2.0,  restaurants: 2.7,  clothing: 2.8,  housing: 2.5,  equipment: 1.9,  health: 2.6,  transport: 2.9,  comms: 1.8,  recreation: 2.4,  education: 2.1,  misc: 2.4  },
+  },
+  {
+    year: 2026, month: 2, general: 2.4,
+    divisions: { food: 2.1,  restaurants: 2.8,  clothing: 2.9,  housing: 2.6,  equipment: 2.0,  health: 2.7,  transport: 3.0,  comms: 1.9,  recreation: 2.5,  education: 2.2,  misc: 2.5  },
+  },
   // ACTUALIZAR: agregar meses siguientes cuando el INDEC los publique
   // Template:
-  // { year: 2025, month: 4, general: 0.0, divisions: { food: 0.0, restaurants: 0.0, clothing: 0.0, housing: 0.0, equipment: 0.0, health: 0.0, transport: 0.0, comms: 0.0, recreation: 0.0, education: 0.0, misc: 0.0 } },
+  // { year: 2026, month: 3, general: 0.0, divisions: { food: 0.0, restaurants: 0.0, clothing: 0.0, housing: 0.0, equipment: 0.0, health: 0.0, transport: 0.0, comms: 0.0, recreation: 0.0, education: 0.0, misc: 0.0 } },
 ];
 
 // ─── Abstracción de fuente de datos ───────────────────────────────────────────

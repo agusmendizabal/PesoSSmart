@@ -21,10 +21,16 @@ import { Text } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/utils/format';
 import { getLatestIndecEntry } from '@/lib/indecData';
-import { deriveHorizon, DEFAULT_INVESTMENT_PROFILE, type UserInvestmentProfile, type ConfidenceLevel } from '@/lib/investmentRecommendation';
+import { deriveHorizon, type UserInvestmentProfile, type ConfidenceLevel } from '@/lib/investmentRecommendation';
 import { buildOpportunityInsights, type OpportunityInsights, type WhatIfResult, type CategoryOpportunity, type SavingsOpportunity } from '@/utils/opportunityCost';
 import { RecommendationComparison } from './RecommendationComparison';
+import { SavingsSimulator } from './SavingsSimulator';
 import type { RiskProfile } from '@/types';
+
+// ─── Constantes estables para SavingsSimulator (evitan re-renders infinitos) ──
+
+const EMPTY_KEYS: string[] = [];
+const NOOP_RESULT_CHANGE = () => {};
 
 // ─── Colores por nivel de riesgo ──────────────────────────────────────────────
 
@@ -269,7 +275,11 @@ const catStyles = StyleSheet.create({
 
 // ─── SavingsCard ──────────────────────────────────────────────────────────────
 
-function SavingsCard({ opportunity }: { opportunity: SavingsOpportunity }) {
+function SavingsCard({ opportunity, fromMonthKey, toMonthKey }: {
+  opportunity:  SavingsOpportunity;
+  fromMonthKey: string;
+  toMonthKey:   string;
+}) {
   const { savingsAmount, whatIf, secondaryWhatIf, inflationLossArs, officialMonthlyInflation, recommendation } = opportunity;
   const [expanded, setExpanded] = useState(true);
 
@@ -295,6 +305,9 @@ function SavingsCard({ opportunity }: { opportunity: SavingsOpportunity }) {
         {recommendation.explanation}
       </Text>
 
+      {/* Confianza de la sugerencia */}
+      <ConfidenceBadge level={recommendation.confidence.level} note={recommendation.confidence.note} />
+
       {/* Costo de no invertir */}
       <View style={savStyles.lossRow}>
         <Text variant="caption" color={colors.text.secondary}>
@@ -305,7 +318,15 @@ function SavingsCard({ opportunity }: { opportunity: SavingsOpportunity }) {
         </Text>
       </View>
 
-      {/* Simulaciones */}
+      {/* Comparador: solo si hay secundario */}
+      {recommendation.secondary && (
+        <RecommendationComparison
+          primary={recommendation.primary}
+          secondary={recommendation.secondary}
+        />
+      )}
+
+      {/* Simulaciones numéricas */}
       <TouchableOpacity
         style={savStyles.expandRow}
         onPress={() => setExpanded(e => !e)}
@@ -316,9 +337,6 @@ function SavingsCard({ opportunity }: { opportunity: SavingsOpportunity }) {
         </Text>
         <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={12} color={colors.text.tertiary} />
       </TouchableOpacity>
-
-      {/* Confianza de la sugerencia */}
-      <ConfidenceBadge level={recommendation.confidence.level} note={recommendation.confidence.note} />
 
       {expanded && (
         <View style={{ gap: spacing[3] }}>
@@ -336,6 +354,17 @@ function SavingsCard({ opportunity }: { opportunity: SavingsOpportunity }) {
           )}
         </View>
       )}
+
+      {/* Simulador interactivo */}
+      <SavingsSimulator
+        realAmount={savingsAmount}
+        primary={recommendation.primary.instrument}
+        secondary={recommendation.secondary?.instrument ?? null}
+        interestKeys={EMPTY_KEYS}
+        fromMonthKey={fromMonthKey}
+        toMonthKey={toMonthKey}
+        onResultChange={NOOP_RESULT_CHANGE}
+      />
 
       <Text variant="caption" color={colors.text.tertiary}>
         Si cambió tu ahorro, actualizalo en Perfil.
@@ -420,7 +449,7 @@ export function OpportunityCost({ userId, monthsBack = 3 }: OpportunityCostProps
   const [loading,  setLoading]  = useState(true);
   const [insights, setInsights] = useState<OpportunityInsights | null>(null);
 
-  useEffect(() => { load(); }, [userId]);
+  useEffect(() => { load(); }, [userId, monthsBack]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = async () => {
     setLoading(true);
@@ -477,7 +506,11 @@ export function OpportunityCost({ userId, monthsBack = 3 }: OpportunityCostProps
       )}
 
       {insights.savingsOpportunity && (
-        <SavingsCard opportunity={insights.savingsOpportunity} />
+        <SavingsCard
+          opportunity={insights.savingsOpportunity}
+          fromMonthKey={insights.fromMonthKey}
+          toMonthKey={insights.toMonthKey}
+        />
       )}
 
       <Disclaimer />
@@ -495,7 +528,8 @@ async function fetchAllData(userId: string, monthsBack: number): Promise<Fetched
   const lastDay  = new Date(toDate.getFullYear(), toDate.getMonth() + 1, 0).getDate();
   const to       = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}-${lastDay}`;
 
-  const [expensesRes, interestsRes, profileRes, riskRes] = await Promise.all([
+  // risk_profiles corre separado para que un fallo no cancele todo el fetch
+  const [expensesRes, interestsRes, profileRes] = await Promise.all([
     supabase
       .from('expenses')
       .select('amount, expense_categories ( name_es, color )')
@@ -514,13 +548,14 @@ async function fetchAllData(userId: string, monthsBack: number): Promise<Fetched
       .select('savings_amount')
       .eq('user_id', userId)
       .maybeSingle(),
-
-    supabase
-      .from('risk_profiles')
-      .select('profile, answers')
-      .eq('user_id', userId)
-      .maybeSingle(),
   ]);
+
+  const riskRes = await supabase
+    .from('risk_profiles')
+    .select('profile, answers')
+    .eq('user_id', userId)
+    .maybeSingle()
+    .then(res => res, () => ({ data: null }));
 
   // Agrupar gastos por categoría
   const grouped: Record<string, { categoryNameEs: string; categoryColor: string; amount: number }> = {};

@@ -29,7 +29,6 @@ import { supabase } from '@/lib/supabase';
 import { formatCurrency, formatDate } from '@/utils/format';
 import type { PaymentMethod, Expense, ExpenseClassification } from '@/types';
 import { PendingTransactions } from '@/components/PendingTransactions';
-import { ExpenseAnalysis } from '@/components/ExpenseAnalysis';
 
 const expenseSchema = z.object({
   description: z.string().min(1, 'Describí el gasto.').max(100),
@@ -91,7 +90,6 @@ export default function ExpensesScreen() {
   const [dolarType,     setDolarType]     = useState<DolarType>('blue');
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'movimientos' | 'analisis'>('movimientos');
 
   // Estado para editar un gasto confirmado
   const [editingExpense,     setEditingExpense]     = useState<Expense | null>(null);
@@ -244,8 +242,9 @@ export default function ExpensesScreen() {
     },
   });
 
-  const [pendingTxs,    setPendingTxs]    = useState<any[]>([]);
-  const [isPolling,     setIsPolling]     = useState(false);
+  const [pendingTxs,        setPendingTxs]        = useState<any[]>([]);
+  const [isPolling,         setIsPolling]         = useState(false);
+  const [gmailTokenExpired, setGmailTokenExpired] = useState(false);
   const [inCoupleMode,  setInCoupleMode]  = useState(false);
   const [isShared,      setIsShared]      = useState(false);
 
@@ -311,6 +310,13 @@ export default function ExpensesScreen() {
         return res.status;
       }
       const data = await res.json();
+      // Token de Gmail vencido — la función devuelve 200 con code GMAIL_TOKEN_EXPIRED
+      if (data?.code === 'GMAIL_TOKEN_EXPIRED') {
+        console.log('[pollGmail] Token Gmail expirado, mostrando aviso.');
+        setGmailTokenExpired(true);
+        return;
+      }
+      setGmailTokenExpired(false);
       console.log('[pollGmail] gmail_connected:', data?.gmail_connected, '| new_found:', data?.new_found, '| pending:', data?.pending?.length ?? 0);
       setPendingTxs(data?.pending ?? []);
     } catch (e) {
@@ -434,6 +440,23 @@ export default function ExpensesScreen() {
         </View>
       </View>
 
+      {/* Aviso: token de Gmail vencido */}
+      {gmailTokenExpired && (
+        <View style={{ paddingHorizontal: layout.screenPadding, marginBottom: spacing[3] }}>
+          <View style={styles.gmailExpiredBanner}>
+            <Ionicons name="mail-unread-outline" size={16} color={colors.yellow} />
+            <View style={{ flex: 1 }}>
+              <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'DMSans_600SemiBold' }}>
+                Gmail desconectado
+              </Text>
+              <Text variant="caption" color={colors.text.secondary}>
+                Tu conexión con Gmail venció. Reconectá tu cuenta para seguir importando gastos automáticamente.
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Transacciones detectadas en Gmail */}
       {(pendingTxs.length > 0 || isPolling) && (
         <View style={{ paddingHorizontal: layout.screenPadding, marginBottom: spacing[4] }}>
@@ -441,6 +464,7 @@ export default function ExpensesScreen() {
             transactions={pendingTxs}
             userId={user!.id}
             isPolling={isPolling}
+            categories={categories}
             onConfirmed={() => {
               pollGmail();
               fetchExpenses(user!.id);
@@ -533,62 +557,28 @@ export default function ExpensesScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Segmented control */}
-        <View style={styles.segTrack}>
-          {([
-            { value: 'movimientos', label: 'Movimientos', icon: 'list-outline' },
-            { value: 'analisis',    label: 'Análisis',    icon: 'pie-chart-outline' },
-          ] as const).map((tab) => {
-            const active = activeTab === tab.value;
-            return (
-              <TouchableOpacity
-                key={tab.value}
-                style={[styles.segPill, active && styles.segPillActive]}
-                onPress={() => setActiveTab(tab.value)}
-              >
-                <Ionicons
-                  name={tab.icon}
-                  size={14}
-                  color={active ? colors.text.primary : colors.text.tertiary}
-                />
-                <Text
-                  variant="label"
-                  color={active ? colors.text.primary : colors.text.tertiary}
-                  style={{ fontFamily: active ? 'DMSans_600SemiBold' : 'DMSans_400Regular' }}
-                >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
       </View>
 
-      {/* ── Contenido por tab ── */}
-      {activeTab === 'analisis' ? (
-        <ExpenseAnalysis userId={user!.id} />
-      ) : (
-        <FlatList
-          style={styles.flatList}
-          data={expenses}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <ExpenseItem expense={item} onPress={() => openEditExpense(item)} />}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={listHeader}
-          onEndReached={() => { if (user?.id && hasMore) fetchMoreExpenses(user.id); }}
-          onEndReachedThreshold={0.3}
-          ListFooterComponent={isLoadingMore ? <ActivityIndicator size="small" color={colors.neon} style={{ paddingVertical: spacing[4] }} /> : null}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Ionicons name="wallet-outline" size={48} color={colors.text.tertiary} />
-              <Text variant="body" color={colors.text.secondary} align="center">
-                {isLoading ? 'Cargando...' : 'No hay gastos este mes.'}
-              </Text>
-            </View>
-          }
-        />
-      )}
+      <FlatList
+        style={styles.flatList}
+        data={expenses}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <ExpenseItem expense={item} onPress={() => openEditExpense(item)} />}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={listHeader}
+        onEndReached={() => { if (user?.id && hasMore) fetchMoreExpenses(user.id); }}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={isLoadingMore ? <ActivityIndicator size="small" color={colors.neon} style={{ paddingVertical: spacing[4] }} /> : null}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Ionicons name="wallet-outline" size={48} color={colors.text.tertiary} />
+            <Text variant="body" color={colors.text.secondary} align="center">
+              {isLoading ? 'Cargando...' : 'No hay gastos este mes.'}
+            </Text>
+          </View>
+        }
+      />
 
       {/* ── FAB agregar gasto ── */}
       <TouchableOpacity style={styles.fab} onPress={() => setShowAddModal(true)}>
@@ -731,31 +721,33 @@ export default function ExpensesScreen() {
                 <Text variant="label" color={colors.text.secondary} style={styles.inputLabel}>
                   CATEGORÍA
                 </Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.categoryList}
-                >
-                  {categories.map((cat) => (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[
-                        styles.categoryChip,
-                        selectedCategory === cat.id && styles.categoryChipActive,
-                      ]}
-                      onPress={() =>
-                        setSelectedCategory(selectedCategory === cat.id ? null : cat.id)
-                      }
-                    >
-                      <Text
-                        variant="caption"
-                        color={selectedCategory === cat.id ? colors.neon : colors.text.secondary}
+                <View style={styles.categoryGrid}>
+                  {categories.map((cat) => {
+                    const isActive = selectedCategory === cat.id;
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        style={[styles.categoryGridItem, isActive && { borderColor: cat.color, backgroundColor: cat.color + '1A' }]}
+                        onPress={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
+                        activeOpacity={0.7}
                       >
-                        {cat.name_es}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                        <Ionicons
+                          name={cat.icon as any}
+                          size={20}
+                          color={isActive ? cat.color : colors.text.tertiary}
+                        />
+                        <Text
+                          variant="caption"
+                          color={isActive ? colors.text.primary : colors.text.tertiary}
+                          style={{ fontSize: 9, textAlign: 'center', lineHeight: 12 }}
+                          numberOfLines={2}
+                        >
+                          {cat.name_es}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
 
               {/* Medio de pago */}
@@ -916,25 +908,36 @@ export default function ExpensesScreen() {
                   <Text variant="label" color={colors.text.secondary} style={styles.inputLabel}>
                     CATEGORÍA
                   </Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
-                    {categories.map((cat) => (
-                      <TouchableOpacity
-                        key={cat.id}
-                        style={[styles.categoryChip, editExpenseValues.category_id === cat.id && styles.categoryChipActive]}
-                        onPress={() => setEditExpenseValues((p) => p ? {
-                          ...p,
-                          category_id: p.category_id === cat.id ? null : cat.id,
-                        } : p)}
-                      >
-                        <Text
-                          variant="caption"
-                          color={editExpenseValues.category_id === cat.id ? colors.neon : colors.text.secondary}
+                  <View style={styles.categoryGrid}>
+                    {categories.map((cat) => {
+                      const isActive = editExpenseValues.category_id === cat.id;
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={[styles.categoryGridItem, isActive && { borderColor: cat.color, backgroundColor: cat.color + '1A' }]}
+                          onPress={() => setEditExpenseValues((p) => p ? {
+                            ...p,
+                            category_id: p.category_id === cat.id ? null : cat.id,
+                          } : p)}
+                          activeOpacity={0.7}
                         >
-                          {cat.name_es}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
+                          <Ionicons
+                            name={cat.icon as any}
+                            size={20}
+                            color={isActive ? cat.color : colors.text.tertiary}
+                          />
+                          <Text
+                            variant="caption"
+                            color={isActive ? colors.text.primary : colors.text.tertiary}
+                            style={{ fontSize: 9, textAlign: 'center', lineHeight: 12 }}
+                            numberOfLines={2}
+                          >
+                            {cat.name_es}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
 
                 <Button
@@ -1091,6 +1094,16 @@ const styles = StyleSheet.create({
     gap:              spacing[3],
   },
   summaryTop: { gap: 2 },
+  gmailExpiredBanner: {
+    flexDirection:   'row',
+    alignItems:      'flex-start',
+    gap:             spacing[3],
+    backgroundColor: colors.yellow + '12',
+    borderWidth:     1,
+    borderColor:     colors.yellow + '30',
+    borderRadius:    10,
+    padding:         spacing[3],
+  },
   compositionBar: {
     flexDirection: 'row',
     height:        6,
@@ -1226,6 +1239,22 @@ const styles = StyleSheet.create({
   },
   inputLabel: { marginBottom: spacing[2] },
   categoryList: { gap: spacing[2] },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[2],
+  },
+  categoryGridItem: {
+    width: '22%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[1],
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[1],
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    borderRadius: 10,
+  },
   categoryChip: {
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],

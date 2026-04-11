@@ -60,7 +60,8 @@ function MenuItem({ icon, label, description, onPress, color = colors.text.secon
 export default function ProfileScreen() {
   const { profile, user, signOut, updateProfile, isLoading } = useAuthStore();
   const [showEditModal, setShowEditModal] = useState(false);
-  const [gmailEmail, setGmailEmail] = useState<string | null>(null);
+  const [gmailEmail,   setGmailEmail]   = useState<string | null>(null);
+  const [gmailExpired, setGmailExpired] = useState(false);
   const [gmailLoading, setGmailLoading] = useState(false);
   // Detectar deep link de retorno de Gmail OAuth
   useEffect(() => {
@@ -84,8 +85,17 @@ export default function ProfileScreen() {
   // Cargar estado de Gmail al entrar
   useEffect(() => {
     if (!user?.id) return;
-    supabase.from('gmail_connections').select('gmail_email').eq('user_id', user.id).single()
-      .then(({ data }) => { if (data) setGmailEmail(data.gmail_email); });
+    supabase
+      .from('gmail_connections')
+      .select('gmail_email, token_expired')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setGmailEmail(data.gmail_email);
+          setGmailExpired(data.token_expired ?? false);
+        }
+      });
   }, [user?.id]);
 
   const connectGmail = async () => {
@@ -128,6 +138,7 @@ export default function ProfileScreen() {
         if (match) {
           const email = decodeURIComponent(match[1]);
           setGmailEmail(email);
+          setGmailExpired(false);
           Alert.alert('Gmail conectado', `Tu cuenta ${email} quedó vinculada. Ahora detectamos gastos automáticamente.`);
         } else if (hasError) {
           const errMatch = result.url.match(/error=([^&]+)/);
@@ -314,21 +325,64 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text variant="label" color={colors.text.secondary} style={styles.sectionTitle}>INTEGRACIONES</Text>
           <Card style={styles.menuCard}>
-            <TouchableOpacity style={styles.menuItem} onPress={gmailEmail ? disconnectGmail : connectGmail} disabled={gmailLoading}>
+
+            {/* Fila principal */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={gmailEmail ? disconnectGmail : connectGmail}
+              disabled={gmailLoading}
+            >
               <View style={styles.menuIcon}>
-                <Ionicons name="mail-outline" size={20} color={gmailEmail ? colors.neon : colors.text.secondary} />
+                <Ionicons
+                  name="mail-outline"
+                  size={20}
+                  color={gmailExpired ? colors.yellow : gmailEmail ? colors.neon : colors.text.secondary}
+                />
               </View>
               <View style={styles.menuText}>
                 <Text variant="bodySmall" color={colors.text.primary}>Gmail</Text>
-                <Text variant="caption" color={gmailEmail ? colors.neon : colors.text.secondary}>
-                  {gmailLoading ? 'Conectando...' : gmailEmail ? `Conectado: ${gmailEmail}` : 'Detectar gastos desde emails bancarios'}
+                <Text variant="caption" color={gmailExpired ? colors.yellow : gmailEmail ? colors.neon : colors.text.secondary}>
+                  {gmailLoading
+                    ? 'Conectando...'
+                    : gmailExpired
+                      ? `Sesión expirada · ${gmailEmail}`
+                      : gmailEmail
+                        ? `Conectado: ${gmailEmail}`
+                        : 'Detectar gastos desde emails bancarios'}
                 </Text>
               </View>
-              {gmailEmail
+              {gmailEmail && !gmailExpired
                 ? <Ionicons name="checkmark-circle" size={20} color={colors.neon} />
-                : <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
+                : gmailExpired
+                  ? <Ionicons name="warning" size={18} color={colors.yellow} />
+                  : <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
               }
             </TouchableOpacity>
+
+            {/* Banner de reconexión — visible solo cuando el token expiró */}
+            {gmailExpired && (
+              <>
+                <View style={styles.menuDivider} />
+                <TouchableOpacity
+                  style={styles.reconnectBanner}
+                  onPress={connectGmail}
+                  disabled={gmailLoading}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="refresh-outline" size={16} color={colors.yellow} />
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodySmall" color={colors.yellow} style={{ fontFamily: 'DMSans_600SemiBold' }}>
+                      Reconectá tu cuenta de Gmail
+                    </Text>
+                    <Text variant="caption" color={colors.text.secondary}>
+                      La sesión de Google venció. Tocá para volver a autorizar.
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={14} color={colors.yellow} />
+                </TouchableOpacity>
+              </>
+            )}
+
           </Card>
         </View>
 
@@ -544,6 +598,14 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  reconnectBanner: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               spacing[3],
+    paddingHorizontal: spacing[5],
+    paddingVertical:   spacing[3],
+    backgroundColor:   colors.yellow + '12',
   },
   emailField: {},
   emailValue: {
