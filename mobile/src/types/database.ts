@@ -12,7 +12,7 @@ export type Json =
 
 // ---- Enums ----
 
-export type SubscriptionPlan = 'free' | 'pro';
+export type SubscriptionPlan = 'free' | 'pro' | 'premium';
 export type SubscriptionStatus = 'active' | 'inactive' | 'cancelled' | 'trial';
 export type RiskProfile = 'conservative' | 'moderate' | 'aggressive';
 export type WorkType = 'employee' | 'freelance' | 'self_employed' | 'student' | 'unemployed' | 'retired';
@@ -40,6 +40,9 @@ export interface Profile {
   phone: string | null;
   subscription_plan: SubscriptionPlan;
   subscription_status: SubscriptionStatus;
+  plan_expires_at: string | null;
+  trial_used: boolean;
+  trial_started_at: string | null;
   onboarding_completed: boolean;
   onboarding_step: number;
   created_at: string;

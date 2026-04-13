@@ -82,6 +82,7 @@ export default function AppLayout() {
       />
       <Tabs.Screen name="advisor"       options={{ href: null }} />
       <Tabs.Screen name="grupo-familia" options={{ href: null }} />
+      <Tabs.Screen name="plans"         options={{ href: null }} />
     </Tabs>
   );
 }

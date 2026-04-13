@@ -1,11 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
+import { supabase } from '@/lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -58,6 +61,48 @@ export default function HomeScreen() {
   const greeting = getGreeting(profile?.full_name ?? undefined);
   const recentExpenses = expenses.slice(0, 3);
 
+  // ── Editar ingreso ─────────────────────────────────────────────────────────
+  const [showIncomeModal, setShowIncomeModal] = useState(false);
+  const [selectedRange,   setSelectedRange]   = useState<string | null>(null);
+  const [savingIncome,    setSavingIncome]     = useState(false);
+
+  const INCOME_OPTIONS = [
+    { label: 'Menos de $500.000',       value: 'under_150k'  },
+    { label: '$500.000 – $1.000.000',   value: '150k_300k'   },
+    { label: '$1.000.000 – $2.000.000', value: '300k_500k'   },
+    { label: '$2.000.000 – $3.500.000', value: '500k_800k'   },
+    { label: '$3.500.000 – $6.000.000', value: '800k_1500k'  },
+    { label: 'Más de $6.000.000',       value: 'over_1500k'  },
+  ];
+
+  const openIncomeModal = async () => {
+    // Pre-cargar rango actual
+    if (user?.id) {
+      const { data } = await supabase
+        .from('financial_profiles')
+        .select('income_range')
+        .eq('user_id', user.id)
+        .single();
+      setSelectedRange(data?.income_range ?? null);
+    }
+    setShowIncomeModal(true);
+  };
+
+  const saveIncome = async () => {
+    if (!selectedRange || !user?.id) return;
+    setSavingIncome(true);
+    try {
+      await supabase
+        .from('financial_profiles')
+        .update({ income_range: selectedRange })
+        .eq('user_id', user.id);
+      setShowIncomeModal(false);
+      fetchSubscriptionsAndProjection(user.id);
+    } finally {
+      setSavingIncome(false);
+    }
+  };
+
   // Cálculo estimado del dinero potencialmente invertible
   const potentialInvestable = totalInvestable > 0 ? totalInvestable * 0.3 : 0;
 
@@ -96,7 +141,23 @@ export default function HomeScreen() {
 
         {/* Main KPI Card */}
         <Card variant="default" style={styles.mainCard}>
-          <Text variant="label" color={colors.text.secondary}>GASTASTE ESTE MES</Text>
+          <View style={styles.mainCardHeader}>
+            <Text variant="label" color={colors.text.secondary}>GASTASTE ESTE MES</Text>
+            {estimatedIncome !== null && (
+              <TouchableOpacity style={styles.incomeChip} onPress={openIncomeModal}>
+                <Text variant="caption" color={colors.text.tertiary}>
+                  Ingreso: {formatCurrency(estimatedIncome)}
+                </Text>
+                <Ionicons name="pencil-outline" size={11} color={colors.text.tertiary} />
+              </TouchableOpacity>
+            )}
+            {estimatedIncome === null && (
+              <TouchableOpacity style={styles.incomeChip} onPress={openIncomeModal}>
+                <Ionicons name="add-outline" size={11} color={colors.neon} />
+                <Text variant="caption" color={colors.neon}>Cargar ingreso</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           <AmountDisplay amount={totalThisMonth} size="xl" />
           <View style={styles.mainCardRow}>
             <View style={styles.kpiItem}>
@@ -449,6 +510,62 @@ export default function HomeScreen() {
         </PressableCard>
 
       </ScrollView>
+      {/* ── Modal editar ingreso ── */}
+      <Modal
+        visible={showIncomeModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowIncomeModal(false)}
+      >
+        <View style={styles.incomeOverlay}>
+          <View style={styles.incomeSheet}>
+            <View style={styles.incomeSheetHandle} />
+            <View style={styles.incomeSheetHeader}>
+              <Text variant="subtitle">¿Cuánto ganás por mes?</Text>
+              <TouchableOpacity onPress={() => setShowIncomeModal(false)}>
+                <Ionicons name="close" size={22} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+            <Text variant="caption" color={colors.text.tertiary} style={{ marginBottom: spacing[4] }}>
+              Ingreso neto mensual aproximado. Se usa para calcular tu salud financiera.
+            </Text>
+            <View style={styles.incomeOptions}>
+              {INCOME_OPTIONS.map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.incomeOption,
+                    selectedRange === opt.value && styles.incomeOptionActive,
+                  ]}
+                  onPress={() => setSelectedRange(opt.value)}
+                >
+                  <Text
+                    variant="bodySmall"
+                    color={selectedRange === opt.value ? colors.primary : colors.text.primary}
+                    style={{ fontFamily: selectedRange === opt.value ? 'Montserrat_700Bold' : 'Montserrat_400Regular' }}
+                  >
+                    {opt.label}
+                  </Text>
+                  {selectedRange === opt.value && (
+                    <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={[styles.incomeSaveBtn, (!selectedRange || savingIncome) && { opacity: 0.5 }]}
+              onPress={saveIncome}
+              disabled={!selectedRange || savingIncome}
+            >
+              {savingIncome
+                ? <ActivityIndicator size="small" color={colors.black} />
+                : <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 14, color: colors.black }}>Guardar</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -472,6 +589,22 @@ const styles = StyleSheet.create({
   mainCard: {
     padding: spacing[5],
     gap: spacing[4],
+  },
+  mainCardHeader: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+  },
+  incomeChip: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               4,
+    paddingHorizontal: spacing[2],
+    paddingVertical:   3,
+    borderRadius:      20,
+    borderWidth:       1,
+    borderColor:       colors.border.default,
+    backgroundColor:   colors.bg.secondary,
   },
   mainCardRow: {
     flexDirection: 'row',
@@ -544,6 +677,59 @@ const styles = StyleSheet.create({
   },
   emptyBtn: {
     marginTop: spacing[2],
+  },
+
+  // ── Income modal ──
+  incomeOverlay: {
+    flex:            1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent:  'flex-end',
+  },
+  incomeSheet: {
+    backgroundColor:  colors.bg.primary,
+    borderTopLeftRadius:  20,
+    borderTopRightRadius: 20,
+    padding:          spacing[5],
+    paddingBottom:    spacing[10],
+    gap:              spacing[3],
+  },
+  incomeSheetHandle: {
+    width:           40,
+    height:          4,
+    borderRadius:    2,
+    backgroundColor: colors.border.default,
+    alignSelf:       'center',
+    marginBottom:    spacing[2],
+  },
+  incomeSheetHeader: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    marginBottom:   spacing[1],
+  },
+  incomeOptions: { gap: spacing[2] },
+  incomeOption: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+    paddingVertical:   spacing[4],
+    paddingHorizontal: spacing[4],
+    borderRadius:      10,
+    borderWidth:       1,
+    borderColor:       colors.border.default,
+    backgroundColor:   colors.bg.secondary,
+  },
+  incomeOptionActive: {
+    borderColor:     colors.primary,
+    backgroundColor: colors.primary + '0D',
+  },
+  incomeSaveBtn: {
+    marginTop:      spacing[3],
+    backgroundColor: colors.primary,
+    borderRadius:   12,
+    height:         52,
+    alignItems:     'center',
+    justifyContent: 'center',
   },
   projectionCard: {
     padding: spacing[5],

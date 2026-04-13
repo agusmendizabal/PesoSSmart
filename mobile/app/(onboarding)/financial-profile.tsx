@@ -81,6 +81,12 @@ export default function FinancialProfileScreen() {
   }, [user?.id]);
 
   const steps: Step[] = ['income', 'work', 'family', 'savings'];
+  const stepLabels: Record<Step, string> = {
+    income: 'INGRESOS',
+    work: 'TRABAJO',
+    family: 'FAMILIA',
+    savings: 'AHORROS',
+  };
   const stepIndex = steps.indexOf(currentStep);
   const progress = ((stepIndex + 1) / steps.length);
 
@@ -105,7 +111,7 @@ export default function FinancialProfileScreen() {
     if (!user?.id) return;
     try {
       await saveFinancialProfile(user.id);
-      router.back();
+      router.push('/(onboarding)/interests');
     } catch {
       // error en store
     }
@@ -124,7 +130,7 @@ export default function FinancialProfileScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text variant="label" color={colors.text.secondary}>
-          PASO 1 DE 3
+          {stepLabels[currentStep]} · {stepIndex + 1} / {steps.length}
         </Text>
         <View style={{ width: 24 }} />
       </View>
@@ -158,7 +164,7 @@ export default function FinancialProfileScreen() {
                         <Text
                           variant="bodySmall"
                           color={income_range === opt.value ? colors.neon : colors.text.primary}
-                          style={{ fontFamily: 'DMSans_600SemiBold' }}
+                          style={{ fontFamily: 'Montserrat_600SemiBold' }}
                         >
                           {opt.label}
                         </Text>
@@ -210,7 +216,7 @@ export default function FinancialProfileScreen() {
                       <Text
                         variant="bodySmall"
                         color={work_type === opt.value ? colors.neon : colors.text.primary}
-                        style={{ flex: 1, fontFamily: 'DMSans_500Medium' }}
+                        style={{ flex: 1, fontFamily: 'Montserrat_500Medium' }}
                       >
                         {opt.label}
                       </Text>
@@ -256,7 +262,7 @@ export default function FinancialProfileScreen() {
                       <Text
                         variant="bodySmall"
                         color={family_status === opt.value ? colors.neon : colors.text.primary}
-                        style={{ flex: 1, fontFamily: 'DMSans_500Medium' }}
+                        style={{ flex: 1, fontFamily: 'Montserrat_500Medium' }}
                       >
                         {opt.label}
                       </Text>
@@ -415,6 +421,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderWidth: 1,
     borderColor: colors.border.default,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bg.card,

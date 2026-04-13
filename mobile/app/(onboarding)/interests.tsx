@@ -221,6 +221,7 @@ const styles = StyleSheet.create({
   interestCard: {
     width: '47%',
     borderWidth: 1,
+    borderRadius: 12,
     padding: spacing[4],
     gap: spacing[2],
   },
@@ -231,7 +232,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing[2],
   },
   cardLabel: {
-    fontFamily: 'DMSans_600SemiBold',
+    fontFamily: 'Montserrat_600SemiBold',
     lineHeight: 18,
   },
   cardDesc: {

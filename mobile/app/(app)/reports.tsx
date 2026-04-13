@@ -1,10 +1,10 @@
 /**
  * ReportsScreen — "Informe"
  *
- * Centro de análisis financiero del usuario.
- * Bloques: HealthScore · Resumen · Termómetro · Tendencia ·
- *          Distribución · Aprendizajes · En qué ahorrar ·
- *          Riesgos · CTA Asesor IA
+ * Bloques: Estado del mes · Dato clave · Resumen ·
+ *          Termómetro · Distribución · Comparación histórica ·
+ *          Dinero recuperable · Plan próximo mes ·
+ *          Objetivo automático · CTA Asesor IA
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path, Circle, G } from 'react-native-svg';
+
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { colors, spacing, layout } from '@/theme';
@@ -28,7 +28,7 @@ import { formatCurrency } from '@/utils/format';
 import { InflationThermometer } from '@/components/InflationThermometer';
 import { getLatestIndecEntry } from '@/lib/indecData';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
+// ─── Constantes ───────────────────────────────────────────────────────────────
 
 const MONTH_NAMES = [
   'Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -40,17 +40,18 @@ const PALETTE = [
   '#7B61FF','#FF6D00','#00BCD4','#E91E63','#4CAF50','#795548',
 ];
 
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
 interface CategoryRow {
   id: string | null;
   name: string;
   color: string;
   amount: number;
   pct: number;
-  classification_breakdown?: { necessary: number; disposable: number; investable: number };
 }
 
 interface MonthSummary {
-  monthKey: string; // "YYYY-MM"
+  monthKey: string;
   label: string;
   total: number;
   disposable: number;
@@ -58,103 +59,25 @@ interface MonthSummary {
   investable: number;
 }
 
-// ─── Health Score ─────────────────────────────────────────────────────────────
-
-interface HealthData {
-  score: number;          // 0-100
-  label: 'Excelente' | 'Buena' | 'Media' | 'Baja';
+interface StatusData {
+  status: 'good' | 'tight' | 'over';
+  emoji: string;
+  label: string;
+  subtitle: string;
   color: string;
-  reasons: string[];
-  prevScore: number | null;
 }
 
-function computeHealthScore({
-  total, necessary, disposable, investable,
-  estimatedIncome, personalInflation, officialInflation,
-}: {
-  total: number; necessary: number; disposable: number; investable: number;
-  estimatedIncome: number | null; personalInflation: number | null; officialInflation: number;
-}): HealthData {
-  let score = 65;
-  const reasons: string[] = [];
-
-  // Factor 1: % del ingreso gastado (±30 puntos)
-  if (estimatedIncome && estimatedIncome > 0) {
-    const pct = total / estimatedIncome;
-    if (pct > 1.1)      { score -= 30; reasons.push('Te pasaste bastante del ingreso estimado.'); }
-    else if (pct > 1)   { score -= 20; reasons.push('Te pasaste ligeramente del ingreso.'); }
-    else if (pct > 0.85){ score -= 10; reasons.push('Gastaste más del 85% del ingreso.'); }
-    else if (pct < 0.6) { score += 15; reasons.push('Gastaste menos del 60% del ingreso. Excelente margen.'); }
-    else                { score +=  5; }
-  }
-
-  // Factor 2: % prescindibles sobre total (±20 puntos)
-  if (total > 0) {
-    const dispPct = disposable / total;
-    if (dispPct > 0.25)      { score -= 20; reasons.push('Alta proporción de gastos prescindibles (+25%).'); }
-    else if (dispPct > 0.15) { score -= 10; reasons.push('Gastos prescindibles moderados (15-25%).'); }
-    else if (dispPct < 0.05) { score += 10; reasons.push('Muy pocos gastos prescindibles. Bien.'); }
-  }
-
-  // Factor 3: inflación personal vs oficial (±15 puntos)
-  if (personalInflation !== null) {
-    const diff = personalInflation - officialInflation;
-    if (diff > 3)       { score -= 15; reasons.push(`Tu inflación personal superó la oficial en ${diff.toFixed(1)} puntos.`); }
-    else if (diff > 1)  { score -=  7; reasons.push('Tu inflación personal fue algo mayor a la oficial.'); }
-    else if (diff < -1) { score += 10; reasons.push('Tu inflación personal fue menor a la oficial. Positivo.'); }
-  }
-
-  // Factor 4: ahorro / invertible (±10 puntos)
-  if (investable > 0) {
-    score += 10;
-    reasons.push(`Tenés ${formatCurrency(investable)} clasificados como invertibles.`);
-  }
-
-  score = Math.max(0, Math.min(100, Math.round(score)));
-
-  const label: HealthData['label'] =
-    score >= 80 ? 'Excelente' :
-    score >= 60 ? 'Buena' :
-    score >= 40 ? 'Media' : 'Baja';
-
-  const color =
-    score >= 80 ? colors.primary :
-    score >= 60 ? '#66bb6a' :
-    score >= 40 ? colors.yellow : colors.red;
-
-  return { score, label, color, reasons, prevScore: null };
+interface KeyInsight {
+  text: string;
+  sentiment: 'negative' | 'warning' | 'positive';
+  icon: string;
 }
 
-// ─── Tendencia ────────────────────────────────────────────────────────────────
-
-function buildTendenciaInsights(history: MonthSummary[]): string[] {
-  if (history.length < 2) return [];
-  const insights: string[] = [];
-  const last   = history[history.length - 1];
-  const prev   = history[history.length - 2];
-  const oldest = history[0];
-
-  // Gasto total tendencia
-  const diffPct = prev.total > 0 ? ((last.total - prev.total) / prev.total) * 100 : 0;
-  if (diffPct > 15)       insights.push(`Gastaste un ${Math.round(diffPct)}% más que el mes pasado.`);
-  else if (diffPct < -10) insights.push(`Bajaste el gasto un ${Math.round(Math.abs(diffPct))}% vs el mes pasado. 👏`);
-
-  // Prescindibles tendencia
-  if (prev.disposable > 0 && last.disposable < prev.disposable * 0.85) {
-    insights.push(`Bajaste tus gastos prescindibles vs el mes pasado. Bien.`);
-  } else if (last.disposable > prev.disposable * 1.2) {
-    insights.push(`Tus gastos prescindibles subieron respecto al mes pasado.`);
-  }
-
-  // Tendencia 3 meses
-  if (history.length >= 3 && last.total > oldest.total * 1.2) {
-    insights.push(`Venís con tendencia alcista en gasto hace ${history.length} meses.`);
-  }
-
-  return insights;
+interface ComparacionData {
+  vsPrev: { changePct: number; changeAmount: number; better: boolean } | null;
+  vsAvg:  { changePct: number; changeAmount: number; better: boolean } | null;
+  disposableTrend: 'up' | 'down' | 'same' | null;
 }
-
-// ─── En qué ahorrar ───────────────────────────────────────────────────────────
 
 interface AhorroSugerencia {
   icon: string;
@@ -162,109 +85,247 @@ interface AhorroSugerencia {
   saving: number;
 }
 
-function buildAhorroSugerencias({
-  rows, disposable, total, estimatedIncome,
-}: {
+interface PlanItem {
+  icon: string;
+  title: string;
+  description: string;
+  impact: number | null;
+}
+
+interface ObjetivoData {
+  title: string;
+  currentPct: number;
+  targetPct: number;
+  status: 'on_track' | 'off_track' | 'achieved';
+  statusLabel: string;
+  color: string;
+}
+
+// ─── Lógica de análisis ───────────────────────────────────────────────────────
+
+function computeMonthStatus({ total, disposable, estimatedIncome }: {
+  total: number; disposable: number; estimatedIncome: number | null;
+}): StatusData {
+  const dispPct    = total > 0 ? disposable / total : 0;
+  const incomePct  = estimatedIncome && estimatedIncome > 0 ? total / estimatedIncome : null;
+
+  if (incomePct !== null && incomePct > 1) {
+    return {
+      status: 'over', emoji: '🔴', label: 'Te pasaste',
+      subtitle: `Gastaste el ${Math.round(incomePct * 100)}% de tu ingreso estimado`,
+      color: colors.red,
+    };
+  }
+  if ((incomePct !== null && incomePct > 0.85) || dispPct > 0.2) {
+    return {
+      status: 'tight', emoji: '🟡', label: 'Ajustado',
+      subtitle: incomePct !== null && incomePct > 0.85
+        ? `Usaste el ${Math.round(incomePct * 100)}% de tu ingreso`
+        : `El ${Math.round(dispPct * 100)}% de tu gasto fue prescindible`,
+      color: colors.yellow,
+    };
+  }
+  return {
+    status: 'good', emoji: '🟢', label: 'Buen manejo',
+    subtitle: incomePct !== null
+      ? `Usaste el ${Math.round(incomePct * 100)}% de tu ingreso. Bien.`
+      : `Tus gastos prescindibles están bajo control`,
+    color: colors.primary,
+  };
+}
+
+function buildKeyInsight({ total, disposable, estimatedIncome, rows, history }: {
+  total: number; disposable: number; estimatedIncome: number | null;
+  rows: CategoryRow[]; history: MonthSummary[];
+}): KeyInsight | null {
+  if (total === 0) return null;
+
+  if (estimatedIncome && total > estimatedIncome) {
+    const pct = Math.round(((total - estimatedIncome) / estimatedIncome) * 100);
+    return { text: `Te pasaste un ${pct}% de tu ingreso estimado este mes`, sentiment: 'negative', icon: 'trending-up-outline' };
+  }
+
+  const dispPct = total > 0 ? disposable / total : 0;
+  if (dispPct > 0.25) {
+    return { text: `El ${Math.round(dispPct * 100)}% de tu gasto fue prescindible este mes`, sentiment: 'negative', icon: 'warning-outline' };
+  }
+
+  if (rows.length > 0 && rows[0].pct > 0.45) {
+    return { text: `"${rows[0].name}" concentró el ${Math.round(rows[0].pct * 100)}% de todo tu gasto`, sentiment: 'warning', icon: 'pie-chart-outline' };
+  }
+
+  if (history.length >= 1) {
+    const prev = history[history.length - 1];
+    if (prev.total > 0) {
+      const changePct = Math.round(((total - prev.total) / prev.total) * 100);
+      if (changePct > 15) return { text: `Gastaste un ${changePct}% más que el mes pasado`, sentiment: 'warning', icon: 'trending-up-outline' };
+      if (changePct < -10) return { text: `Bajaste el gasto un ${Math.abs(changePct)}% respecto al mes pasado`, sentiment: 'positive', icon: 'trending-down-outline' };
+    }
+  }
+
+  if (dispPct > 0.15) {
+    return { text: `El ${Math.round(dispPct * 100)}% de tus gastos fueron prescindibles`, sentiment: 'warning', icon: 'wallet-outline' };
+  }
+
+  if (estimatedIncome && total < estimatedIncome * 0.75) {
+    const savedPct = Math.round(((estimatedIncome - total) / estimatedIncome) * 100);
+    return { text: `Mantuviste el ${savedPct}% de tu ingreso sin gastar. Excelente margen`, sentiment: 'positive', icon: 'checkmark-circle-outline' };
+  }
+
+  if (rows.length > 0) {
+    return { text: `Tu mayor gasto fue "${rows[0].name}" con el ${Math.round(rows[0].pct * 100)}% del total`, sentiment: 'warning', icon: 'bar-chart-outline' };
+  }
+
+  return null;
+}
+
+function buildComparacion(history: MonthSummary[], currentTotal: number, currentDisposable: number): ComparacionData {
+  if (history.length === 0) return { vsPrev: null, vsAvg: null, disposableTrend: null };
+
+  const sorted = [...history].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+  const prev   = sorted[sorted.length - 1];
+
+  const vsPrev = prev ? {
+    changePct:    prev.total > 0 ? Math.round(((currentTotal - prev.total) / prev.total) * 100) : 0,
+    changeAmount: Math.round(currentTotal - prev.total),
+    better:       currentTotal <= prev.total,
+  } : null;
+
+  const vsAvg = sorted.length >= 2 ? (() => {
+    const avg = sorted.reduce((s, m) => s + m.total, 0) / sorted.length;
+    return {
+      changePct:    avg > 0 ? Math.round(((currentTotal - avg) / avg) * 100) : 0,
+      changeAmount: Math.round(currentTotal - avg),
+      better:       currentTotal <= avg,
+    };
+  })() : null;
+
+  const disposableTrend: ComparacionData['disposableTrend'] = prev
+    ? currentDisposable < prev.disposable * 0.9 ? 'down'
+      : currentDisposable > prev.disposable * 1.1 ? 'up'
+      : 'same'
+    : null;
+
+  return { vsPrev, vsAvg, disposableTrend };
+}
+
+function buildAhorroSugerencias({ rows, disposable, total, estimatedIncome }: {
   rows: CategoryRow[]; disposable: number; total: number; estimatedIncome: number | null;
 }): AhorroSugerencia[] {
   const sugerencias: AhorroSugerencia[] = [];
 
-  // Top categoría prescindible
-  const topRow = rows[0];
-  if (topRow && topRow.pct > 0.2 && topRow.amount > 5000) {
-    const saving = Math.round(topRow.amount * 0.3);
-    sugerencias.push({
-      icon: 'cut-outline',
-      text: `Reduciendo "${topRow.name}" un 30% → ahorrás ${formatCurrency(saving)}/mes.`,
-      saving,
-    });
-  }
-
-  // Prescindibles totales
   if (disposable > 10000) {
-    const saving = Math.round(disposable * 0.5);
-    sugerencias.push({
-      icon: 'wallet-outline',
-      text: `La mitad de tus prescindibles son ${formatCurrency(saving)} que podrías invertir.`,
-      saving,
-    });
+    sugerencias.push({ icon: 'wallet-outline', text: `Ajustando la mitad de tus prescindibles`, saving: Math.round(disposable * 0.5) });
   }
-
-  // Exceso vs ingreso
+  if (rows[0] && rows[0].pct > 0.2 && rows[0].amount > 5000) {
+    sugerencias.push({ icon: 'cut-outline', text: `Reduciendo "${rows[0].name}" un 30%`, saving: Math.round(rows[0].amount * 0.3) });
+  }
   if (estimatedIncome && total > estimatedIncome) {
-    const excess = total - estimatedIncome;
-    sugerencias.push({
-      icon: 'trending-down-outline',
-      text: `Si ajustás ${formatCurrency(excess)} de gastos, cerrarías el mes en equilibrio.`,
-      saving: excess,
-    });
+    sugerencias.push({ icon: 'trending-down-outline', text: `Ajustando el exceso sobre tu ingreso`, saving: Math.round(total - estimatedIncome) });
   }
-
-  // Segunda categoría más alta
   if (rows.length >= 2 && rows[1].amount > 8000) {
-    const saving = Math.round(rows[1].amount * 0.2);
-    sugerencias.push({
-      icon: 'remove-circle-outline',
-      text: `Un 20% menos en "${rows[1].name}" → ${formatCurrency(saving)} de diferencia.`,
-      saving,
-    });
+    sugerencias.push({ icon: 'remove-circle-outline', text: `Un 20% menos en "${rows[1].name}"`, saving: Math.round(rows[1].amount * 0.2) });
   }
 
   return sugerencias.slice(0, 3);
 }
 
-// ─── Qué aprendimos ───────────────────────────────────────────────────────────
+function buildPlanProximoMes({ rows, disposable, total, estimatedIncome, history }: {
+  rows: CategoryRow[]; disposable: number; total: number;
+  estimatedIncome: number | null; history: MonthSummary[];
+}): PlanItem[] {
+  const items: PlanItem[] = [];
+  const dispPct = total > 0 ? disposable / total : 0;
 
-function buildAprendizajes({
-  rows, history, disposable, total,
-}: {
-  rows: CategoryRow[]; history: MonthSummary[]; disposable: number; total: number;
-}): string[] {
-  const insights: string[] = [];
-
-  // Concentración
-  if (rows.length > 0 && rows[0].pct > 0.45) {
-    insights.push(`Tu gasto está muy concentrado: "${rows[0].name}" representa casi la mitad del total.`);
-  } else if (rows.length >= 2 && rows[0].pct + rows[1].pct > 0.65) {
-    insights.push(`Solo 2 categorías explican el ${Math.round((rows[0].pct + rows[1].pct) * 100)}% de tu gasto.`);
+  if (dispPct > 0.15) {
+    const target = Math.round(total * 0.1);
+    const saving = Math.round(disposable - target);
+    items.push({
+      icon: 'cut-outline',
+      title: 'Reducí los prescindibles',
+      description: `Intentá no superar el 10% en gastos no esenciales (${formatCurrency(target)})`,
+      impact: saving > 0 ? saving : null,
+    });
   }
 
-  // Patrón prescindibles
-  if (total > 0 && disposable / total > 0.2) {
-    insights.push(`Sos sensible a gastos de ocio/prescindibles — representan más del 20% de tu total.`);
+  if (rows.length > 0 && rows[0].pct > 0.3) {
+    items.push({
+      icon: 'pie-chart-outline',
+      title: `Controlá "${rows[0].name}"`,
+      description: `Apuntá a no pasar de ${formatCurrency(Math.round(rows[0].amount * 0.85))} en esta categoría`,
+      impact: Math.round(rows[0].amount * 0.15),
+    });
   }
 
-  // Tendencia consistente
-  if (history.length >= 3) {
-    const increasing = history.every((m, i) => i === 0 || m.total >= history[i - 1].total);
-    const decreasing = history.every((m, i) => i === 0 || m.total <= history[i - 1].total);
-    if (increasing) insights.push(`Tus gastos vienen en aumento constante los últimos ${history.length} meses.`);
-    if (decreasing) insights.push(`Venís bajando el gasto consistentemente. Muy bien.`);
+  if (estimatedIncome && total > estimatedIncome * 0.95) {
+    const target = Math.round(estimatedIncome * 0.85);
+    items.push({
+      icon: 'trending-down-outline',
+      title: 'Apuntá a gastar menos del 85% del ingreso',
+      description: `Objetivo: ${formatCurrency(target)}/mes para tener margen de ahorro`,
+      impact: Math.round(total - target),
+    });
   }
 
-  // Diversificación
-  if (rows.length >= 6) {
-    insights.push(`Tu gasto está bien distribuido entre ${rows.length} categorías distintas.`);
+  if (estimatedIncome && total < estimatedIncome * 0.8 && items.length < 3) {
+    items.push({
+      icon: 'trending-up-outline',
+      title: 'Invertí lo que pudiste ahorrar',
+      description: `Tenés margen para invertir hasta ${formatCurrency(Math.round((estimatedIncome - total) * 0.5))} este mes`,
+      impact: null,
+    });
   }
 
-  return insights.slice(0, 3);
+  if (history.length >= 2 && items.length < 3) {
+    const sorted = [...history].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+    const prev   = sorted[sorted.length - 1];
+    if (prev.total > 0 && total > prev.total * 1.1) {
+      items.push({
+        icon: 'bar-chart-outline',
+        title: 'Cortá la tendencia al alza',
+        description: `Venís gastando más cada mes. El próximo, intentá mantenerte o bajar`,
+        impact: null,
+      });
+    }
+  }
+
+  return items.slice(0, 3);
+}
+
+function buildObjetivo({ disposable, total }: { disposable: number; total: number }): ObjetivoData | null {
+  if (total === 0) return null;
+  const currentPct = Math.round((disposable / total) * 100);
+  const targetPct  = currentPct > 15 ? 10 : 5;
+
+  const status: ObjetivoData['status'] =
+    currentPct <= targetPct ? 'achieved' :
+    currentPct <= targetPct + 5 ? 'on_track' : 'off_track';
+
+  const statusMap = {
+    achieved: { label: '¡Objetivo cumplido!', color: colors.primary },
+    on_track: { label: 'Cerca del objetivo',  color: colors.yellow  },
+    off_track:{ label: 'Por encima del objetivo', color: colors.red },
+  };
+
+  return {
+    title: `Bajar prescindibles al ${targetPct}%`,
+    currentPct, targetPct, status,
+    statusLabel: statusMap[status].label,
+    color:       statusMap[status].color,
+  };
 }
 
 // ─── Componentes UI ───────────────────────────────────────────────────────────
 
-// MonthSelector
 function MonthSelector({ month, year, onPrev, onNext, disableNext }: {
-  month: number; year: number;
-  onPrev: () => void; onNext: () => void; disableNext: boolean;
+  month: number; year: number; onPrev: () => void; onNext: () => void; disableNext: boolean;
 }) {
   return (
     <View style={msStyles.row}>
       <TouchableOpacity style={msStyles.btn} onPress={onPrev}>
         <Ionicons name="chevron-back" size={20} color={colors.text.primary} />
       </TouchableOpacity>
-      <Text variant="subtitle" color={colors.text.primary}>
-        {MONTH_NAMES[month - 1]} {year}
-      </Text>
+      <Text variant="subtitle" color={colors.text.primary}>{MONTH_NAMES[month - 1]} {year}</Text>
       <TouchableOpacity style={[msStyles.btn, disableNext && { opacity: 0.3 }]} onPress={onNext} disabled={disableNext}>
         <Ionicons name="chevron-forward" size={20} color={colors.text.primary} />
       </TouchableOpacity>
@@ -276,91 +337,66 @@ const msStyles = StyleSheet.create({
   btn: { padding: spacing[2] },
 });
 
-// HealthScoreCard
-function HealthScoreCard({ data }: { data: HealthData }) {
-  const ringSize = 80;
-  const radius   = 32;
-  const circumference = 2 * Math.PI * radius;
-  const progress = (data.score / 100) * circumference;
+// ── MonthStatusBanner ─────────────────────────────────────────────────────────
 
+function MonthStatusBanner({ data }: { data: StatusData }) {
   return (
-    <Card style={hsStyles.card}>
-      <Text variant="label" color={colors.text.tertiary}>SALUD FINANCIERA DEL MES</Text>
-      <View style={hsStyles.inner}>
-        {/* Anillo SVG */}
-        <View style={hsStyles.ringWrap}>
-          <Svg width={ringSize} height={ringSize}>
-            <Circle cx={ringSize/2} cy={ringSize/2} r={radius} stroke={colors.border.subtle} strokeWidth={7} fill="none" />
-            <Circle
-              cx={ringSize/2} cy={ringSize/2} r={radius}
-              stroke={data.color} strokeWidth={7} fill="none"
-              strokeDasharray={`${progress} ${circumference}`}
-              strokeLinecap="round"
-              rotation="-90"
-              origin={`${ringSize/2}, ${ringSize/2}`}
-            />
-          </Svg>
-          <View style={hsStyles.ringCenter}>
-            <Text style={{ fontSize: 18, fontFamily: 'DMSans_700Bold', color: data.color }}>{data.score}</Text>
-          </View>
-        </View>
-
-        {/* Label + reasons */}
-        <View style={{ flex: 1, gap: spacing[2] }}>
-          <View style={[hsStyles.labelPill, { backgroundColor: data.color + '20' }]}>
-            <Text style={{ fontSize: 13, fontFamily: 'DMSans_700Bold', color: data.color }}>
-              {data.label}
-            </Text>
-            {data.prevScore !== null && (
-              <Text variant="caption" color={data.score >= data.prevScore ? colors.primary : colors.red}>
-                {data.score >= data.prevScore ? '▲' : '▼'} vs mes anterior
-              </Text>
-            )}
-          </View>
-          {data.reasons.slice(0, 2).map((r, i) => (
-            <Text key={i} variant="caption" color={colors.text.secondary} style={{ lineHeight: 16 }}>
-              · {r}
-            </Text>
-          ))}
-        </View>
+    <View style={[banStyles.banner, { borderColor: data.color + '50', backgroundColor: data.color + '12' }]}>
+      <Text style={banStyles.emoji}>{data.emoji}</Text>
+      <View style={{ gap: 3, flex: 1 }}>
+        <Text style={[banStyles.label, { color: data.color }]}>{data.label}</Text>
+        <Text variant="caption" color={colors.text.secondary} style={{ lineHeight: 16 }}>{data.subtitle}</Text>
       </View>
+    </View>
+  );
+}
+const banStyles = StyleSheet.create({
+  banner: { borderWidth: 1, borderRadius: 12, padding: spacing[4], flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  emoji:  { fontSize: 28 },
+  label:  { fontSize: 17, fontFamily: 'Montserrat_700Bold' },
+});
+
+// ── KeyInsightCard ────────────────────────────────────────────────────────────
+
+function KeyInsightCard({ insight }: { insight: KeyInsight }) {
+  const color = insight.sentiment === 'negative' ? colors.red : insight.sentiment === 'positive' ? colors.primary : colors.yellow;
+  return (
+    <Card style={[kiStyles.card, { borderLeftWidth: 3, borderLeftColor: color }]}>
+      <View style={kiStyles.header}>
+        <View style={[kiStyles.iconWrap, { backgroundColor: color + '18' }]}>
+          <Ionicons name={insight.icon as any} size={16} color={color} />
+        </View>
+        <Text variant="label" color={colors.text.tertiary}>DATO CLAVE DEL MES</Text>
+      </View>
+      <Text style={kiStyles.text}>{insight.text}</Text>
     </Card>
   );
 }
-const hsStyles = StyleSheet.create({
-  card:      { padding: spacing[5], gap: spacing[4] },
-  inner:     { flexDirection: 'row', alignItems: 'center', gap: spacing[4] },
-  ringWrap:  { width: 80, height: 80, alignItems: 'center', justifyContent: 'center' },
-  ringCenter:{ position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  labelPill: { alignSelf: 'flex-start', paddingHorizontal: spacing[3], paddingVertical: spacing[1], borderRadius: 20, gap: 2 },
+const kiStyles = StyleSheet.create({
+  card:    { padding: spacing[5], gap: spacing[3] },
+  header:  { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  iconWrap:{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  text:    { fontSize: 17, fontFamily: 'Montserrat_600SemiBold', lineHeight: 26, color: colors.text.primary },
 });
 
-// ResumenCard
+// ── ResumenCard ───────────────────────────────────────────────────────────────
+
 function ResumenCard({ total, necessary, disposable, investable, estimatedIncome }: {
   total: number; necessary: number; disposable: number; investable: number; estimatedIncome: number | null;
 }) {
-  const incomePct  = estimatedIncome && estimatedIncome > 0 ? Math.round((total / estimatedIncome) * 100) : null;
-  const overBudget = incomePct !== null && incomePct > 100;
-  const statusColor = overBudget ? colors.red : incomePct !== null && incomePct > 80 ? colors.yellow : colors.primary;
-  const statusLabel = overBudget ? '¡TE PASASTE!' : incomePct !== null && incomePct > 80 ? 'CUIDADO' : 'EN ORDEN';
+  const incomePct   = estimatedIncome && estimatedIncome > 0 ? Math.round((total / estimatedIncome) * 100) : null;
+  const statusColor = incomePct !== null && incomePct > 100 ? colors.red : incomePct !== null && incomePct > 80 ? colors.yellow : colors.primary;
 
   return (
     <Card style={resStyles.card}>
-      <View style={resStyles.header}>
-        <Text variant="label" color={colors.text.tertiary}>RESUMEN DEL MES</Text>
-        {incomePct !== null && (
-          <View style={[resStyles.statusPill, { backgroundColor: statusColor + '20' }]}>
-            <Text style={[resStyles.statusText, { color: statusColor }]}>{statusLabel}</Text>
-          </View>
-        )}
-      </View>
+      <Text variant="label" color={colors.text.tertiary}>RESUMEN DEL MES</Text>
       <Text variant="number" color={colors.text.primary}>{formatCurrency(total)}</Text>
       {incomePct !== null && (
         <View style={resStyles.incomeRow}>
           <View style={resStyles.progressTrack}>
             <View style={[resStyles.progressFill, { width: `${Math.min(incomePct, 100)}%`, backgroundColor: statusColor }]} />
           </View>
-          <Text variant="caption" color={statusColor} style={{ fontFamily: 'DMSans_600SemiBold' }}>
+          <Text variant="caption" color={statusColor} style={{ fontFamily: 'Montserrat_600SemiBold' }}>
             {incomePct}% del ingreso estimado ({formatCurrency(estimatedIncome!)})
           </Text>
         </View>
@@ -382,9 +418,6 @@ function ResumenCard({ total, necessary, disposable, investable, estimatedIncome
 }
 const resStyles = StyleSheet.create({
   card:          { padding: spacing[5], gap: spacing[3] },
-  header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  statusPill:    { paddingHorizontal: spacing[2], paddingVertical: 3, borderRadius: 20 },
-  statusText:    { fontSize: 9, fontFamily: 'DMSans_700Bold' },
   incomeRow:     { gap: spacing[1] },
   progressTrack: { height: 5, backgroundColor: colors.border.subtle, borderRadius: 3, overflow: 'hidden' },
   progressFill:  { height: '100%', borderRadius: 3 },
@@ -392,152 +425,151 @@ const resStyles = StyleSheet.create({
   breakdownItem: { gap: 2 },
 });
 
-// TendenciaCard
-function TendenciaCard({ history, insights }: { history: MonthSummary[]; insights: string[] }) {
-  if (history.length < 2) return null;
-  const maxTotal = Math.max(...history.map(m => m.total), 1);
+// ── CategoryBreakdown ─────────────────────────────────────────────────────────
+
+function CategoryBreakdown({ rows, total }: { rows: CategoryRow[]; total: number }) {
+  if (rows.length === 0) return null;
+  const maxAmount = rows[0]?.amount ?? 1;
+  return (
+    <Card style={cbStyles.card}>
+      <View style={cbStyles.header}>
+        <Text variant="label" color={colors.text.tertiary}>DISTRIBUCIÓN POR CATEGORÍA</Text>
+        <Text variant="caption" color={colors.text.tertiary}>{formatCurrency(total)}</Text>
+      </View>
+
+      {/* Stacked bar */}
+      <View style={cbStyles.stackBar}>
+        {rows.map((row, i) => (
+          <View key={i} style={[cbStyles.stackSlice, { flex: row.amount, backgroundColor: row.color }]} />
+        ))}
+      </View>
+
+      {/* Bar list */}
+      <View style={cbStyles.barList}>
+        {rows.map((row, i) => (
+          <View key={i} style={cbStyles.barRow}>
+            <View style={cbStyles.barMeta}>
+              <View style={[cbStyles.dot, { backgroundColor: row.color }]} />
+              <Text variant="caption" color={colors.text.secondary} style={{ flex: 1 }} numberOfLines={1}>
+                {row.name}
+              </Text>
+              <Text variant="caption" color={row.color} style={{ fontFamily: 'Montserrat_600SemiBold' }}>
+                {Math.round(row.pct * 100)}%
+              </Text>
+              <Text variant="caption" color={colors.text.primary} style={{ fontFamily: 'Montserrat_500Medium', minWidth: 72, textAlign: 'right' }}>
+                {formatCurrency(row.amount)}
+              </Text>
+            </View>
+            <View style={cbStyles.track}>
+              <View style={[cbStyles.fill, { width: `${(row.amount / maxAmount) * 100}%`, backgroundColor: row.color }]} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </Card>
+  );
+}
+const cbStyles = StyleSheet.create({
+  card:       { padding: spacing[5], gap: spacing[4] },
+  header:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  stackBar:   { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', gap: 1 },
+  stackSlice: { borderRadius: 2 },
+  barList:    { gap: spacing[3] },
+  barRow:     { gap: spacing[1] },
+  barMeta:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  dot:        { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  track:      { height: 4, backgroundColor: colors.border.subtle, borderRadius: 2, overflow: 'hidden' },
+  fill:       { height: '100%', borderRadius: 2 },
+});
+
+// ── HistoryComparisonCard ─────────────────────────────────────────────────────
+
+function HistoryComparisonCard({ history, comparacion, currentTotal }: {
+  history: MonthSummary[]; comparacion: ComparacionData; currentTotal: number;
+}) {
+  if (history.length < 1) return null;
+  const maxTotal = Math.max(...history.map(m => m.total), currentTotal, 1);
+  const displayBars = [...history.slice(-3), { monthKey: 'current', label: 'Este mes', total: currentTotal }];
 
   return (
-    <Card style={tendStyles.card}>
-      <Text variant="label" color={colors.text.tertiary}>TENDENCIA</Text>
+    <Card style={hcStyles.card}>
+      <Text variant="label" color={colors.text.tertiary}>COMPARACIÓN HISTÓRICA</Text>
 
-      {/* Mini barras por mes */}
-      <View style={tendStyles.bars}>
-        {history.map((m, i) => {
-          const isLast = i === history.length - 1;
+      <View style={hcStyles.bars}>
+        {displayBars.map((m) => {
+          const isLast = m.monthKey === 'current';
           const h = Math.max(4, Math.round((m.total / maxTotal) * 60));
           return (
-            <View key={m.monthKey} style={tendStyles.barGroup}>
-              <Text variant="caption" color={colors.text.tertiary} style={{ fontSize: 8 }}>
+            <View key={m.monthKey} style={hcStyles.barGroup}>
+              <Text variant="caption" color={isLast ? colors.text.primary : colors.text.tertiary} style={{ fontSize: 8 }}>
                 {formatCurrency(m.total).replace('$ ', '').replace('.000', 'k')}
               </Text>
-              <View style={[tendStyles.bar, { height: h, backgroundColor: isLast ? colors.primary : colors.border.default }]} />
-              <Text variant="caption" color={isLast ? colors.text.primary : colors.text.tertiary} style={{ fontSize: 9 }}>
-                {m.label}
-              </Text>
+              <View style={[hcStyles.bar, { height: h, backgroundColor: isLast ? colors.primary : colors.border.default }]} />
+              <Text variant="caption" color={isLast ? colors.text.primary : colors.text.tertiary} style={{ fontSize: 9 }}>{m.label}</Text>
             </View>
           );
         })}
       </View>
 
-      {/* Insights de tendencia */}
-      {insights.map((ins, i) => (
-        <View key={i} style={tendStyles.insightRow}>
-          <Ionicons name="trending-up-outline" size={14} color={colors.text.tertiary} />
-          <Text variant="caption" color={colors.text.secondary} style={{ flex: 1, lineHeight: 16 }}>{ins}</Text>
-        </View>
-      ))}
-    </Card>
-  );
-}
-const tendStyles = StyleSheet.create({
-  card:       { padding: spacing[5], gap: spacing[4] },
-  bars:       { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[3] },
-  barGroup:   { flex: 1, alignItems: 'center', gap: spacing[1] },
-  bar:        { width: '100%', borderRadius: 4 },
-  insightRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
-});
-
-// MiniDonut
-const DS = 160, DCX = DS/2, DCY = DS/2, DR = 62, DIR = 38;
-function polar(cx: number, cy: number, r: number, deg: number) {
-  const rad = (deg - 90) * Math.PI / 180;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-}
-function arcPath(s: number, e: number): string {
-  const o1 = polar(DCX,DCY,DR,s), o2 = polar(DCX,DCY,DR,e);
-  const i1 = polar(DCX,DCY,DIR,s), i2 = polar(DCX,DCY,DIR,e);
-  const large = e-s>180?1:0;
-  return [`M ${o1.x} ${o1.y}`,`A ${DR} ${DR} 0 ${large} 1 ${o2.x} ${o2.y}`,`L ${i2.x} ${i2.y}`,`A ${DIR} ${DIR} 0 ${large} 0 ${i1.x} ${i1.y}`,'Z'].join(' ');
-}
-function MiniDonut({ rows, total }: { rows: CategoryRow[]; total: number }) {
-  let deg = 0;
-  return (
-    <View style={{ width: DS, height: DS }}>
-      <Svg width={DS} height={DS}>
-        <Circle cx={DCX} cy={DCY} r={DR} fill={colors.border.subtle} />
-        <Circle cx={DCX} cy={DCY} r={DIR} fill={colors.bg.primary} />
-        {rows.map((row, i) => {
-          const sweep = row.pct * 360;
-          const start = deg + 1; const end = deg + sweep - 1;
-          deg += sweep;
-          if (sweep < 2) return null;
-          return <G key={i}><Path d={arcPath(start, end)} fill={row.color} /></G>;
-        })}
-        <Circle cx={DCX} cy={DCY} r={DIR - 1} fill={colors.bg.primary} />
-      </Svg>
-      <View style={donutStyles.center} pointerEvents="none">
-        <Text variant="caption" color={colors.text.tertiary} style={{ fontSize: 9 }}>TOTAL</Text>
-        <Text style={{ fontSize: 12, fontFamily: 'DMSans_700Bold', color: colors.text.primary }}>{formatCurrency(total)}</Text>
-      </View>
-    </View>
-  );
-}
-const donutStyles = StyleSheet.create({
-  center: { position: 'absolute', top:0,left:0,right:0,bottom:0, alignItems:'center', justifyContent:'center' },
-});
-
-// DistribucionCard
-function DistribucionCard({ rows, total }: { rows: CategoryRow[]; total: number }) {
-  if (rows.length === 0) return null;
-  return (
-    <Card style={distStyles.card}>
-      <Text variant="label" color={colors.text.tertiary}>DISTRIBUCIÓN POR CATEGORÍA</Text>
-      <View style={distStyles.inner}>
-        <MiniDonut rows={rows} total={total} />
-        <View style={distStyles.legend}>
-          {rows.slice(0, 5).map(row => (
-            <View key={row.id ?? row.name} style={distStyles.row}>
-              <View style={[distStyles.dot, { backgroundColor: row.color }]} />
-              <Text variant="caption" color={colors.text.secondary} style={{ flex: 1 }} numberOfLines={1}>{row.name}</Text>
-              <Text variant="caption" color={colors.text.primary} style={{ fontFamily: 'DMSans_600SemiBold' }}>{Math.round(row.pct * 100)}%</Text>
-            </View>
-          ))}
-          {rows.length > 5 && <Text variant="caption" color={colors.text.tertiary}>+{rows.length - 5} más</Text>}
-        </View>
+      <View style={hcStyles.comparisons}>
+        {comparacion.vsPrev !== null && (
+          <View style={hcStyles.compRow}>
+            <Ionicons
+              name={comparacion.vsPrev.better ? 'trending-down-outline' : 'trending-up-outline'}
+              size={14}
+              color={comparacion.vsPrev.better ? colors.primary : colors.red}
+            />
+            <Text variant="caption" color={colors.text.secondary} style={{ flex: 1, lineHeight: 16 }}>
+              {comparacion.vsPrev.better
+                ? `Gastaste ${Math.abs(comparacion.vsPrev.changePct)}% menos que el mes pasado 👏`
+                : `Gastaste ${comparacion.vsPrev.changePct}% más que el mes pasado`}
+            </Text>
+          </View>
+        )}
+        {comparacion.vsAvg !== null && (
+          <View style={hcStyles.compRow}>
+            <Ionicons name="stats-chart-outline" size={14} color={comparacion.vsAvg.better ? colors.primary : colors.yellow} />
+            <Text variant="caption" color={colors.text.secondary} style={{ flex: 1, lineHeight: 16 }}>
+              {comparacion.vsAvg.better
+                ? `Por debajo de tu promedio de los últimos 3 meses`
+                : `${Math.abs(comparacion.vsAvg.changePct)}% por encima de tu promedio histórico`}
+            </Text>
+          </View>
+        )}
+        {comparacion.disposableTrend !== null && comparacion.disposableTrend !== 'same' && (
+          <View style={hcStyles.compRow}>
+            <Ionicons
+              name={comparacion.disposableTrend === 'down' ? 'thumbs-up-outline' : 'alert-circle-outline'}
+              size={14}
+              color={comparacion.disposableTrend === 'down' ? colors.primary : colors.red}
+            />
+            <Text variant="caption" color={colors.text.secondary} style={{ flex: 1, lineHeight: 16 }}>
+              {comparacion.disposableTrend === 'down'
+                ? 'Reduciste tus prescindibles respecto al mes pasado'
+                : 'Tus prescindibles subieron respecto al mes pasado'}
+            </Text>
+          </View>
+        )}
       </View>
     </Card>
   );
 }
-const distStyles = StyleSheet.create({
-  card:  { padding: spacing[5], gap: spacing[4] },
-  inner: { flexDirection: 'row', alignItems: 'center', gap: spacing[4] },
-  legend:{ flex: 1, gap: spacing[2] },
-  row:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  dot:   { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+const hcStyles = StyleSheet.create({
+  card:        { padding: spacing[5], gap: spacing[4] },
+  bars:        { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[3] },
+  barGroup:    { flex: 1, alignItems: 'center', gap: spacing[1] },
+  bar:         { width: '100%', borderRadius: 4 },
+  comparisons: { gap: spacing[2] },
+  compRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
 });
 
-// AprendizajesCard
-function AprendizajesCard({ insights }: { insights: string[] }) {
-  if (insights.length === 0) return null;
-  return (
-    <Card style={apStyles.card}>
-      <View style={apStyles.header}>
-        <Ionicons name="bulb-outline" size={14} color={colors.yellow} />
-        <Text variant="label" color={colors.text.tertiary}>QUÉ APRENDIMOS DE VOS ESTE MES</Text>
-      </View>
-      {insights.map((ins, i) => (
-        <View key={i} style={apStyles.row}>
-          <View style={apStyles.bullet} />
-          <Text variant="bodySmall" color={colors.text.primary} style={{ flex: 1, lineHeight: 20 }}>{ins}</Text>
-        </View>
-      ))}
-    </Card>
-  );
-}
-const apStyles = StyleSheet.create({
-  card:   { padding: spacing[5], gap: spacing[3] },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  row:    { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3] },
-  bullet: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.yellow, marginTop: 7, flexShrink: 0 },
-});
+// ── DineroRecuperableCard ─────────────────────────────────────────────────────
 
-// AhorroCard
-function AhorroCard({ sugerencias, month, year }: { sugerencias: AhorroSugerencia[]; month: number; year: number }) {
+function DineroRecuperableCard({ sugerencias, month, year }: {
+  sugerencias: AhorroSugerencia[]; month: number; year: number;
+}) {
   if (sugerencias.length === 0) return null;
-  const totalSaving = sugerencias.reduce((s, sg) => s + sg.saving, 0);
-
-  // Rendimiento estimado si invierte el ahorro en FCI (2%/mes) y CEDEARs (3.5%/mes promedio)
+  const totalSaving  = sugerencias.reduce((s, sg) => s + sg.saving, 0);
   const fciReturn    = Math.round(totalSaving * 0.02);
   const cedearReturn = Math.round(totalSaving * 0.035);
 
@@ -550,45 +582,51 @@ function AhorroCard({ sugerencias, month, year }: { sugerencias: AhorroSugerenci
   ].join(' ');
 
   return (
-    <Card style={ahoStyles.card}>
-      <View style={ahoStyles.header}>
+    <Card style={drStyles.card}>
+      <View style={drStyles.header}>
         <Ionicons name="sparkles-outline" size={14} color={colors.primary} />
-        <Text variant="label" color={colors.text.tertiary}>EN QUÉ PODRÍAS AHORRAR YA</Text>
-      </View>
-      {sugerencias.map((sg, i) => (
-        <View key={i} style={ahoStyles.row}>
-          <View style={ahoStyles.iconBox}>
-            <Ionicons name={sg.icon as any} size={16} color={colors.primary} />
-          </View>
-          <Text variant="bodySmall" color={colors.text.primary} style={{ flex: 1, lineHeight: 20 }}>{sg.text}</Text>
-        </View>
-      ))}
-      <View style={ahoStyles.totalRow}>
-        <Text variant="caption" color={colors.text.tertiary}>Potencial de ahorro total:</Text>
-        <Text variant="labelMd" color={colors.primary}>{formatCurrency(totalSaving)}/mes</Text>
+        <Text variant="label" color={colors.text.tertiary}>DINERO RECUPERABLE</Text>
       </View>
 
-      {/* Proyección de rendimiento */}
-      <View style={ahoStyles.projRow}>
-        <View style={ahoStyles.projItem}>
+      <View style={drStyles.headline}>
+        <Text variant="caption" color={colors.text.secondary}>Podrías haber ahorrado</Text>
+        <Text style={drStyles.amount}>{formatCurrency(totalSaving)}</Text>
+        <Text variant="caption" color={colors.text.tertiary}>este mes</Text>
+      </View>
+
+      {sugerencias.map((sg, i) => (
+        <View key={i} style={drStyles.row}>
+          <View style={drStyles.iconBox}>
+            <Ionicons name={sg.icon as any} size={14} color={colors.primary} />
+          </View>
+          <Text variant="caption" color={colors.text.secondary} style={{ flex: 1, lineHeight: 18 }}>
+            {sg.text}:{' '}
+            <Text variant="caption" color={colors.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }}>
+              {formatCurrency(sg.saving)}
+            </Text>
+          </Text>
+        </View>
+      ))}
+
+      <View style={drStyles.projRow}>
+        <View style={drStyles.projItem}>
           <Text variant="caption" color={colors.text.tertiary}>FCI (2%/mes)</Text>
           <Text variant="labelMd" color={colors.neon}>+{formatCurrency(fciReturn)}</Text>
         </View>
-        <View style={ahoStyles.projDivider} />
-        <View style={ahoStyles.projItem}>
+        <View style={drStyles.projDivider} />
+        <View style={drStyles.projItem}>
           <Text variant="caption" color={colors.text.tertiary}>CEDEARs (≈3.5%)</Text>
           <Text variant="labelMd" color={colors.neon}>+{formatCurrency(cedearReturn)}</Text>
         </View>
       </View>
 
-      {/* CTA específico de inversión */}
       <TouchableOpacity
-        style={ahoStyles.investBtn}
+        style={drStyles.investBtn}
         activeOpacity={0.85}
         onPress={() => router.push({ pathname: '/(app)/advisor', params: { initialContext: investContext } } as any)}
       >
         <Ionicons name="trending-up-outline" size={16} color={colors.black} />
-        <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: colors.black }}>
+        <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: colors.black }}>
           ¿En qué invierto y cuánto genero?
         </Text>
         <Ionicons name="arrow-forward" size={14} color={colors.black} style={{ marginLeft: 'auto' }} />
@@ -596,43 +634,103 @@ function AhorroCard({ sugerencias, month, year }: { sugerencias: AhorroSugerenci
     </Card>
   );
 }
-const ahoStyles = StyleSheet.create({
+const drStyles = StyleSheet.create({
   card:        { padding: spacing[5], gap: spacing[3] },
   header:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  headline:    { alignItems: 'center', paddingVertical: spacing[3], borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border.subtle, gap: 2 },
+  amount:      { fontSize: 30, fontFamily: 'Montserrat_700Bold', color: colors.text.primary },
   row:         { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3] },
-  iconBox:     { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  totalRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: colors.border.subtle },
+  iconBox:     { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   projRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.elevated, borderRadius: 10, padding: spacing[3] },
   projItem:    { flex: 1, alignItems: 'center', gap: 2 },
   projDivider: { width: 1, height: 32, backgroundColor: colors.border.subtle },
   investBtn:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: colors.neon, borderRadius: 10, paddingHorizontal: spacing[4], paddingVertical: spacing[3] },
 });
 
-// RiesgosCard
-function RiesgosCard({ items }: { items: { icon: string; color: string; text: string }[] }) {
+// ── PlanProximoMesCard ────────────────────────────────────────────────────────
+
+function PlanProximoMesCard({ items }: { items: PlanItem[] }) {
   if (items.length === 0) return null;
   return (
-    <Card style={riesStyles.card}>
-      <View style={riesStyles.header}>
-        <Ionicons name="warning-outline" size={14} color={colors.red} />
-        <Text variant="label" color={colors.text.tertiary}>RIESGOS DETECTADOS</Text>
+    <Card style={planStyles.card}>
+      <View style={planStyles.header}>
+        <Ionicons name="calendar-outline" size={14} color={colors.text.tertiary} />
+        <Text variant="label" color={colors.text.tertiary}>PLAN PARA EL PRÓXIMO MES</Text>
       </View>
       {items.map((item, i) => (
-        <View key={i} style={riesStyles.row}>
-          <Ionicons name={item.icon as any} size={16} color={item.color} style={{ flexShrink: 0 }} />
-          <Text variant="bodySmall" color={colors.text.primary} style={{ flex: 1, lineHeight: 20 }}>{item.text}</Text>
+        <View key={i} style={[planStyles.item, i < items.length - 1 && planStyles.itemBorder]}>
+          <View style={planStyles.iconWrap}>
+            <Ionicons name={item.icon as any} size={16} color={colors.neon} />
+          </View>
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }}>
+              {item.title}
+            </Text>
+            <Text variant="caption" color={colors.text.secondary} style={{ lineHeight: 16 }}>
+              {item.description}
+            </Text>
+            {item.impact !== null && (
+              <Text variant="caption" color={colors.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }}>
+                → Ahorrarías {formatCurrency(item.impact)}
+              </Text>
+            )}
+          </View>
         </View>
       ))}
     </Card>
   );
 }
-const riesStyles = StyleSheet.create({
-  card:   { padding: spacing[5], gap: spacing[3] },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  row:    { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3] },
+const planStyles = StyleSheet.create({
+  card:       { padding: spacing[5], gap: spacing[3] },
+  header:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  item:       { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3], paddingVertical: spacing[2] },
+  itemBorder: { borderBottomWidth: 1, borderBottomColor: colors.border.subtle },
+  iconWrap:   { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.neon + '12', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
 });
 
-// AdvisorCTA
+// ── ObjetivoCard ──────────────────────────────────────────────────────────────
+
+function ObjetivoCard({ objetivo }: { objetivo: ObjetivoData }) {
+  const fillPct = objetivo.currentPct <= objetivo.targetPct ? 1 : objetivo.targetPct / objetivo.currentPct;
+  return (
+    <Card style={objStyles.card}>
+      <View style={objStyles.header}>
+        <Ionicons name="flag-outline" size={14} color={colors.text.tertiary} />
+        <Text variant="label" color={colors.text.tertiary}>OBJETIVO SUGERIDO</Text>
+        <View style={[objStyles.statusPill, { backgroundColor: objetivo.color + '20' }]}>
+          <Text style={[objStyles.statusText, { color: objetivo.color }]}>{objetivo.statusLabel}</Text>
+        </View>
+      </View>
+      <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }}>
+        {objetivo.title}
+      </Text>
+      <View style={objStyles.progressSection}>
+        <View style={objStyles.progressTrack}>
+          <View style={[objStyles.progressFill, { width: `${Math.round(fillPct * 100)}%`, backgroundColor: objetivo.color }]} />
+        </View>
+        <View style={objStyles.progressLabels}>
+          <Text variant="caption" color={colors.text.tertiary}>Estás en {objetivo.currentPct}%</Text>
+          <Text variant="caption" color={objetivo.color} style={{ fontFamily: 'Montserrat_600SemiBold' }}>
+            Objetivo: {objetivo.targetPct}%
+          </Text>
+        </View>
+      </View>
+    </Card>
+  );
+}
+const objStyles = StyleSheet.create({
+  card:           { padding: spacing[5], gap: spacing[3] },
+  header:         { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  statusPill:     { marginLeft: 'auto', paddingHorizontal: spacing[2], paddingVertical: 2, borderRadius: 20 },
+  statusText:     { fontSize: 9, fontFamily: 'Montserrat_700Bold' },
+  progressSection:{ gap: spacing[2] },
+  progressTrack:  { height: 6, backgroundColor: colors.border.subtle, borderRadius: 3, overflow: 'hidden' },
+  progressFill:   { height: '100%', borderRadius: 3 },
+  progressLabels: { flexDirection: 'row', justifyContent: 'space-between' },
+});
+
+// ── AdvisorCTA ────────────────────────────────────────────────────────────────
+
 function AdvisorCTA({ context }: { context: string }) {
   return (
     <TouchableOpacity
@@ -642,7 +740,7 @@ function AdvisorCTA({ context }: { context: string }) {
     >
       <View style={ctaStyles.left}>
         <View style={ctaStyles.avatar}>
-          <Text style={{ fontSize: 13, fontFamily: 'DMSans_700Bold', color: colors.black }}>SP</Text>
+          <Text style={{ fontSize: 13, fontFamily: 'Montserrat_700Bold', color: colors.black }}>SP</Text>
         </View>
         <View style={{ flex: 1, gap: 3 }}>
           <Text variant="labelMd" color={colors.black}>Hablá con tu asesor</Text>
@@ -662,7 +760,7 @@ const ctaStyles = StyleSheet.create({
 // ─── Screen principal ─────────────────────────────────────────────────────────
 
 export default function ReportsScreen() {
-  const { user }   = useAuthStore();
+  const { user } = useAuthStore();
   const { totalThisMonth, totalNecessary, totalDisposable, totalInvestable, estimatedIncome } = useExpensesStore();
 
   const now = new Date();
@@ -687,7 +785,6 @@ export default function ReportsScreen() {
     if (!user?.id) return;
     setIsLoading(true);
     try {
-      // Query mes actual + 3 meses históricos en paralelo
       const [mainRes, histRes] = await Promise.all([
         supabase
           .from('expenses')
@@ -696,7 +793,6 @@ export default function ReportsScreen() {
           .is('deleted_at', null)
           .gte('date', startDate)
           .lt('date', endDate),
-
         supabase
           .from('expenses')
           .select('amount, date, classification')
@@ -709,44 +805,34 @@ export default function ReportsScreen() {
           .lt('date', startDate),
       ]);
 
-      // Procesar mes principal
       const map: Record<string, CategoryRow> = {};
       let sum = 0;
       for (const exp of mainRes.data ?? []) {
         const cat   = (exp as any).category;
         const catId = cat?.id ?? 'none';
         if (!map[catId]) {
-          map[catId] = {
-            id: catId, name: cat?.name_es ?? 'Sin categoría',
-            color: cat?.color ?? PALETTE[Object.keys(map).length % PALETTE.length],
-            amount: 0, pct: 0,
-          };
+          map[catId] = { id: catId, name: cat?.name_es ?? 'Sin categoría', color: cat?.color ?? PALETTE[Object.keys(map).length % PALETTE.length], amount: 0, pct: 0 };
         }
         map[catId].amount += (exp as any).amount;
         sum += (exp as any).amount;
       }
-      const result = Object.values(map)
-        .map(r => ({ ...r, pct: sum > 0 ? r.amount / sum : 0 }))
-        .sort((a, b) => b.amount - a.amount);
+      const result = Object.values(map).map(r => ({ ...r, pct: sum > 0 ? r.amount / sum : 0 })).sort((a, b) => b.amount - a.amount);
       setTotal(sum);
       setRows(result);
 
-      // Procesar histórico: agrupar por mes
       const histMap: Record<string, MonthSummary> = {};
       for (const exp of histRes.data ?? []) {
-        const key = (exp.date as string).slice(0, 7); // "YYYY-MM"
+        const key = (exp.date as string).slice(0, 7);
         if (!histMap[key]) {
           const [y, m] = key.split('-').map(Number);
           histMap[key] = { monthKey: key, label: MONTH_NAMES[m - 1].slice(0, 3), total: 0, disposable: 0, necessary: 0, investable: 0 };
         }
         histMap[key].total += exp.amount;
-        if (exp.classification === 'disposable')  histMap[key].disposable += exp.amount;
-        if (exp.classification === 'necessary')   histMap[key].necessary  += exp.amount;
-        if (exp.classification === 'investable')  histMap[key].investable += exp.amount;
+        if (exp.classification === 'disposable') histMap[key].disposable += exp.amount;
+        if (exp.classification === 'necessary')  histMap[key].necessary  += exp.amount;
+        if (exp.classification === 'investable') histMap[key].investable += exp.amount;
       }
-      const histList = Object.values(histMap).sort((a, b) => a.monthKey.localeCompare(b.monthKey)).slice(-3);
-      setHistory(histList);
-
+      setHistory(Object.values(histMap).sort((a, b) => a.monthKey.localeCompare(b.monthKey)).slice(-3));
     } catch (err) {
       console.error('[Informe] loadData error:', err);
     } finally {
@@ -765,52 +851,42 @@ export default function ReportsScreen() {
   const displayInvestable = isCurrentMonth ? totalInvestable : 0;
   const displayIncome     = isCurrentMonth ? estimatedIncome : null;
 
-  // Computar bloques derivados
-  const officialInflation = getLatestIndecEntry().general;
+  const statusData = useMemo(() => computeMonthStatus({
+    total: displayTotal, disposable: displayDisposable, estimatedIncome: displayIncome,
+  }), [displayTotal, displayDisposable, displayIncome]);
 
-  const healthData = useMemo(() => computeHealthScore({
-    total: displayTotal, necessary: displayNecessary,
-    disposable: displayDisposable, investable: displayInvestable,
-    estimatedIncome: displayIncome,
-    personalInflation: null, // InflationThermometer lo calcula internamente
-    officialInflation,
-  }), [displayTotal, displayNecessary, displayDisposable, displayInvestable, displayIncome, officialInflation]);
+  const keyInsight = useMemo(() => buildKeyInsight({
+    total: displayTotal, disposable: displayDisposable, estimatedIncome: displayIncome, rows, history,
+  }), [displayTotal, displayDisposable, displayIncome, rows, history]);
 
-  const tendenciaInsights = useMemo(() => buildTendenciaInsights(history), [history]);
+  const comparacion = useMemo(() => buildComparacion(history, displayTotal, displayDisposable),
+    [history, displayTotal, displayDisposable]);
 
   const ahorroSugerencias = useMemo(() => buildAhorroSugerencias({
     rows, disposable: displayDisposable, total: displayTotal, estimatedIncome: displayIncome,
   }), [rows, displayDisposable, displayTotal, displayIncome]);
 
-  const aprendizajes = useMemo(() => buildAprendizajes({
-    rows, history, disposable: displayDisposable, total: displayTotal,
-  }), [rows, history, displayDisposable, displayTotal]);
+  const planItems = useMemo(() => buildPlanProximoMes({
+    rows, disposable: displayDisposable, total: displayTotal, estimatedIncome: displayIncome, history,
+  }), [rows, displayDisposable, displayTotal, displayIncome, history]);
 
-  const riesgos = useMemo(() => {
-    const items: { icon: string; color: string; text: string }[] = [];
-    if (displayIncome && displayTotal > displayIncome)
-      items.push({ icon: 'alert-circle-outline', color: colors.red, text: `Estás gastando más de lo que ganás. Déficit de ${formatCurrency(displayTotal - displayIncome)}.` });
-    if (displayTotal > 0 && displayDisposable / displayTotal > 0.25)
-      items.push({ icon: 'warning-outline', color: colors.yellow, text: `Más del 25% de tu gasto es prescindible. Alta exposición a gastos evitables.` });
-    if (rows.length > 0 && rows[0].pct > 0.5)
-      items.push({ icon: 'pie-chart-outline', color: colors.yellow, text: `Alta dependencia de una sola categoría: "${rows[0].name}" (${Math.round(rows[0].pct * 100)}% del total).` });
-    if (displayInvestable === 0 && displayTotal > 50000)
-      items.push({ icon: 'trending-down-outline', color: colors.text.tertiary, text: `Ningún gasto clasificado como invertible. Revisá si hay plata que podrías redirigir.` });
-    return items;
-  }, [displayTotal, displayDisposable, displayInvestable, displayIncome, rows]);
+  const objetivo = useMemo(() => buildObjetivo({ disposable: displayDisposable, total: displayTotal }),
+    [displayDisposable, displayTotal]);
 
   const advisorContext = useMemo(() => {
-    const parts = [
+    const totalSaving = ahorroSugerencias.reduce((s, sg) => s + sg.saving, 0);
+    return [
       `Informe de ${MONTH_NAMES[month - 1]} ${year}.`,
       `Gasté ${formatCurrency(displayTotal)}.`,
-      healthData.score < 60 ? `Mi salud financiera está ${healthData.label}.` : `Mi salud financiera es ${healthData.label}.`,
+      `Estado del mes: ${statusData.label}.`,
       displayDisposable > 0 ? `Tengo ${formatCurrency(displayDisposable)} en prescindibles.` : '',
       displayIncome ? `Eso es el ${Math.round((displayTotal / displayIncome) * 100)}% de mi ingreso.` : '',
       rows[0] ? `Mi categoría más alta: "${rows[0].name}" (${Math.round(rows[0].pct * 100)}%).` : '',
-      '¿Qué me recomendás?',
-    ].filter(Boolean);
-    return parts.join(' ');
-  }, [month, year, displayTotal, healthData, displayDisposable, displayIncome, rows]);
+      comparacion.vsPrev ? `Cambio vs mes pasado: ${comparacion.vsPrev.changePct > 0 ? '+' : ''}${comparacion.vsPrev.changePct}%.` : '',
+      totalSaving > 0 ? `Podría ahorrar ${formatCurrency(totalSaving)}/mes.` : '',
+      '¿Qué me recomendás hacer el próximo mes?',
+    ].filter(Boolean).join(' ');
+  }, [month, year, displayTotal, statusData, displayDisposable, displayIncome, rows, comparacion, ahorroSugerencias]);
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -831,29 +907,32 @@ export default function ReportsScreen() {
               Sin datos para {MONTH_NAMES[month - 1]} {year}
             </Text>
             <Text variant="body" color={colors.text.secondary} align="center" style={{ lineHeight: 22 }}>
-              Cargá gastos para ver tu informe, salud financiera y oportunidades de ahorro.
+              Cargá gastos para ver tu informe, estado del mes y oportunidades de ahorro.
             </Text>
-            <TouchableOpacity
-              style={s.emptyBtn}
-              onPress={() => router.push('/(app)/expenses')}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/(app)/expenses')} activeOpacity={0.8}>
               <Ionicons name="add" size={16} color={colors.black} />
-              <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: colors.black }}>
+              <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: colors.black }}>
                 Ir a cargar gastos
               </Text>
             </TouchableOpacity>
           </View>
         ) : (
           <>
-            <HealthScoreCard data={healthData} />
-            <ResumenCard total={displayTotal} necessary={displayNecessary} disposable={displayDisposable} investable={displayInvestable} estimatedIncome={displayIncome} />
-            <Card style={s.section}><InflationThermometer userId={user!.id} year={year} month={month} /></Card>
-            <TendenciaCard history={history} insights={tendenciaInsights} />
-            <DistribucionCard rows={rows} total={total || displayTotal} />
-            <AprendizajesCard insights={aprendizajes} />
-            <AhorroCard sugerencias={ahorroSugerencias} month={month} year={year} />
-            <RiesgosCard items={riesgos} />
+            <MonthStatusBanner data={statusData} />
+            {keyInsight && <KeyInsightCard insight={keyInsight} />}
+            <ResumenCard
+              total={displayTotal} necessary={displayNecessary}
+              disposable={displayDisposable} investable={displayInvestable}
+              estimatedIncome={displayIncome}
+            />
+            <Card style={s.section}>
+              <InflationThermometer userId={user!.id} year={year} month={month} />
+            </Card>
+            <CategoryBreakdown rows={rows} total={total || displayTotal} />
+            <HistoryComparisonCard history={history} comparacion={comparacion} currentTotal={displayTotal} />
+            <DineroRecuperableCard sugerencias={ahorroSugerencias} month={month} year={year} />
+            <PlanProximoMesCard items={planItems} />
+            {objetivo && <ObjetivoCard objetivo={objetivo} />}
             <AdvisorCTA context={advisorContext} />
           </>
         )}
@@ -864,8 +943,8 @@ export default function ReportsScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: colors.bg.primary },
-  scroll:  { paddingHorizontal: layout.screenPadding, paddingTop: spacing[4], paddingBottom: layout.tabBarHeight + spacing[8], gap: spacing[4] },
+  safe:         { flex: 1, backgroundColor: colors.bg.primary },
+  scroll:       { paddingHorizontal: layout.screenPadding, paddingTop: spacing[4], paddingBottom: layout.tabBarHeight + spacing[8], gap: spacing[4] },
   loading:      { height: 280, alignItems: 'center', justifyContent: 'center' },
   empty:        { alignItems: 'center', justifyContent: 'center', gap: spacing[4], paddingVertical: spacing[10] },
   emptyIconWrap:{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.bg.elevated, alignItems: 'center', justifyContent: 'center' },

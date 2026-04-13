@@ -98,19 +98,17 @@ function MemberRow({
       disabled={!onPress}
       activeOpacity={onPress ? 0.7 : 1}
     >
-      {/* Avatar */}
-      <View style={[styles.memberAvatar, { borderColor: accentColor }]}>
-        <Ionicons
-          name={isParent ? 'shield-checkmark' : 'person'}
-          size={16}
-          color={accentColor}
-        />
+      {/* Avatar circular con inicial */}
+      <View style={[styles.memberAvatar, { backgroundColor: accentColor + '18', borderColor: accentColor + '40' }]}>
+        <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 14, color: accentColor }}>
+          {(isCurrentUser ? 'Vos' : member.full_name).charAt(0).toUpperCase()}
+        </Text>
       </View>
 
       {/* Info */}
       <View style={styles.memberInfo}>
         <View style={styles.memberNameRow}>
-          <Text variant="bodySmall" color={colors.text.primary}>
+          <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }}>
             {isCurrentUser ? 'Vos' : member.full_name}
           </Text>
           {isCurrentUser && (
@@ -120,7 +118,7 @@ function MemberRow({
           )}
         </View>
         <Text variant="caption" color={accentColor}>
-          {isParent ? 'PADRE / MADRE' : 'HIJO / HIJA'}
+          {isParent ? 'Padre / Madre' : 'Hijo / Hija'}
         </Text>
       </View>
 
@@ -636,18 +634,11 @@ export default function FamilyScreen() {
             {/* Hero */}
             <View style={styles.emptyHero}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="people" size={44} color={colors.neon} />
+                <Ionicons name="people" size={40} color={colors.neon} />
               </View>
-              <Text variant="h4" align="center" style={{ marginTop: spacing[5] }}>
-                Grupo Familiar
-              </Text>
-              <Text
-                variant="body"
-                color={colors.text.secondary}
-                align="center"
-                style={{ marginTop: spacing[2], lineHeight: 22 }}
-              >
-                Gestioná los gastos de toda tu familia desde un solo lugar
+              <Text variant="h4" align="center">Grupo Familiar</Text>
+              <Text variant="body" color={colors.text.secondary} align="center" style={{ lineHeight: 22 }}>
+                Gestioná los gastos de toda tu familia{'\n'}desde un solo lugar.
               </Text>
             </View>
 
@@ -692,14 +683,16 @@ export default function FamilyScreen() {
             {/* Feature list */}
             <View style={styles.featureList}>
               {[
-                { icon: 'eye-outline',         text: 'Papá/mamá ve los gastos de todos los hijos' },
-                { icon: 'lock-closed-outline',  text: 'Los hijos solo ven sus propios gastos' },
-                { icon: 'bar-chart-outline',    text: 'Identificá cuánto gasta cada hijo por mes' },
-                { icon: 'person-add-outline',   text: 'Invitá con un código de 6 letras' },
+                { icon: 'eye-outline',        text: 'Papá/mamá ve los gastos de todos los hijos' },
+                { icon: 'lock-closed-outline', text: 'Los hijos solo ven sus propios gastos' },
+                { icon: 'bar-chart-outline',   text: 'Identificá cuánto gasta cada hijo por mes' },
+                { icon: 'person-add-outline',  text: 'Invitá con un código de 6 letras' },
               ].map((f, i) => (
                 <View key={i} style={styles.featureRow}>
-                  <Ionicons name={f.icon as any} size={16} color={colors.neon} />
-                  <Text variant="caption" color={colors.text.secondary} style={{ flex: 1 }}>
+                  <View style={styles.featureIconWrap}>
+                    <Ionicons name={f.icon as any} size={15} color={colors.neon} />
+                  </View>
+                  <Text variant="bodySmall" color={colors.text.secondary} style={{ flex: 1, lineHeight: 20 }}>
                     {f.text}
                   </Text>
                 </View>
@@ -1114,16 +1107,18 @@ const styles = StyleSheet.create({
 
   // ── Empty ──────────────────────────────────────────────────────────────
   emptyHero: {
-    alignItems:   'center',
-    paddingTop:   spacing[10],
+    alignItems:    'center',
+    paddingTop:    spacing[10],
     paddingBottom: spacing[6],
+    gap:           spacing[3],
   },
   emptyIcon: {
-    width:           80,
-    height:          80,
+    width:           88,
+    height:          88,
+    borderRadius:    44,
     backgroundColor: colors.neon + '15',
     borderWidth:     1,
-    borderColor:     colors.neon + '40',
+    borderColor:     colors.neon + '30',
     alignItems:      'center',
     justifyContent:  'center',
   },
@@ -1131,25 +1126,34 @@ const styles = StyleSheet.create({
     gap: spacing[3],
   },
   orDivider: {
-    flexDirection: 'row',
-    alignItems:    'center',
+    flexDirection:  'row',
+    alignItems:     'center',
     marginVertical: spacing[1],
   },
   orLine: {
-    flex:             1,
-    height:           1,
-    backgroundColor:  colors.border.subtle,
+    flex:            1,
+    height:          1,
+    backgroundColor: colors.border.subtle,
   },
   featureList: {
-    gap:              spacing[4],
-    paddingTop:       spacing[5],
-    borderTopWidth:   1,
-    borderTopColor:   colors.border.subtle,
+    gap:            spacing[3],
+    paddingTop:     spacing[5],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.subtle,
   },
   featureRow: {
     flexDirection: 'row',
-    alignItems:    'flex-start',
+    alignItems:    'center',
     gap:           spacing[3],
+  },
+  featureIconWrap: {
+    width:           32,
+    height:          32,
+    borderRadius:    16,
+    backgroundColor: colors.neon + '12',
+    alignItems:      'center',
+    justifyContent:  'center',
+    flexShrink:      0,
   },
 
   // ── Group card ─────────────────────────────────────────────────────────
@@ -1162,8 +1166,9 @@ const styles = StyleSheet.create({
     alignItems:     'center',
   },
   parentIcon: {
-    width:           52,
-    height:          52,
+    width:           48,
+    height:          48,
+    borderRadius:    24,
     backgroundColor: colors.neon + '15',
     borderWidth:     1,
     borderColor:     colors.neon + '40',
@@ -1222,25 +1227,26 @@ const styles = StyleSheet.create({
     gap:              spacing[4],
   },
   memberAvatar: {
-    width:           36,
-    height:          36,
-    borderWidth:     1,
-    alignItems:      'center',
-    justifyContent:  'center',
-    backgroundColor: colors.bg.elevated,
+    width:        40,
+    height:       40,
+    borderRadius: 20,
+    borderWidth:  1,
+    alignItems:   'center',
+    justifyContent: 'center',
   },
   memberInfo:    { flex: 1, gap: spacing[1] },
   memberNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   memberRight:   { flexDirection: 'row', alignItems: 'center' },
   youBadge: {
-    backgroundColor:  colors.neon,
+    backgroundColor:   colors.neon,
     paddingHorizontal: spacing[2],
-    paddingVertical:  1,
+    paddingVertical:   2,
+    borderRadius:      4,
   },
   youBadgeText: {
-    fontFamily: 'SpaceMono_400Regular',
-    fontSize:   9,
-    color:      colors.black,
+    fontFamily:    'Montserrat_700Bold',
+    fontSize:      9,
+    color:         colors.black,
     letterSpacing: 0.5,
   },
   rowDivider: {

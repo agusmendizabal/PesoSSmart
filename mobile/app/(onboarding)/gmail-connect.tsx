@@ -222,6 +222,7 @@ const styles = StyleSheet.create({
   iconWrap: {
     width:           96,
     height:          96,
+    borderRadius:    48,
     backgroundColor: colors.neon + '15',
     borderWidth:     1,
     borderColor:     colors.neon + '40',
@@ -245,7 +246,7 @@ const styles = StyleSheet.create({
   },
   featureRow: {
     flexDirection: 'row',
-    alignItems:    'flex-start',
+    alignItems:    'center',
     gap:           spacing[3],
     padding:       spacing[4],
   },

@@ -250,6 +250,7 @@ const styles = StyleSheet.create({
   optionRow: { flexDirection: 'row', alignItems: 'center' },
   resultCard: {
     borderWidth: 1,
+    borderRadius: 12,
     padding: spacing[5],
     marginTop: spacing[4],
     gap: spacing[4],

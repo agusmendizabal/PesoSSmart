@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   FlatList,
@@ -15,8 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, layout, textVariants } from '@/theme';
 import { Text } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
+import { useExpensesStore } from '@/store/expensesStore';
 import { supabase } from '@/lib/supabase';
+import { formatCurrency } from '@/utils/format';
 import { useLocalSearchParams } from 'expo-router';
+
+// ─── Tipos ────────────────────────────────────────────────────────────────────
 
 interface ChatMessage {
   id: string;
@@ -25,40 +29,143 @@ interface ChatMessage {
   created_at: string;
 }
 
-const SUGGESTED_QUESTIONS = [
-  '¿En qué estoy gastando de más este mes?',
-  '¿Qué hago con la plata que me sobra?',
-  '¿Mis suscripciones valen la pena?',
-  '¿Cómo arranco a invertir con poco?',
-  '¿Cuánto me falta para mi meta de ahorro?',
-  '¿Cómo bajo mis gastos prescindibles?',
-  '¿Me conviene el dólar MEP?',
-];
+interface ClientContext {
+  month_total: number;
+  income: number | null;
+  income_pct: number | null;
+  month_status: 'good' | 'tight' | 'over';
+  necessary: number;
+  disposable: number;
+  disposable_pct: number;
+  investable: number;
+  recoverable: number;
+}
+
+// ─── Lógica de contexto ───────────────────────────────────────────────────────
+
+function buildClientContext(
+  totalThisMonth: number,
+  totalNecessary: number,
+  totalDisposable: number,
+  totalInvestable: number,
+  estimatedIncome: number | null,
+): ClientContext {
+  const total     = totalThisMonth;
+  const dispPct   = total > 0 ? Math.round((totalDisposable / total) * 100) : 0;
+  const incomePct = estimatedIncome && estimatedIncome > 0
+    ? Math.round((total / estimatedIncome) * 100)
+    : null;
+
+  const status: ClientContext['month_status'] =
+    incomePct !== null && incomePct > 100 ? 'over' :
+    (incomePct !== null && incomePct > 85) || dispPct > 20 ? 'tight' :
+    'good';
+
+  return {
+    month_total:    total,
+    income:         estimatedIncome,
+    income_pct:     incomePct,
+    month_status:   status,
+    necessary:      totalNecessary,
+    disposable:     totalDisposable,
+    disposable_pct: dispPct,
+    investable:     totalInvestable,
+    recoverable:    total > 0 ? Math.round(totalDisposable * 0.5) : 0,
+  };
+}
+
+function buildQuickActions(ctx: ClientContext): string[] {
+  const actions: string[] = [];
+
+  // Acción primaria según estado del mes
+  if (ctx.month_status === 'over') {
+    actions.push('¿Cómo recorto gastos para no pasarme del ingreso?');
+  } else if (ctx.month_status === 'tight') {
+    actions.push('¿Qué gastos puedo ajustar este mes?');
+  } else if (ctx.recoverable > 0) {
+    actions.push(`Tengo ~${formatCurrency(ctx.recoverable)} disponibles — ¿en qué los invierto?`);
+  } else {
+    actions.push('¿Cómo mejoro mi situación financiera este mes?');
+  }
+
+  // Segunda acción según prescindibles
+  if (ctx.disposable_pct > 15) {
+    actions.push('¿Cuáles son mis gastos más prescindibles?');
+  } else {
+    actions.push('¿Mis gastos están bien distribuidos?');
+  }
+
+  // Acciones fijas útiles
+  actions.push('¿Cuál es mi plan para el próximo mes?');
+  actions.push('¿Me conviene FCI, Cedears o dólar MEP?');
+
+  return actions;
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AdvisorScreen() {
-  const { user, profile } = useAuthStore();
+  const { user, profile }  = useAuthStore();
+  const { totalThisMonth, totalNecessary, totalDisposable, totalInvestable, estimatedIncome } = useExpensesStore();
   const { initialContext } = useLocalSearchParams<{ initialContext?: string }>();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
-  const flatListRef = useRef<FlatList>(null);
-  const contextSentRef = useRef(false);
 
-  // Si viene con contexto del Informe, enviarlo automáticamente como primer mensaje
+  const [messages,      setMessages]      = useState<ChatMessage[]>([]);
+  const [input,         setInput]         = useState('');
+  const [isThinking,    setIsThinking]    = useState(false);
+  const [welcomeDone,   setWelcomeDone]   = useState(false);
+
+  const flatListRef  = useRef<FlatList>(null);
+  const welcomeRef   = useRef(false);
+
+  // Contexto del mes calculado desde el store
+  const clientContext = useMemo(() => buildClientContext(
+    totalThisMonth, totalNecessary, totalDisposable, totalInvestable, estimatedIncome,
+  ), [totalThisMonth, totalNecessary, totalDisposable, totalInvestable, estimatedIncome]);
+
+  // Quick actions contextuales
+  const quickActions = useMemo(() => buildQuickActions(clientContext), [clientContext]);
+
+  // Generar bienvenida automática al montar
   useEffect(() => {
-    if (initialContext && !contextSentRef.current && user?.id) {
-      contextSentRef.current = true;
-      sendMessage(initialContext);
-    }
-  }, [initialContext, user?.id]);
+    if (!user?.id || welcomeRef.current) return;
+    welcomeRef.current = true;
+    generateWelcome();
+  }, [user?.id]);
 
-  const sendMessage = async (text: string) => {
+  const generateWelcome = useCallback(async () => {
+    setIsThinking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-advisor', {
+        body: {
+          generate_welcome:  true,
+          client_context:    clientContext,
+          initial_context:   initialContext ?? null,
+          user_id:           user!.id,
+        },
+      });
+      if (!error && data?.message) {
+        setMessages([{
+          id:         `welcome-${Date.now()}`,
+          role:       'assistant',
+          content:    data.message,
+          created_at: new Date().toISOString(),
+        }]);
+      }
+    } catch {
+      // Falla silenciosa — el usuario ve el estado vacío igual
+    } finally {
+      setIsThinking(false);
+      setWelcomeDone(true);
+    }
+  }, [clientContext, initialContext, user?.id]);
+
+  const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || !user?.id || isThinking) return;
 
     const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: text.trim(),
+      id:         `user-${Date.now()}`,
+      role:       'user',
+      content:    text.trim(),
       created_at: new Date().toISOString(),
     };
 
@@ -66,50 +173,52 @@ export default function AdvisorScreen() {
     setMessages(updatedMessages);
     setInput('');
     setIsThinking(true);
-
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
 
     try {
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
 
       const { data, error } = await supabase.functions.invoke('ai-advisor', {
         body: {
-          message: text.trim(),
+          message:        text.trim(),
           history,
-          user_id: user.id,
+          user_id:        user.id,
+          client_context: clientContext,
         },
       });
 
       if (error) {
-        const ctx = (error as any)?.context;
+        const ctx  = (error as any)?.context;
         const body = ctx ? await ctx.text?.() : null;
         throw new Error(body ?? error.message);
       }
       if (!data?.message) throw new Error(`Sin mensaje: ${JSON.stringify(data)}`);
 
-      const aiMsg: ChatMessage = {
-        id: `ai-${Date.now()}`,
-        role: 'assistant',
-        content: data.message,
+      setMessages((prev) => [...prev, {
+        id:         `ai-${Date.now()}`,
+        role:       'assistant',
+        content:    data.message,
         created_at: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, aiMsg]);
+      }]);
     } catch {
-      const errMsg: ChatMessage = {
-        id: `err-${Date.now()}`,
-        role: 'assistant',
-        content: 'Uy, algo salió mal de nuestro lado. Probá de nuevo en un momento.',
+      setMessages((prev) => [...prev, {
+        id:         `err-${Date.now()}`,
+        role:       'assistant',
+        content:    'Uy, algo salió mal de nuestro lado. Probá de nuevo en un momento.',
         created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, errMsg]);
+      }]);
     } finally {
       setIsThinking(false);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
-  };
+  }, [messages, user?.id, isThinking, clientContext]);
 
-  const clearChat = () => setMessages([]);
+  const clearChat = () => {
+    setMessages([]);
+    welcomeRef.current = false;
+    setWelcomeDone(false);
+    generateWelcome();
+  };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isUser = item.role === 'user';
@@ -121,17 +230,15 @@ export default function AdvisorScreen() {
           </View>
         )}
         <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAI]}>
-          <Text
-            variant="bodySmall"
-            color={isUser ? colors.black : colors.text.primary}
-            style={{ lineHeight: 20 }}
-          >
+          <Text variant="bodySmall" color={isUser ? colors.black : colors.text.primary} style={{ lineHeight: 21 }}>
             {item.content}
           </Text>
         </View>
       </View>
     );
   };
+
+  const showEmptyState = messages.length === 0 && !isThinking;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -148,7 +255,7 @@ export default function AdvisorScreen() {
         </View>
         {messages.length > 0 && (
           <TouchableOpacity onPress={clearChat} style={styles.refreshBtn}>
-            <Ionicons name="trash-outline" size={20} color={colors.text.secondary} />
+            <Ionicons name="refresh-outline" size={20} color={colors.text.secondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -158,13 +265,10 @@ export default function AdvisorScreen() {
         style={{ flex: 1 }}
         keyboardVerticalOffset={0}
       >
-        {/* Messages */}
-        {messages.length === 0 ? (
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={styles.emptyState}
-            keyboardShouldPersistTaps="handled"
-          >
+        {/* Cuerpo */}
+        {showEmptyState ? (
+          /* Estado vacío — solo si la bienvenida falló */
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.emptyState} keyboardShouldPersistTaps="handled">
             <View style={styles.emptyAvatar}>
               <Text variant="h3" color={colors.black}>SP</Text>
             </View>
@@ -172,27 +276,23 @@ export default function AdvisorScreen() {
               Hola, {profile?.full_name?.split(' ')[0] ?? 'ahí'}
             </Text>
             <Text variant="body" color={colors.text.secondary} align="center">
-              Soy tu asesor financiero personal. Preguntame lo que quieras sobre tu plata, inversiones o gastos.
+              Soy tu asesor financiero. Tengo contexto real de tu mes. ¿Por dónde arrancamos?
             </Text>
-            <Text variant="caption" color={colors.text.tertiary} align="center">
-              Tengo contexto real de tu perfil financiero.
-            </Text>
-            <View style={styles.suggestedQuestions}>
-              <Text variant="label" color={colors.text.secondary} style={styles.suggestedTitle}>
-                ALGUNAS IDEAS:
-              </Text>
-              {SUGGESTED_QUESTIONS.map((q) => (
-                <TouchableOpacity
-                  key={q}
-                  style={styles.suggestedChip}
-                  onPress={() => sendMessage(q)}
-                >
-                  <Text variant="bodySmall" color={colors.neon}>{q}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <QuickActionList actions={quickActions} onPress={sendMessage} />
           </ScrollView>
+        ) : messages.length === 0 && isThinking ? (
+          /* Generando bienvenida */
+          <View style={styles.loadingWelcome}>
+            <View style={styles.emptyAvatar}>
+              <Text variant="h3" color={colors.black}>SP</Text>
+            </View>
+            <View style={styles.thinkingBubble}>
+              <ActivityIndicator color={colors.neon} size="small" />
+              <Text variant="caption" color={colors.text.secondary}>Analizando tu mes...</Text>
+            </View>
+          </View>
         ) : (
+          /* Chat */
           <FlatList
             ref={flatListRef}
             data={messages}
@@ -208,7 +308,7 @@ export default function AdvisorScreen() {
                   <View style={styles.avatarAI}>
                     <Text variant="label" color={colors.black} style={{ fontSize: 10 }}>SP</Text>
                   </View>
-                  <View style={styles.bubbleAI}>
+                  <View style={[styles.bubbleAI, styles.thinkingBubbleInline]}>
                     <ActivityIndicator color={colors.neon} size="small" />
                   </View>
                 </View>
@@ -219,26 +319,25 @@ export default function AdvisorScreen() {
 
         {/* Input */}
         <View style={styles.inputContainer}>
-          {messages.length > 0 && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.suggestionsRow}
-              keyboardShouldPersistTaps="handled"
-            >
-              {SUGGESTED_QUESTIONS.slice(0, 3).map((q) => (
-                <TouchableOpacity
-                  key={q}
-                  style={styles.inlineSuggestion}
-                  onPress={() => sendMessage(q)}
-                >
-                  <Text variant="caption" color={colors.text.secondary} numberOfLines={1}>
-                    {q}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+          {/* Quick actions — siempre visibles */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.actionsRow}
+            keyboardShouldPersistTaps="handled"
+          >
+            {quickActions.map((q) => (
+              <TouchableOpacity
+                key={q}
+                style={styles.actionChip}
+                onPress={() => sendMessage(q)}
+                disabled={isThinking}
+              >
+                <Text variant="caption" color={colors.neon} numberOfLines={1}>{q}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
           <View style={styles.inputRow}>
             <TextInput
               style={styles.textInput}
@@ -272,149 +371,95 @@ export default function AdvisorScreen() {
   );
 }
 
+// ─── QuickActionList ──────────────────────────────────────────────────────────
+
+function QuickActionList({ actions, onPress }: { actions: string[]; onPress: (q: string) => void }) {
+  return (
+    <View style={qaStyles.container}>
+      <Text variant="label" color={colors.text.secondary} style={qaStyles.title}>PREGUNTAS RÁPIDAS</Text>
+      {actions.map((q) => (
+        <TouchableOpacity key={q} style={qaStyles.chip} onPress={() => onPress(q)}>
+          <Ionicons name="flash-outline" size={14} color={colors.neon} />
+          <Text variant="bodySmall" color={colors.text.primary} style={{ flex: 1, lineHeight: 18 }}>{q}</Text>
+          <Ionicons name="arrow-forward" size={14} color={colors.text.tertiary} />
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+const qaStyles = StyleSheet.create({
+  container: { width: '100%', gap: spacing[2], marginTop: spacing[4] },
+  title:     { marginBottom: spacing[1] },
+  chip:      {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    borderWidth: 1, borderColor: colors.border.default, borderRadius: 10,
+    padding: spacing[3], backgroundColor: colors.bg.card,
+  },
+});
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg.primary },
+
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: layout.screenPadding,
-    paddingVertical: spacing[4],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: layout.screenPadding, paddingVertical: spacing[4],
+    borderBottomWidth: 1, borderBottomColor: colors.border.subtle,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  advisorAvatar: {
-    width: 40,
-    height: 40,
-    backgroundColor: colors.primary,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  refreshBtn: { padding: spacing[2] },
+  headerLeft:    { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  advisorAvatar: { width: 40, height: 40, backgroundColor: colors.primary, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  refreshBtn:    { padding: spacing[2] },
+
   emptyState: {
-    paddingHorizontal: layout.screenPadding,
-    paddingTop: spacing[8],
-    alignItems: 'center',
-    gap: spacing[4],
-    paddingBottom: spacing[8],
+    paddingHorizontal: layout.screenPadding, paddingTop: spacing[8],
+    alignItems: 'center', gap: spacing[4], paddingBottom: spacing[8],
   },
   emptyAvatar: {
-    width: 72,
-    height: 72,
-    backgroundColor: colors.primary,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing[2],
+    width: 72, height: 72, backgroundColor: colors.primary,
+    borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: spacing[2],
   },
-  suggestedQuestions: {
-    width: '100%',
-    marginTop: spacing[4],
-    gap: spacing[3],
+
+  loadingWelcome: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[5] },
+  thinkingBubble: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    backgroundColor: colors.bg.elevated, borderRadius: 12,
+    paddingHorizontal: spacing[5], paddingVertical: spacing[3],
+    borderWidth: 1, borderColor: colors.border.default,
   },
-  suggestedTitle: { marginBottom: spacing[1] },
-  suggestedChip: {
-    borderWidth: 1,
-    borderColor: colors.primary + '44',
-    borderRadius: 8,
-    padding: spacing[3],
-    backgroundColor: colors.primary + '0D',
-  },
-  messageList: {
-    paddingHorizontal: layout.screenPadding,
-    paddingVertical: spacing[4],
-    gap: spacing[4],
-  },
-  messageWrapper: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: spacing[2],
-  },
+
+  messageList: { paddingHorizontal: layout.screenPadding, paddingVertical: spacing[4], gap: spacing[4] },
+  messageWrapper:     { flexDirection: 'row', alignItems: 'flex-end', gap: spacing[2] },
   messageWrapperUser: { justifyContent: 'flex-end' },
-  messageWrapperAI: { justifyContent: 'flex-start' },
-  avatarAI: {
-    width: 28,
-    height: 28,
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+  messageWrapperAI:   { justifyContent: 'flex-start' },
+  avatarAI: { width: 28, height: 28, backgroundColor: colors.primary, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  bubble:     { maxWidth: '78%', padding: spacing[4], borderRadius: 12 },
+  bubbleUser: { backgroundColor: colors.primary, borderBottomRightRadius: 2 },
+  bubbleAI:   { backgroundColor: colors.bg.elevated, borderWidth: 1, borderColor: colors.border.default, borderBottomLeftRadius: 2 },
+
+  thinkingWrapper:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[2], paddingHorizontal: layout.screenPadding },
+  thinkingBubbleInline:{ minWidth: 60, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+
+  inputContainer: { borderTopWidth: 1, borderTopColor: colors.border.subtle, backgroundColor: colors.bg.secondary },
+
+  actionsRow: { paddingHorizontal: layout.screenPadding, paddingVertical: spacing[2], gap: spacing[2] },
+  actionChip: {
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderWidth: 1, borderColor: colors.neon + '44',
+    borderRadius: 16, backgroundColor: colors.neon + '0D', maxWidth: 240,
   },
-  bubble: {
-    maxWidth: '78%',
-    padding: spacing[4],
-    borderRadius: 12,
-  },
-  bubbleUser: {
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 2,
-  },
-  bubbleAI: {
-    backgroundColor: colors.bg.elevated,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    borderBottomLeftRadius: 2,
-    minWidth: 60,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thinkingWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[2],
-    paddingVertical: spacing[2],
-    paddingHorizontal: layout.screenPadding,
-  },
-  inputContainer: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border.subtle,
-    backgroundColor: colors.bg.secondary,
-  },
-  suggestionsRow: {
-    paddingHorizontal: layout.screenPadding,
-    paddingVertical: spacing[2],
-    gap: spacing[2],
-  },
-  inlineSuggestion: {
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[2],
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    borderRadius: 16,
-    maxWidth: 200,
-  },
+
   inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: layout.screenPadding,
-    paddingVertical: spacing[3],
-    gap: spacing[3],
+    flexDirection: 'row', alignItems: 'flex-end',
+    paddingHorizontal: layout.screenPadding, paddingVertical: spacing[3], gap: spacing[3],
   },
   textInput: {
-    flex: 1,
-    ...textVariants.body,
-    color: colors.text.primary,
-    backgroundColor: colors.bg.input,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    borderRadius: 8,
-    paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-    maxHeight: 100,
-    minHeight: 44,
+    flex: 1, ...textVariants.body, color: colors.text.primary,
+    backgroundColor: colors.bg.input, borderWidth: 1, borderColor: colors.border.default,
+    borderRadius: 8, paddingHorizontal: spacing[4], paddingVertical: spacing[3],
+    maxHeight: 100, minHeight: 44,
   },
-  sendBtn: {
-    width: 44,
-    height: 44,
-    backgroundColor: colors.primary,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  sendBtn:         { width: 44, height: 44, backgroundColor: colors.primary, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   sendBtnDisabled: { backgroundColor: colors.mediumGray },
-  disclaimer: { paddingBottom: spacing[3] },
+  disclaimer:      { paddingBottom: spacing[3] },
 });
