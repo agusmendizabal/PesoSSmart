@@ -543,13 +543,18 @@ export default function ExpensesScreen() {
         category_id:    selectedCategory ?? undefined,
         notes:          notesWithFx,
         is_recurring:   false,
-        is_shared:      isShared,
       });
       reset();
       setShowAddModal(false);
       setSelectedCategory(null);
       setCurrency('ARS');
       setIsShared(false);
+      // Si el filtro activo no coincide con el mes del nuevo gasto, sincronizarlo
+      // para que el gasto recién agregado sea visible inmediatamente.
+      const [ey, em] = data.date.split('-').map(Number);
+      if (filter.month !== em || filter.year !== ey) {
+        setFilter({ month: em, year: ey });
+      }
     } catch {
       Alert.alert('Error', 'No se pudo guardar el gasto. Intentá de nuevo.');
     }
@@ -1239,7 +1244,7 @@ function ExpenseItem({ expense, onPress }: { expense: Expense; onPress: () => vo
             {formatCurrency(expense.amount)}
           </Text>
           {expense.classification && (
-            <Badge classification={expense.classification} small />
+            <Badge classification={expense.classification} label={expense.classification} small />
           )}
         </View>
       </View>

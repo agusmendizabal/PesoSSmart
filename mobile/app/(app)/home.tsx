@@ -77,6 +77,53 @@ function buildInsight(
   return 'Tu mes viene bien. Seguí así.';
 }
 
+// ─── SpendingMiniChart ───────────────────────────────────────────────────────
+
+function SpendingMiniChart({
+  expenses,
+  statusColor,
+}: {
+  expenses:    Expense[];
+  statusColor: string;
+}) {
+  const now          = new Date();
+  const daysInMonth  = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const today        = now.getDate();
+
+  const dailyTotals  = Array<number>(daysInMonth).fill(0);
+  expenses.forEach(e => {
+    const day = parseInt(e.date.split('-')[2], 10) - 1;
+    if (day >= 0 && day < daysInMonth) dailyTotals[day] += e.amount;
+  });
+
+  const maxAmt  = Math.max(...dailyTotals, 1);
+  const CHART_H = 38;
+
+  return (
+    <View style={{ height: CHART_H, flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
+      {dailyTotals.map((amt, idx) => {
+        const day      = idx + 1;
+        const isToday  = day === today;
+        const isFuture = day > today;
+        const barH     = amt > 0 ? Math.max((amt / maxAmt) * CHART_H, 4) : 3;
+        return (
+          <View
+            key={idx}
+            style={{
+              flex: 1, height: barH, borderRadius: 2,
+              backgroundColor: isFuture
+                ? colors.border.subtle
+                : isToday
+                  ? statusColor
+                  : statusColor + '55',
+            }}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 // ─── MonthHeroCard ────────────────────────────────────────────────────────────
 
 function MonthHeroCard({
@@ -85,6 +132,7 @@ function MonthHeroCard({
   totalDisposable,
   totalInvestable,
   estimatedIncome,
+  expenses,
   onEditIncome,
 }: {
   totalThisMonth:  number;
@@ -92,6 +140,7 @@ function MonthHeroCard({
   totalDisposable: number;
   totalInvestable: number;
   estimatedIncome: number | null;
+  expenses:        Expense[];
   onEditIncome:    () => void;
 }) {
   const status  = computeStatus(totalThisMonth, totalDisposable, estimatedIncome);
@@ -140,6 +189,11 @@ function MonthHeroCard({
         <Text variant="label" color={colors.text.secondary}>GASTASTE ESTE MES</Text>
         <AmountDisplay amount={totalThisMonth} size="xl" />
       </View>
+
+      {/* Gráfico de gasto diario */}
+      {expenses.length > 0 && (
+        <SpendingMiniChart expenses={expenses} statusColor={cfg.color} />
+      )}
 
       {/* Progress bar vs ingreso */}
       {incomePct !== null && (
@@ -322,14 +376,89 @@ const recStyles = StyleSheet.create({
   ctaText: { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: colors.black },
 });
 
+// ─── TopCategoriesCard ────────────────────────────────────────────────────────
+
+function TopCategoriesCard({ expenses }: { expenses: Expense[] }) {
+  if (expenses.length === 0) return null;
+
+  const catMap: Record<string, { amount: number; color: string }> = {};
+  expenses.forEach(e => {
+    const name  = e.category?.name_es
+      ?? (e.classification === 'necessary'  ? 'Necesarios'
+        : e.classification === 'disposable' ? 'Prescindibles'
+        : e.classification === 'investable' ? 'Invertibles'
+        : 'Sin clasificar');
+    const color = e.category?.color
+      ?? (e.classification === 'necessary'  ? colors.primary
+        : e.classification === 'disposable' ? colors.red
+        : e.classification === 'investable' ? colors.neon
+        : colors.text.tertiary);
+    if (!catMap[name]) catMap[name] = { amount: 0, color };
+    catMap[name].amount += e.amount;
+  });
+
+  const sorted = Object.entries(catMap)
+    .sort((a, b) => b[1].amount - a[1].amount)
+    .slice(0, 4);
+
+  const maxAmt = sorted[0]?.[1].amount ?? 1;
+
+  return (
+    <View style={topCatStyles.card}>
+      <View style={topCatStyles.header}>
+        <Text variant="label" color={colors.text.secondary}>TOP CATEGORÍAS</Text>
+        <TouchableOpacity onPress={() => router.push('/(app)/reports')}>
+          <Text variant="label" color={colors.neon}>Ver informe →</Text>
+        </TouchableOpacity>
+      </View>
+
+      {sorted.map(([name, { amount, color }]) => (
+        <View key={name} style={topCatStyles.row}>
+          <View style={[topCatStyles.dot, { backgroundColor: color }]} />
+          <Text variant="caption" color={colors.text.primary} style={topCatStyles.catName} numberOfLines={1}>
+            {name}
+          </Text>
+          <View style={topCatStyles.barTrack}>
+            <View style={[topCatStyles.barFill, {
+              width: `${Math.round((amount / maxAmt) * 100)}%`,
+              backgroundColor: color + '70',
+            }]} />
+          </View>
+          <Text variant="caption" color={colors.text.secondary} style={topCatStyles.amount}>
+            {formatCurrency(amount)}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const topCatStyles = StyleSheet.create({
+  card: {
+    backgroundColor: colors.bg.card,
+    borderWidth: 1, borderColor: colors.border.default,
+    borderRadius: 16, padding: spacing[5], gap: spacing[4],
+  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  dot:  { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  catName: { width: 90, flexShrink: 0 },
+  barTrack: {
+    flex: 1, height: 6, backgroundColor: colors.border.subtle,
+    borderRadius: 3, overflow: 'hidden',
+  },
+  barFill:  { height: '100%', borderRadius: 3 },
+  amount: { width: 80, textAlign: 'right', flexShrink: 0 },
+});
+
 // ─── QuickActions ─────────────────────────────────────────────────────────────
 
 function QuickActions() {
   const actions = [
     { label: 'Agregar gasto', icon: 'add-circle-outline',        color: colors.neon,    route: '/(app)/expenses'  },
     { label: 'Asesor IA',     icon: 'chatbubble-ellipses-outline',color: colors.yellow,  route: '/(app)/advisor'   },
-    { label: 'Mi informe',    icon: 'bar-chart-outline',          color: colors.primary, route: '/(app)/reports'   },
-    { label: 'Simulador',     icon: 'trending-up-outline',        color: '#A78BFA',      route: '/(app)/simulator' },
+    { label: 'Mis ahorros',   icon: 'wallet-outline',             color: '#A78BFA',      route: '/(app)/savings'   },
+    { label: 'Simulador',     icon: 'trending-up-outline',        color: colors.primary, route: '/(app)/simulator' },
   ] as const;
 
   return (
@@ -752,8 +881,12 @@ export default function HomeScreen() {
           totalDisposable={totalDisposable}
           totalInvestable={totalInvestable}
           estimatedIncome={estimatedIncome}
+          expenses={expenses}
           onEditIncome={openIncomeModal}
         />
+
+        {/* ── Top categorías ─────────────────────────────────────────────────── */}
+        <TopCategoriesCard expenses={expenses} />
 
         {/* ── Dinero recuperable ──────────────────────────────────────────────── */}
         <RecoverableCard
