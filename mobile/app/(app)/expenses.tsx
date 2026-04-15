@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   View,
   ScrollView,
@@ -29,6 +30,26 @@ import { supabase } from '@/lib/supabase';
 import { formatCurrency, formatDate } from '@/utils/format';
 import type { PaymentMethod, Expense, ExpenseClassification } from '@/types';
 import { PendingTransactions } from '@/components/PendingTransactions';
+import { InflationThermometer } from '@/components/InflationThermometer';
+import {
+  MONTH_NAMES,
+  PALETTE,
+  type CategoryRow as ReportCategoryRow,
+  type MonthSummary,
+  computeMonthStatus,
+  buildComparacion,
+  buildAhorroSugerencias,
+  buildPlanProximoMes,
+  buildObjetivo,
+  MonthStatusBanner,
+  ResumenCard,
+  CategoryBreakdown,
+  HistoryComparisonCard,
+  DineroRecuperableCard,
+  PlanProximoMesCard,
+  ObjetivoCard,
+  AdvisorCTA,
+} from '@/components/ReportCards';
 
 const expenseSchema = z.object({
   description: z.string().min(1, 'Describí el gasto.').max(100),
@@ -146,6 +167,15 @@ const detStyles = StyleSheet.create({
   barAmount: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: colors.text.secondary, minWidth: 72, textAlign: 'right' },
   barTrack:  { height: 6, backgroundColor: colors.border.subtle, borderRadius: 3, overflow: 'hidden' },
   barFill:   { height: '100%', borderRadius: 3 },
+
+  // Reports CTA
+  reportCta: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.primary + '40',
+    borderRadius: 12, paddingVertical: spacing[4],
+    backgroundColor: colors.primary + '0A',
+  },
 });
 
 // ─── MonthSelector ────────────────────────────────────────────────────────────
@@ -218,6 +248,8 @@ const msStyles = StyleSheet.create({
 // ─── Screen ────────────────────────────────────────────────────────────────────
 
 export default function ExpensesScreen() {
+  const router = useRouter();
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   const { user } = useAuthStore();
   const {
     expenses,
@@ -226,6 +258,7 @@ export default function ExpensesScreen() {
     totalNecessary,
     totalDisposable,
     totalInvestable,
+    estimatedIncome,
     fetchExpenses,
     fetchMoreExpenses,
     fetchCategories,
@@ -245,7 +278,94 @@ export default function ExpensesScreen() {
   // dolarLabels viene del hook pero también exportamos DOLAR_LABELS directamente
 
   const [showSubscriptions, setShowSubscriptions] = useState(false);
-  const [activeTab, setActiveTab] = useState<'gastos' | 'stats'>('gastos');
+  const [activeTab, setActiveTab] = useState<'gastos' | 'analisis'>('gastos');
+
+  // Si se navega con ?tab=analisis (p.ej. desde Home), ir directo al tab Análisis
+  useEffect(() => {
+    if (tabParam === 'analisis') setActiveTab('analisis');
+  }, [tabParam]);
+
+  // ── Datos para el tab Análisis ──────────────────────────────────────────────
+  const [analysisHistory, setAnalysisHistory] = useState<MonthSummary[]>([]);
+
+  useEffect(() => {
+    if (activeTab !== 'analisis' || !user?.id) return;
+    const fYear  = filter.year  ?? new Date().getFullYear();
+    const fMonth = filter.month ?? (new Date().getMonth() + 1);
+    const startDate = `${fYear}-${String(fMonth).padStart(2, '0')}-01`;
+    const histStart = (() => {
+      const d = new Date(fYear, fMonth - 4, 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    })();
+
+    supabase
+      .from('expenses')
+      .select('amount, date, classification')
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .gte('date', histStart)
+      .lt('date', startDate)
+      .then(({ data }) => {
+        const histMap: Record<string, MonthSummary> = {};
+        for (const exp of data ?? []) {
+          const key = (exp.date as string).slice(0, 7);
+          if (!histMap[key]) {
+            const [y, m] = key.split('-').map(Number);
+            histMap[key] = { monthKey: key, label: MONTH_NAMES[m - 1].slice(0, 3), total: 0, disposable: 0, necessary: 0, investable: 0 };
+          }
+          histMap[key].total += exp.amount;
+          if (exp.classification === 'disposable') histMap[key].disposable += exp.amount;
+          if (exp.classification === 'necessary')  histMap[key].necessary  += exp.amount;
+          if (exp.classification === 'investable') histMap[key].investable += exp.amount;
+        }
+        setAnalysisHistory(Object.values(histMap).sort((a, b) => a.monthKey.localeCompare(b.monthKey)).slice(-3));
+      });
+  }, [activeTab, user?.id, filter.month, filter.year]);
+
+  // ─── Filas de categoría en formato ReportCards para el tab Análisis ─────────
+  const analysisRows = useMemo((): ReportCategoryRow[] => {
+    const map: Record<string, ReportCategoryRow> = {};
+    let sum = 0;
+    for (const e of expenses) {
+      const catId = (e as any).category_id ?? 'none';
+      const cat   = (e as any).category;
+      const name  = cat?.name_es
+        ?? (e.classification === 'necessary'  ? 'Necesarios'
+          : e.classification === 'disposable' ? 'Prescindibles'
+          : e.classification === 'investable' ? 'Invertibles'
+          : 'Sin categoría');
+      const color = cat?.color ?? PALETTE[Object.keys(map).length % PALETTE.length];
+      if (!map[catId]) map[catId] = { id: catId, name, color, amount: 0, pct: 0 };
+      map[catId].amount += e.amount;
+      sum += e.amount;
+    }
+    return Object.values(map)
+      .map(r => ({ ...r, pct: sum > 0 ? r.amount / sum : 0 }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [expenses]);
+
+  const analysisStatusData  = useMemo(() => computeMonthStatus({ total: totalThisMonth, disposable: totalDisposable, estimatedIncome }), [totalThisMonth, totalDisposable, estimatedIncome]);
+  const analysisComparacion = useMemo(() => buildComparacion(analysisHistory, totalThisMonth, totalDisposable), [analysisHistory, totalThisMonth, totalDisposable]);
+  const analysisSugerencias = useMemo(() => buildAhorroSugerencias({ rows: analysisRows, disposable: totalDisposable, total: totalThisMonth, estimatedIncome }), [analysisRows, totalDisposable, totalThisMonth, estimatedIncome]);
+  const analysisPlanItems   = useMemo(() => buildPlanProximoMes({ rows: analysisRows, disposable: totalDisposable, total: totalThisMonth, estimatedIncome, history: analysisHistory }), [analysisRows, totalDisposable, totalThisMonth, estimatedIncome, analysisHistory]);
+  const analysisObjetivo    = useMemo(() => buildObjetivo({ disposable: totalDisposable, total: totalThisMonth }), [totalDisposable, totalThisMonth]);
+
+  const analysisAdvisorCtx  = useMemo(() => {
+    const fYear  = filter.year  ?? new Date().getFullYear();
+    const fMonth = filter.month ?? (new Date().getMonth() + 1);
+    const totalSaving = analysisSugerencias.reduce((s, sg) => s + sg.saving, 0);
+    return [
+      `Informe de ${MONTH_NAMES[fMonth - 1]} ${fYear}.`,
+      `Gasté ${formatCurrency(totalThisMonth)}.`,
+      `Estado del mes: ${analysisStatusData.label}.`,
+      totalDisposable > 0 ? `Tengo ${formatCurrency(totalDisposable)} en prescindibles.` : '',
+      estimatedIncome ? `Eso es el ${Math.round((totalThisMonth / estimatedIncome) * 100)}% de mi ingreso.` : '',
+      analysisRows[0] ? `Mi categoría más alta: "${analysisRows[0].name}" (${Math.round(analysisRows[0].pct * 100)}%).` : '',
+      analysisComparacion.vsPrev ? `Cambio vs mes pasado: ${analysisComparacion.vsPrev.changePct > 0 ? '+' : ''}${analysisComparacion.vsPrev.changePct}%.` : '',
+      totalSaving > 0 ? `Podría ahorrar ${formatCurrency(totalSaving)}/mes.` : '',
+      '¿Qué me recomendás hacer el próximo mes?',
+    ].filter(Boolean).join(' ');
+  }, [filter.year, filter.month, totalThisMonth, analysisStatusData, totalDisposable, estimatedIncome, analysisRows, analysisComparacion, analysisSugerencias]);
 
   // Agrupar gastos del mes actual por categoría para el resumen de detalles
   const categoryRows = useMemo(() => {
@@ -752,8 +872,8 @@ export default function ExpensesScreen() {
         {/* Segmented control */}
         <View style={styles.segTrack}>
           {([
-            { key: 'gastos', label: 'Gastos',       icon: 'list-outline' },
-            { key: 'stats',  label: 'Distribución', icon: 'pie-chart-outline' },
+            { key: 'gastos',   label: 'Gastos',   icon: 'list-outline'      },
+            { key: 'analisis', label: 'Análisis', icon: 'bar-chart-outline' },
           ] as const).map(tab => (
             <TouchableOpacity
               key={tab.key}
@@ -777,13 +897,13 @@ export default function ExpensesScreen() {
         </View>
       </View>
 
-      {/* ── Vista Estadísticas ── */}
-      {activeTab === 'stats' ? (
+      {/* ── Vista Análisis ── */}
+      {activeTab === 'analisis' ? (
         <ScrollView
-          contentContainerStyle={{ paddingBottom: layout.tabBarHeight + spacing[8], paddingTop: spacing[3] }}
+          contentContainerStyle={{ paddingHorizontal: layout.screenPadding, paddingBottom: layout.tabBarHeight + spacing[8], paddingTop: spacing[3], gap: spacing[4] }}
           showsVerticalScrollIndicator={false}
         >
-          {categoryRows.length === 0 ? (
+          {totalThisMonth === 0 ? (
             <View style={{ alignItems: 'center', paddingTop: spacing[10], gap: spacing[4] }}>
               <Ionicons name="bar-chart-outline" size={48} color={colors.border.default} />
               <Text variant="body" color={colors.text.tertiary} align="center">
@@ -791,13 +911,20 @@ export default function ExpensesScreen() {
               </Text>
             </View>
           ) : (
-            <View style={detStyles.card}>
-              <View style={detStyles.cardHeader}>
-                <Ionicons name="bar-chart-outline" size={14} color={colors.text.secondary} />
-                <Text variant="label" color={colors.text.secondary}>DISTRIBUCIÓN POR CATEGORÍA</Text>
-              </View>
-              <CategoryBarChart rows={categoryRows} total={totalThisMonth} />
-            </View>
+            <>
+              <CategoryBreakdown rows={analysisRows} total={totalThisMonth} />
+              <MonthStatusBanner data={analysisStatusData} />
+              {user?.id && (
+                <View style={{ backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default, borderRadius: 16, padding: spacing[5] }}>
+                  <InflationThermometer userId={user.id} year={filter.year ?? new Date().getFullYear()} month={filter.month ?? (new Date().getMonth() + 1)} />
+                </View>
+              )}
+              <HistoryComparisonCard history={analysisHistory} comparacion={analysisComparacion} currentTotal={totalThisMonth} />
+              <DineroRecuperableCard sugerencias={analysisSugerencias} month={filter.month ?? (new Date().getMonth() + 1)} year={filter.year ?? new Date().getFullYear()} />
+              <PlanProximoMesCard items={analysisPlanItems} />
+              {analysisObjetivo && <ObjetivoCard objetivo={analysisObjetivo} />}
+              <AdvisorCTA context={analysisAdvisorCtx} />
+            </>
           )}
         </ScrollView>
       ) : (

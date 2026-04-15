@@ -174,7 +174,7 @@ const cardStyles = StyleSheet.create({
   },
   total: {
     fontFamily: 'Montserrat_700Bold', fontSize: 34, color: colors.text.primary,
-    letterSpacing: -1,
+    lineHeight: 44,
   },
   stackBar: {
     flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden',

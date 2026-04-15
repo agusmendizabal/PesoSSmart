@@ -19,6 +19,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useGoalsStore, type SavingsGoal } from '@/store/goalsStore';
 import type { Expense } from '@/types';
+import type { DetectedSubscription } from '@/store/expensesStore';
 import { GoalsSection } from '@/components/GoalsSection';
 import { scheduleBudgetAlert } from '@/lib/notifications';
 import { getGreeting, formatCurrency } from '@/utils/format';
@@ -407,8 +408,8 @@ function TopCategoriesCard({ expenses }: { expenses: Expense[] }) {
     <View style={topCatStyles.card}>
       <View style={topCatStyles.header}>
         <Text variant="label" color={colors.text.secondary}>TOP CATEGORÍAS</Text>
-        <TouchableOpacity onPress={() => router.push('/(app)/reports')}>
-          <Text variant="label" color={colors.neon}>Ver informe →</Text>
+        <TouchableOpacity onPress={() => router.push('/(app)/expenses?tab=analisis' as any)}>
+          <Text variant="label" color={colors.neon}>Ver análisis →</Text>
         </TouchableOpacity>
       </View>
 
@@ -453,36 +454,302 @@ const topCatStyles = StyleSheet.create({
 
 // ─── QuickActions ─────────────────────────────────────────────────────────────
 
-function QuickActions() {
-  const actions = [
-    { label: 'Agregar gasto', icon: 'add-circle-outline',        color: colors.neon,    route: '/(app)/expenses'  },
-    { label: 'Asesor IA',     icon: 'chatbubble-ellipses-outline',color: colors.yellow,  route: '/(app)/advisor'   },
-    { label: 'Mis ahorros',   icon: 'wallet-outline',             color: '#A78BFA',      route: '/(app)/savings'   },
-    { label: 'Simulador',     icon: 'trending-up-outline',        color: colors.primary, route: '/(app)/simulator' },
-  ] as const;
+const QUICK_ACTIONS = [
+  { label: 'Ingresar\ngasto',  icon: 'add-circle-outline',          color: colors.neon,    route: '/(app)/expenses'            },
+  { label: 'Asesor\nIA',       icon: 'chatbubble-ellipses-outline', color: colors.yellow,  route: '/(app)/advisor'             },
+  { label: 'Mis\nahorros',     icon: 'wallet-outline',              color: '#A78BFA',      route: '/(app)/savings'             },
+  { label: 'Simulador',        icon: 'trending-up-outline',         color: colors.primary, route: '/(app)/simulator'           },
+  { label: 'Análisis',         icon: 'bar-chart-outline',           color: '#FF6D00',      route: '/(app)/expenses?tab=analisis'},
+] as const;
 
+function QuickActions() {
   return (
-    <View style={qaStyles.grid}>
-      {actions.map((a) => (
-        <PressableCard
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={qaStyles.row}
+    >
+      {QUICK_ACTIONS.map((a) => (
+        <TouchableOpacity
           key={a.label}
-          style={qaStyles.card}
+          style={qaStyles.item}
           onPress={() => router.push(a.route as any)}
+          activeOpacity={0.75}
         >
-          <Ionicons name={a.icon as any} size={26} color={a.color} />
-          <Text variant="caption" color={colors.text.primary} style={qaStyles.label} numberOfLines={2}>
+          <View style={[qaStyles.circle, { backgroundColor: a.color + '18' }]}>
+            <Ionicons name={a.icon as any} size={24} color={a.color} />
+          </View>
+          <Text style={[qaStyles.label, { color: colors.text.secondary }]} numberOfLines={2}>
             {a.label}
           </Text>
-        </PressableCard>
+        </TouchableOpacity>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
 const qaStyles = StyleSheet.create({
-  grid:  { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] },
-  card:  { width: '47%', padding: spacing[4], alignItems: 'center', gap: spacing[2] },
-  label: { textAlign: 'center', fontSize: 12, lineHeight: 16 },
+  row:    { paddingHorizontal: layout.screenPadding, gap: spacing[5] },
+  item:   { alignItems: 'center', gap: spacing[2], width: 64 },
+  circle: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  label:  { fontSize: 11, fontFamily: 'Montserrat_500Medium', textAlign: 'center', lineHeight: 14 },
+});
+
+// ─── Datos clave del mes ──────────────────────────────────────────────────────
+
+interface DataInsight {
+  id:        string;
+  icon:      string;
+  iconColor: string;
+  title:     string;
+  body:      string;
+  cta?:      { label: string; route: string };
+}
+
+function buildKeyInsights({
+  expenses, subscriptions, totalThisMonth, totalDisposable,
+  totalNecessary, totalInvestable, estimatedIncome, goals,
+}: {
+  expenses:        Expense[];
+  subscriptions:   DetectedSubscription[];
+  totalThisMonth:  number;
+  totalDisposable: number;
+  totalNecessary:  number;
+  totalInvestable: number;
+  estimatedIncome: number | null;
+  goals:           SavingsGoal[];
+}): DataInsight[] {
+  const items: DataInsight[] = [];
+  const now         = new Date();
+  const dayOfMonth  = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+  // 1. Proyección del mes
+  if (totalThisMonth > 0 && dayOfMonth > 3) {
+    const dailyRate = totalThisMonth / dayOfMonth;
+    const projected = Math.round(dailyRate * daysInMonth);
+    const isOverBudget = estimatedIncome && projected > estimatedIncome;
+    items.push({
+      id: 'projection',
+      icon: isOverBudget ? 'trending-up-outline' : 'analytics-outline',
+      iconColor: isOverBudget ? colors.red : colors.primary,
+      title: 'Proyección del mes',
+      body: isOverBudget
+        ? `Arrancaste el mes con ${formatCurrency(totalThisMonth)}. Si seguís así, en ${daysInMonth} días vas a gastar ${formatCurrency(projected)} — eso supera tu ingreso estimado.`
+        : `Llevas ${formatCurrency(totalThisMonth)} gastados. A este ritmo, vas a cerrar el mes en ${formatCurrency(projected)}. ${estimatedIncome ? `Eso es el ${Math.round((projected / estimatedIncome) * 100)}% del ingreso.` : '¿Está dentro de lo esperado?'}`,
+      cta: { label: 'Ver análisis', route: '/(app)/expenses?tab=analisis' },
+    });
+  }
+
+  // 2. Prescindibles — oportunidad de ahorro
+  if (totalThisMonth > 0 && totalDisposable > 0) {
+    const pct = Math.round((totalDisposable / totalThisMonth) * 100);
+    const recoverable = Math.round(totalDisposable * 0.5);
+    const fciGain = Math.round(recoverable * 0.03);
+    items.push({
+      id: 'disposable',
+      icon: 'wallet-outline',
+      iconColor: pct > 20 ? colors.red : colors.yellow,
+      title: `${pct}% de tus gastos son prescindibles`,
+      body: `El ${pct}% de lo que gastaste este mes (${formatCurrency(totalDisposable)}) fue prescindible. Ajustando la mitad podrías recuperar ${formatCurrency(recoverable)}, que en FCI generaría ~${formatCurrency(fciGain)}/mes.`,
+      cta: { label: 'Hablar con asesor', route: '/(app)/advisor' },
+    });
+  }
+
+  // 3. Top categoría vs ingreso
+  if (expenses.length > 0 && estimatedIncome && estimatedIncome > 0) {
+    const catTotals: Record<string, { name: string; amount: number }> = {};
+    expenses.forEach(e => {
+      const name = (e as any).category?.name_es ?? (e.classification === 'disposable' ? 'Prescindibles' : 'Otros');
+      if (!catTotals[name]) catTotals[name] = { name, amount: 0 };
+      catTotals[name].amount += e.amount;
+    });
+    const top = Object.values(catTotals).sort((a, b) => b.amount - a.amount)[0];
+    if (top) {
+      const pct = Math.round((top.amount / estimatedIncome) * 100);
+      items.push({
+        id: 'top_category',
+        icon: 'pie-chart-outline',
+        iconColor: colors.primary,
+        title: `${top.name}: ${pct}% del ingreso`,
+        body: `Tu categoría más cara este mes fue "${top.name}" con ${formatCurrency(Math.round(top.amount))}. Representa el ${pct}% de tus ingresos estimados — comparado con el promedio del 12% en tu perfil.`,
+        cta: { label: 'Ver desglose', route: '/(app)/expenses?tab=analisis' },
+      });
+    }
+  }
+
+  // 4. Suscripciones detectadas
+  if (subscriptions.length > 0) {
+    const totalSubs = subscriptions.reduce((s, sub) => s + sub.averageAmount, 0);
+    items.push({
+      id: 'subscriptions',
+      icon: 'repeat-outline',
+      iconColor: colors.yellow,
+      title: `${subscriptions.length} suscripciones: ${formatCurrency(Math.round(totalSubs))}/mes`,
+      body: `Tenés ${subscriptions.length} suscripciones activas que te cuestan ${formatCurrency(Math.round(totalSubs))} por mes. En un año son ${formatCurrency(Math.round(totalSubs * 12))}. ¿Usaste todas este mes?`,
+      cta: { label: 'Ver suscripciones', route: '/(app)/expenses' },
+    });
+  }
+
+  // 5. Pesos que rinden — si tiene invertibles
+  if (totalInvestable > 5000) {
+    const fciGain = Math.round(totalInvestable * 0.03);
+    items.push({
+      id: 'investable',
+      icon: 'trending-up-outline',
+      iconColor: '#A78BFA',
+      title: `${formatCurrency(totalInvestable)} disponibles para invertir`,
+      body: `Tus gastos invertibles suman ${formatCurrency(totalInvestable)} este mes. Puestos en FCI Money Market te generarían ~${formatCurrency(fciGain)} sin hacer nada. ¿Los movemos?`,
+      cta: { label: 'Ver simulador', route: '/(app)/simulator' },
+    });
+  }
+
+  // 6. Gastos chicos que suman (muchas transacciones pequeñas)
+  const smallExpenses = expenses.filter(e => e.amount < 5000);
+  if (smallExpenses.length >= 8 && dayOfMonth > 5) {
+    const totalSmall = smallExpenses.reduce((s, e) => s + e.amount, 0);
+    const monthlyProjected = Math.round((totalSmall / dayOfMonth) * daysInMonth);
+    const yearlyProjected  = Math.round((totalSmall / dayOfMonth) * 365);
+    items.push({
+      id: 'small_expenses',
+      icon: 'cafe-outline',
+      iconColor: colors.yellow,
+      title: 'Los gastos chicos suman más de lo que creés',
+      body: `Tus gastos menores a ${formatCurrency(5000)} parecen insignificantes, pero en el mes proyectan ${formatCurrency(monthlyProjected)} y al año son ${formatCurrency(yearlyProjected)} — casi un sueldo.`,
+    });
+  }
+
+  // 7. Fin de mes — sobrante
+  if (dayOfMonth >= 25 && estimatedIncome && estimatedIncome > totalThisMonth) {
+    const surplus = Math.round(estimatedIncome - totalThisMonth);
+    const inflLoss = Math.round(surplus * 0.028);
+    items.push({
+      id: 'eom_surplus',
+      icon: 'cash-outline',
+      iconColor: colors.neon,
+      title: `Fin de mes: te sobraron ${formatCurrency(surplus)}`,
+      body: `Si los dejás en la cuenta pierden ~${formatCurrency(inflLoss)} de valor el mes que viene por inflación. Invertidos en FCI generarían ~${formatCurrency(Math.round(surplus * 0.03))} en cambio.`,
+      cta: { label: 'Ver simulador', route: '/(app)/simulator' },
+    });
+  }
+
+  // 8. Meta de ahorro
+  const activeGoal = goals.find(g => g.current_amount < g.target_amount);
+  if (activeGoal) {
+    const pct       = Math.round((activeGoal.current_amount / activeGoal.target_amount) * 100);
+    const remaining = Math.round(activeGoal.target_amount - activeGoal.current_amount);
+    items.push({
+      id: 'goal',
+      icon: 'flag-outline',
+      iconColor: colors.neon,
+      title: `Meta "${activeGoal.title}": ${pct}% alcanzado`,
+      body: `Llevas el ${pct}% de tu meta. Te faltan ${formatCurrency(remaining)} para llegar a ${formatCurrency(activeGoal.target_amount)}.`,
+      cta: { label: 'Ver ahorros', route: '/(app)/savings' },
+    });
+  }
+
+  // 9. Inflación personal (prescindibles / total vs CPI estimado)
+  if (totalThisMonth > 0 && totalDisposable > 0) {
+    const personalInflation = ((totalDisposable / totalThisMonth) * 100).toFixed(1);
+    items.push({
+      id: 'personal_inflation',
+      icon: 'speedometer-outline',
+      iconColor: colors.red,
+      title: `Tu inflación personal: ${personalInflation}%`,
+      body: `Tu componente de gasto prescindible este mes fue del ${personalInflation}% — más que el INDEC. Tus gastos no esenciales suben más rápido que el promedio. Te mostramos por qué.`,
+      cta: { label: 'Ver informe', route: '/(app)/expenses?tab=analisis' },
+    });
+  }
+
+  return items.slice(0, 6);
+}
+
+function DatosClaveCard({ insights }: { insights: DataInsight[] }) {
+  const [open, setOpen] = useState(false);
+  if (insights.length === 0) return null;
+
+  return (
+    <>
+      <TouchableOpacity
+        style={dkStyles.card}
+        onPress={() => setOpen(true)}
+        activeOpacity={0.85}
+      >
+        <View style={dkStyles.left}>
+          <View style={dkStyles.iconWrap}>
+            <Ionicons name="bulb-outline" size={18} color={colors.neon} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="label" color={colors.text.secondary}>DATOS CLAVE DEL MES</Text>
+            <Text variant="caption" color={colors.text.tertiary} numberOfLines={1}>
+              {insights[0].title}
+            </Text>
+          </View>
+        </View>
+        <View style={dkStyles.badge}>
+          <Text style={dkStyles.badgeText}>{insights.length}</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
+      </TouchableOpacity>
+
+      <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
+        <View style={dkStyles.overlay}>
+          <View style={dkStyles.sheet}>
+            <View style={dkStyles.sheetHeader}>
+              <Text variant="h4" color={colors.text.primary}>Datos clave del mes</Text>
+              <TouchableOpacity onPress={() => setOpen(false)} style={dkStyles.closeBtn}>
+                <Ionicons name="close" size={22} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: spacing[3], paddingBottom: spacing[8] }}>
+              {insights.map((ins) => (
+                <View key={ins.id} style={dkStyles.insightCard}>
+                  <View style={dkStyles.insightHeader}>
+                    <View style={[dkStyles.insightIcon, { backgroundColor: ins.iconColor + '18' }]}>
+                      <Ionicons name={ins.icon as any} size={16} color={ins.iconColor} />
+                    </View>
+                    <Text variant="labelMd" color={colors.text.primary} style={{ flex: 1 }}>
+                      {ins.title}
+                    </Text>
+                  </View>
+                  <Text variant="caption" color={colors.text.secondary} style={{ lineHeight: 18 }}>
+                    {ins.body}
+                  </Text>
+                  {ins.cta && (
+                    <TouchableOpacity
+                      style={[dkStyles.ctaBtn, { borderColor: ins.iconColor + '40', backgroundColor: ins.iconColor + '0A' }]}
+                      onPress={() => { setOpen(false); router.push(ins.cta!.route as any); }}
+                      activeOpacity={0.8}
+                    >
+                      <Text variant="label" color={ins.iconColor}>{ins.cta.label}</Text>
+                      <Ionicons name="arrow-forward" size={12} color={ins.iconColor} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+const dkStyles = StyleSheet.create({
+  card:          { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default, borderRadius: 16, padding: spacing[4] },
+  left:          { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  iconWrap:      { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.neon + '15', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  badge:         { backgroundColor: colors.neon + '20', borderRadius: 10, paddingHorizontal: spacing[2], paddingVertical: 2 },
+  badgeText:     { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: colors.neon },
+  overlay:       { flex: 1, backgroundColor: '#00000080', justifyContent: 'flex-end' },
+  sheet:         { backgroundColor: colors.bg.primary, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing[5], maxHeight: '88%' },
+  sheetHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[4] },
+  closeBtn:      { padding: spacing[2] },
+  insightCard:   { backgroundColor: colors.bg.card, borderWidth: 1, borderColor: colors.border.default, borderRadius: 16, padding: spacing[4], gap: spacing[3] },
+  insightHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  insightIcon:   { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  ctaBtn:        { flexDirection: 'row', alignItems: 'center', gap: spacing[2], borderWidth: 1, borderRadius: 10, paddingVertical: spacing[2], paddingHorizontal: spacing[3], alignSelf: 'flex-start' },
 });
 
 // ─── HomeHighlightCarousel ────────────────────────────────────────────────────
@@ -526,7 +793,7 @@ function buildHomeHighlights({
         title: `Te pasaste un ${pct - 100}%`,
         subtitle: `Gastaste ${formatCurrency(totalThisMonth - estimatedIncome)} más de tu ingreso mensual.`,
         icon: 'trending-down-outline', iconColor: colors.red,
-        cta: { label: 'Ver informe', route: '/(app)/reports' },
+        cta: { label: 'Ver análisis', route: '/(app)/expenses?tab=analisis' },
       });
     } else if (pct >= 80) {
       items.push({
@@ -542,7 +809,7 @@ function buildHomeHighlights({
         title: `Usaste el ${pct}% del ingreso`,
         subtitle: `Te quedan ${formatCurrency(estimatedIncome - totalThisMonth)} libres este mes. Buen ritmo.`,
         icon: 'shield-checkmark-outline', iconColor: colors.neon,
-        cta: { label: 'Ver informe', route: '/(app)/reports' },
+        cta: { label: 'Ver análisis', route: '/(app)/expenses?tab=analisis' },
       });
     }
   }
@@ -576,7 +843,7 @@ function buildHomeHighlights({
         title: topName,
         subtitle: `Gastaste ${formatCurrency(topAmt)} en ${topName.toLowerCase()} este mes.`,
         icon: 'pie-chart-outline', iconColor: colors.primary,
-        cta: { label: 'Ver desglose', route: '/(app)/reports' },
+        cta: { label: 'Ver desglose', route: '/(app)/expenses?tab=analisis' },
       });
     }
   }
@@ -759,6 +1026,7 @@ export default function HomeScreen() {
     projectedBalance,
     estimatedIncome,
     isLoading,
+    subscriptions,
   } = useExpensesStore();
   const { goals, fetchGoals } = useGoalsStore();
 
@@ -788,6 +1056,11 @@ export default function HomeScreen() {
     estimatedIncome,
     expenses,
     goals,
+  });
+
+  const keyInsights = buildKeyInsights({
+    expenses, subscriptions, totalThisMonth, totalDisposable,
+    totalNecessary, totalInvestable, estimatedIncome, goals,
   });
 
   // ── Editar ingreso ──────────────────────────────────────────────────────────
@@ -874,6 +1147,9 @@ export default function HomeScreen() {
         {/* ── Radar financiero ───────────────────────────────────────────────── */}
         <HomeHighlightCarousel highlights={highlights} />
 
+        {/* ── Acciones rápidas ────────────────────────────────────────────────── */}
+        <QuickActions />
+
         {/* ── Hero: estado del mes ────────────────────────────────────────────── */}
         <MonthHeroCard
           totalThisMonth={totalThisMonth}
@@ -884,6 +1160,9 @@ export default function HomeScreen() {
           expenses={expenses}
           onEditIncome={openIncomeModal}
         />
+
+        {/* ── Datos clave del mes ─────────────────────────────────────────────── */}
+        <DatosClaveCard insights={keyInsights} />
 
         {/* ── Top categorías ─────────────────────────────────────────────────── */}
         <TopCategoriesCard expenses={expenses} />
@@ -896,12 +1175,6 @@ export default function HomeScreen() {
             params: recoverableCtx ? { initialContext: recoverableCtx } : {},
           } as any)}
         />
-
-        {/* ── Acciones rápidas ────────────────────────────────────────────────── */}
-        <View style={styles.sectionHeader}>
-          <Text variant="label" color={colors.text.secondary}>ACCIONES RÁPIDAS</Text>
-        </View>
-        <QuickActions />
 
         {/* ── Metas de ahorro ────────────────────────────────────────────────── */}
         {user?.id && (
