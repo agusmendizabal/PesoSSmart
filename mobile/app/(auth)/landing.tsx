@@ -369,8 +369,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: layout.screenPadding, paddingVertical: spacing[3],
   },
   progressDot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: colors.border.default, flex: 1, height: 3, borderRadius: 2,
+    flex: 1, height: 3, borderRadius: 2,
+    backgroundColor: colors.border.default,
   },
   progressDotActive: { backgroundColor: colors.neon },
   progressDotDone:   { backgroundColor: colors.primary },

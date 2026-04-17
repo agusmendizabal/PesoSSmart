@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { hapticLight, hapticMedium } from '@/lib/haptics';
 import {
   View,
   StyleSheet,
@@ -111,7 +112,7 @@ function CategorizarSheet({
 
   const handleConfirm = () => {
     const cat = categories.find(c => c.id === selected);
-    if (cat) onSelect(cat);
+    if (cat) { hapticMedium(); onSelect(cat); }
   };
 
   return (
@@ -165,7 +166,7 @@ function CategorizarSheet({
                   sheetStyles.catItem,
                   isActive && { borderColor: cat.color ?? colors.primary, backgroundColor: (cat.color ?? colors.primary) + '15' },
                 ]}
-                onPress={() => setSelected(cat.id)}
+                onPress={() => { setSelected(cat.id); hapticLight(); }}
                 activeOpacity={0.7}
               >
                 <View style={[sheetStyles.catIconBox, { backgroundColor: (cat.color ?? colors.primary) + '20' }]}>

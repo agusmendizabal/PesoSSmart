@@ -164,66 +164,58 @@ function MonthHeroCard({
                         .toUpperCase();
 
   return (
-    <View style={[heroStyles.card, { borderColor: cfg.border, backgroundColor: cfg.bg }]}>
-      {/* Top row: mes + ingreso */}
+    <TouchableOpacity
+      style={[heroStyles.card, { borderColor: cfg.border, backgroundColor: cfg.bg }]}
+      onPress={() => router.push('/(app)/expenses' as any)}
+      activeOpacity={0.92}
+    >
+      {/* Top row: mes + badge + ingreso */}
       <View style={heroStyles.topRow}>
-        <Text variant="label" style={{ fontSize: 10, color: colors.text.tertiary }}>
-          {monthLabel}
-        </Text>
-        <TouchableOpacity style={heroStyles.incomeChip} onPress={onEditIncome}>
+        <View style={heroStyles.topLeft}>
+          <Text variant="label" style={{ fontSize: 10, color: colors.text.tertiary }}>
+            {monthLabel}
+          </Text>
+          <View style={[heroStyles.badge, { backgroundColor: cfg.color + '20', borderColor: cfg.color + '50' }]}>
+            <Ionicons name={cfg.icon as any} size={10} color={cfg.color} />
+            <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 10, color: cfg.color }}>
+              {cfg.label.toUpperCase()}
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity style={heroStyles.incomeChip} onPress={e => { e.stopPropagation?.(); onEditIncome(); }}>
           <Ionicons
             name={estimatedIncome ? 'pencil-outline' : 'add-outline'}
             size={11}
             color={estimatedIncome ? colors.text.tertiary : colors.neon}
           />
           <Text variant="caption" color={estimatedIncome ? colors.text.tertiary : colors.neon}>
-            {estimatedIncome ? `Ingreso: ${formatCurrency(estimatedIncome)}` : 'Cargar ingreso'}
+            {estimatedIncome ? formatCurrency(estimatedIncome) : 'Ingreso'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Status badge */}
-      <View style={heroStyles.statusRow}>
-        <View style={[heroStyles.badge, { backgroundColor: cfg.color + '20', borderColor: cfg.color + '50' }]}>
-          <Ionicons name={cfg.icon as any} size={12} color={cfg.color} />
-          <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 11, color: cfg.color }}>
-            {cfg.label.toUpperCase()}
-          </Text>
+      {/* Número + barra */}
+      <View style={heroStyles.amountRow}>
+        <View style={heroStyles.amountBlock}>
+          <Text variant="label" color={colors.text.secondary} style={{ fontSize: 9 }}>GASTASTE ESTE MES</Text>
+          <AmountDisplay amount={totalThisMonth} size="lg" />
         </View>
+        {incomePct !== null && (
+          <View style={heroStyles.pctWrap}>
+            <Text style={[heroStyles.pctText, { color: cfg.color }]}>{Math.round(incomePct * 100)}%</Text>
+            <Text variant="caption" color={colors.text.tertiary} style={{ fontSize: 9 }}>del ingreso</Text>
+          </View>
+        )}
       </View>
 
-      {/* Número protagonista */}
-      <View style={heroStyles.amountBlock}>
-        <Text variant="label" color={colors.text.secondary}>GASTASTE ESTE MES</Text>
-        <AmountDisplay amount={totalThisMonth} size="xl" />
-      </View>
-
-      {/* Gráfico de gasto diario */}
-      {expenses.length > 0 && (
-        <SpendingMiniChart expenses={expenses} statusColor={cfg.color} />
-      )}
-
-      {/* Progress bar vs ingreso */}
+      {/* Progress bar */}
       {incomePct !== null && (
-        <View style={heroStyles.progressBlock}>
-          <View style={heroStyles.progressTrack}>
-            <View style={[heroStyles.progressFill, { width: `${incomePct * 100}%`, backgroundColor: cfg.color }]} />
-            {/* Marcador del día del mes */}
-            {(() => {
-              const dayPct = now.getDate() / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-              return (
-                <View style={[heroStyles.dayMarker, { left: `${dayPct * 100}%` }]} />
-              );
-            })()}
-          </View>
-          <View style={heroStyles.progressLabels}>
-            <Text variant="caption" color={colors.text.tertiary}>
-              {Math.round(incomePct * 100)}% del ingreso
-            </Text>
-            <Text variant="caption" color={colors.text.tertiary}>
-              {estimatedIncome ? formatCurrency(Math.max(estimatedIncome - totalThisMonth, 0)) + ' disponible' : ''}
-            </Text>
-          </View>
+        <View style={heroStyles.progressTrack}>
+          <View style={[heroStyles.progressFill, { width: `${incomePct * 100}%`, backgroundColor: cfg.color }]} />
+          {(() => {
+            const dayPct = now.getDate() / new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            return <View style={[heroStyles.dayMarker, { left: `${dayPct * 100}%` }]} />;
+          })()}
         </View>
       )}
 
@@ -233,7 +225,7 @@ function MonthHeroCard({
           <View style={heroStyles.kpiItem}>
             <View style={[heroStyles.kpiDot, { backgroundColor: colors.accent }]} />
             <View>
-              <Text variant="caption" color={colors.text.tertiary}>Necesario</Text>
+              <Text variant="caption" color={colors.text.tertiary} style={{ fontSize: 9 }}>Necesario</Text>
               <Text variant="labelMd" color={colors.text.primary}>{formatCurrency(totalNecessary)}</Text>
             </View>
           </View>
@@ -241,7 +233,7 @@ function MonthHeroCard({
           <View style={heroStyles.kpiItem}>
             <View style={[heroStyles.kpiDot, { backgroundColor: colors.red }]} />
             <View>
-              <Text variant="caption" color={colors.text.tertiary}>Prescindible</Text>
+              <Text variant="caption" color={colors.text.tertiary} style={{ fontSize: 9 }}>Prescindible</Text>
               <Text variant="labelMd" color={colors.red}>{formatCurrency(totalDisposable)}</Text>
             </View>
           </View>
@@ -249,65 +241,54 @@ function MonthHeroCard({
           <View style={heroStyles.kpiItem}>
             <View style={[heroStyles.kpiDot, { backgroundColor: colors.neon }]} />
             <View>
-              <Text variant="caption" color={colors.text.tertiary}>Invertible</Text>
+              <Text variant="caption" color={colors.text.tertiary} style={{ fontSize: 9 }}>Invertible</Text>
               <Text variant="labelMd" color={colors.neon}>{formatCurrency(totalInvestable)}</Text>
             </View>
           </View>
         </View>
       )}
-
-      {/* Insight line */}
-      <View style={[heroStyles.insightRow, { borderTopColor: cfg.border }]}>
-        <Ionicons name="bulb-outline" size={13} color={cfg.color} />
-        <Text variant="caption" color={colors.text.secondary} style={{ flex: 1, lineHeight: 18 }}>
-          {insight}
-        </Text>
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 const heroStyles = StyleSheet.create({
   card: {
     borderWidth: 1, borderRadius: 16,
-    padding: spacing[5], gap: spacing[4], overflow: 'hidden',
+    padding: spacing[4], gap: spacing[3], overflow: 'hidden',
   },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   incomeChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[2], paddingVertical: 3,
     borderRadius: 20, borderWidth: 1, borderColor: colors.border.default,
     backgroundColor: colors.bg.secondary,
   },
-  statusRow: { flexDirection: 'row' },
   badge: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[1],
-    paddingHorizontal: spacing[3], paddingVertical: spacing[1],
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    paddingHorizontal: spacing[2], paddingVertical: 2,
     borderRadius: 20, borderWidth: 1,
   },
-  amountBlock: { gap: spacing[1] },
-  progressBlock: { gap: spacing[2] },
+  amountRow:   { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  amountBlock: { gap: 2 },
+  pctWrap:     { alignItems: 'flex-end', gap: 1 },
+  pctText:     { fontFamily: 'Montserrat_700Bold', fontSize: 22, lineHeight: 26 },
   progressTrack: {
-    height: 6, backgroundColor: colors.border.subtle, borderRadius: 3,
+    height: 4, backgroundColor: colors.border.subtle, borderRadius: 2,
     overflow: 'hidden', position: 'relative',
   },
-  progressFill:  { height: '100%', borderRadius: 3 },
+  progressFill: { height: '100%', borderRadius: 2 },
   dayMarker: {
     position: 'absolute', top: -2, bottom: -2,
     width: 2, backgroundColor: colors.text.tertiary + '80', borderRadius: 1,
   },
-  progressLabels: { flexDirection: 'row', justifyContent: 'space-between' },
   kpiRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: colors.border.subtle,
   },
-  kpiItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  kpiDot:  { width: 6, height: 6, borderRadius: 3 },
-  kpiDivider: { width: 1, height: 28, backgroundColor: colors.border.subtle, marginHorizontal: spacing[2] },
-  insightRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2],
-    paddingTop: spacing[3], borderTopWidth: 1,
-  },
+  kpiItem:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
+  kpiDot:     { width: 5, height: 5, borderRadius: 3 },
+  kpiDivider: { width: 1, height: 24, backgroundColor: colors.border.subtle, marginHorizontal: spacing[2] },
 });
 
 // ─── RecoverableCard ──────────────────────────────────────────────────────────
@@ -461,45 +442,147 @@ const topCatStyles = StyleSheet.create({
 
 // ─── QuickActions ─────────────────────────────────────────────────────────────
 
-const QUICK_ACTIONS = [
-  { label: 'Ingresar\ngasto',  icon: 'add-circle-outline',          color: colors.neon,    route: '/(app)/expenses'            },
-  { label: 'Asesor\nIA',       icon: 'chatbubble-ellipses-outline', color: colors.yellow,  route: '/(app)/advisor'             },
-  { label: 'Mis\nahorros',     icon: 'wallet-outline',              color: '#A78BFA',      route: '/(app)/savings'             },
-  { label: 'Simulador',        icon: 'trending-up-outline',         color: colors.primary, route: '/(app)/simulator'           },
-  { label: 'Análisis',         icon: 'bar-chart-outline',           color: '#FF6D00',      route: '/(app)/expenses?tab=analisis'},
-] as const;
+function QuickActions({ healthScore }: { healthScore: number }) {
+  const scoreColor = healthScore >= 85 ? colors.neon
+    : healthScore >= 70 ? colors.primary
+    : healthScore >= 50 ? colors.yellow
+    : healthScore >= 30 ? '#FF6D00'
+    : colors.red;
 
-function QuickActions() {
+  const items = [
+    { label: 'Ingresar\ngasto', icon: 'add-circle-outline',          color: colors.neon,    onPress: () => router.push('/(app)/expenses' as any),  scoreValue: undefined },
+    { label: 'Simulador',       icon: 'trending-up-outline',         color: colors.primary, onPress: () => router.push('/(app)/simulator' as any), scoreValue: undefined },
+    { label: 'Asesor\nIA',      icon: 'chatbubble-ellipses-outline', color: colors.yellow,  onPress: () => router.push('/(app)/advisor' as any),   scoreValue: undefined },
+    { label: 'Salud\nfinanc.',  icon: 'heart-outline',               color: scoreColor,     onPress: () => router.push('/(app)/expenses' as any),  scoreValue: healthScore },
+  ];
+
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={qaStyles.row}
-    >
-      {QUICK_ACTIONS.map((a) => (
+    <View style={qaStyles.grid}>
+      {items.map((a) => (
         <TouchableOpacity
           key={a.label}
           style={qaStyles.item}
-          onPress={() => router.push(a.route as any)}
+          onPress={a.onPress}
           activeOpacity={0.75}
         >
-          <View style={[qaStyles.circle, { backgroundColor: a.color + '18' }]}>
-            <Ionicons name={a.icon as any} size={24} color={a.color} />
+          <View style={[qaStyles.circle, { backgroundColor: a.color + '18', borderColor: a.color + '30', borderWidth: 1 }]}>
+            {a.scoreValue !== undefined
+              ? <Text style={[qaStyles.scoreText, { color: a.color }]}>{a.scoreValue}%</Text>
+              : <Ionicons name={a.icon as any} size={22} color={a.color} />
+            }
           </View>
           <Text style={[qaStyles.label, { color: colors.text.secondary }]} numberOfLines={2}>
             {a.label}
           </Text>
         </TouchableOpacity>
       ))}
-    </ScrollView>
+    </View>
   );
 }
 
 const qaStyles = StyleSheet.create({
-  row:    { paddingHorizontal: layout.screenPadding, gap: spacing[5] },
-  item:   { alignItems: 'center', gap: spacing[2], width: 64 },
-  circle: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  label:  { fontSize: 11, fontFamily: 'Montserrat_500Medium', textAlign: 'center', lineHeight: 14 },
+  grid:      { flexDirection: 'row', gap: spacing[2] },
+  item:      { flex: 1, alignItems: 'center', gap: spacing[2] },
+  circle:    { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  label:     { fontSize: 10, fontFamily: 'Montserrat_500Medium', textAlign: 'center', lineHeight: 13 },
+  scoreText: { fontFamily: 'Montserrat_700Bold', fontSize: 14, lineHeight: 17 },
+});
+
+// ─── MarketTicker ─────────────────────────────────────────────────────────────
+
+interface MarketData { blue: number | null; mep: number | null }
+
+async function fetchMarketData(): Promise<MarketData> {
+  try {
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), 5000);
+    const r    = await fetch('https://api.bluelytics.com.ar/v2/latest', { signal: ctrl.signal });
+    clearTimeout(tid);
+    const j    = await r.json();
+    return { blue: j.blue?.value_sell ?? null, mep: j.mep?.value_sell ?? null };
+  } catch {
+    return { blue: null, mep: null };
+  }
+}
+
+const SCREEN_W = require('react-native').Dimensions.get('window').width;
+
+function MarketTicker({
+  market, totalInvestable, totalDisposable,
+}: {
+  market:          MarketData;
+  totalInvestable: number;
+  totalDisposable: number;
+}) {
+  const fmt = (n: number) => n >= 1_000_000
+    ? `$${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1_000 ? `$${Math.round(n / 1_000)}K` : `$${Math.round(n)}`;
+
+  const items = [
+    { label: 'DÓLAR BLUE',        value: market.blue ? `$${Math.round(market.blue).toLocaleString('es-AR')}` : '--',  sub: 'venta hoy', color: colors.neon },
+    { label: 'DÓLAR MEP',         value: market.mep  ? `$${Math.round(market.mep).toLocaleString('es-AR')}`  : '--',  sub: 'venta hoy', color: colors.neon },
+    { label: 'INFLACIÓN MARZO',    value: '3.4%',                                                                       sub: 'INDEC mar-26', color: colors.yellow },
+    { label: 'FCI CER EST./MES',  value: '3.2%',                                                                       sub: 'rendimiento', color: colors.primary },
+    { label: 'DISPONIBLE',        value: fmt(totalInvestable),                                                          sub: 'para invertir', color: '#A78BFA' },
+    { label: 'PRESCINDIBLE/MES',  value: fmt(totalDisposable),                                                          sub: 'podrías recortar', color: colors.red },
+  ];
+
+  const scrollRef  = useRef<ScrollView>(null);
+  const itemW      = SCREEN_W - layout.screenPadding * 2;
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setActive(prev => {
+        const next = (prev + 1) % items.length;
+        scrollRef.current?.scrollTo({ x: next * itemW, animated: true });
+        return next;
+      });
+    }, 2800);
+    return () => clearInterval(id);
+  }, [items.length, itemW]);
+
+  return (
+    <View style={tickerStyles.wrap}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        decelerationRate="fast"
+        bounces={false}
+        snapToInterval={itemW}
+        onMomentumScrollEnd={e => {
+          setActive(Math.round(e.nativeEvent.contentOffset.x / itemW) % items.length);
+        }}
+      >
+        {items.map((item, i) => (
+          <View key={i} style={[tickerStyles.slide, { width: itemW }]}>
+            <Text style={tickerStyles.tickLabel}>{item.label}</Text>
+            <Text style={[tickerStyles.tickValue, { color: item.color }]}>{item.value}</Text>
+            <Text style={tickerStyles.tickSub}>{item.sub}</Text>
+          </View>
+        ))}
+      </ScrollView>
+      <View style={tickerStyles.dots}>
+        {items.map((_, i) => (
+          <View key={i} style={[tickerStyles.dot, i === active && tickerStyles.dotActive]} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const tickerStyles = StyleSheet.create({
+  wrap:      { backgroundColor: colors.bg.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.default, overflow: 'hidden' },
+  slide:     { paddingHorizontal: spacing[5], paddingTop: spacing[4], paddingBottom: spacing[2], gap: spacing[1] },
+  tickLabel: { fontFamily: 'Montserrat_600SemiBold', fontSize: 9, color: colors.text.tertiary, letterSpacing: 1.2 },
+  tickValue: { fontFamily: 'Montserrat_700Bold', fontSize: 36, lineHeight: 42, letterSpacing: -0.5 },
+  tickSub:   { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: colors.text.tertiary },
+  dots:      { flexDirection: 'row', justifyContent: 'center', gap: 5, paddingBottom: spacing[3] },
+  dot:       { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.border.default },
+  dotActive: { width: 18, height: 5, borderRadius: 3, backgroundColor: colors.neon },
 });
 
 // ─── Datos clave del mes ──────────────────────────────────────────────────────
@@ -716,7 +799,7 @@ function buildKeyInsights({
   // ── 11. INFLACIÓN PERSONAL (gasto vs mes pasado) ───────────────────────────
   if (prevMonthTotal > 0 && totalThisMonth > 0 && dayOfMonth >= 25) {
     const growth       = ((totalThisMonth - prevMonthTotal) / prevMonthTotal) * 100;
-    const INDEC_CPI    = 2.5; // % mensual estimado
+    const INDEC_CPI    = 3.4; // % mensual — INDEC marzo 2026
     if (growth > INDEC_CPI) {
       const growthStr = growth.toFixed(1);
       items.push({
@@ -760,15 +843,14 @@ function buildKeyInsights({
   return items.slice(0, 6);
 }
 
-function DatosClaveCard({ insights }: { insights: DataInsight[] }) {
-  const [open, setOpen] = useState(false);
+function DatosClaveCard({ insights, open, onOpen, onClose }: { insights: DataInsight[]; open: boolean; onOpen: () => void; onClose: () => void }) {
   if (insights.length === 0) return null;
 
   return (
     <>
       <TouchableOpacity
         style={dkStyles.card}
-        onPress={() => setOpen(true)}
+        onPress={onOpen}
         activeOpacity={0.85}
       >
         <View style={dkStyles.left}>
@@ -788,12 +870,12 @@ function DatosClaveCard({ insights }: { insights: DataInsight[] }) {
         <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
       </TouchableOpacity>
 
-      <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
         <View style={dkStyles.overlay}>
           <View style={dkStyles.sheet}>
             <View style={dkStyles.sheetHeader}>
               <Text variant="h4" color={colors.text.primary}>Datos clave del mes</Text>
-              <TouchableOpacity onPress={() => setOpen(false)} style={dkStyles.closeBtn}>
+              <TouchableOpacity onPress={onClose} style={dkStyles.closeBtn}>
                 <Ionicons name="close" size={22} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
@@ -815,7 +897,7 @@ function DatosClaveCard({ insights }: { insights: DataInsight[] }) {
                   {ins.cta && (
                     <TouchableOpacity
                       style={[dkStyles.ctaBtn, { borderColor: ins.iconColor + '40', backgroundColor: ins.iconColor + '0A' }]}
-                      onPress={() => { setOpen(false); router.push(ins.cta!.route as any); }}
+                      onPress={() => { onClose(); router.push(ins.cta!.route as any); }}
                       activeOpacity={0.8}
                     >
                       <Text variant="label" color={ins.iconColor}>{ins.cta.label}</Text>
@@ -1127,7 +1209,9 @@ export default function HomeScreen() {
   const { goals, fetchGoals } = useGoalsStore();
   const streakStore  = useStreakStore();
   const roundUpStore = useRoundUpStore();
-  const [showRoundUpConfig, setShowRoundUpConfig] = useState(false);
+  const [showRoundUpConfig,   setShowRoundUpConfig]   = useState(false);
+  const [showDatosClaveModal, setShowDatosClaveModal] = useState(false);
+  const [market, setMarket] = useState<MarketData>({ blue: null, mep: null });
 
   const [prevMonthCats,  setPrevMonthCats]  = useState<Record<string, { name: string; amount: number }>>({});
   const [prevMonthTotal, setPrevMonthTotal] = useState(0);
@@ -1141,6 +1225,7 @@ export default function HomeScreen() {
     streakStore.load();
     roundUpStore.load();
     roundUpStore.checkReset();
+    fetchMarketData().then(setMarket);
   }, [user?.id]);
 
   useEffect(() => {
@@ -1314,12 +1399,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── Radar financiero ───────────────────────────────────────────────── */}
-        <HomeHighlightCarousel highlights={highlights} />
-
-        {/* ── Acciones rápidas ────────────────────────────────────────────────── */}
-        <QuickActions />
-
         {/* ── Hero: estado del mes ────────────────────────────────────────────── */}
         <MonthHeroCard
           totalThisMonth={totalThisMonth}
@@ -1331,8 +1410,19 @@ export default function HomeScreen() {
           onEditIncome={openIncomeModal}
         />
 
-        {/* ── Datos clave del mes ─────────────────────────────────────────────── */}
-        <DatosClaveCard insights={keyInsights} />
+        {/* ── Acciones rápidas ────────────────────────────────────────────────── */}
+        <QuickActions healthScore={healthScore} />
+
+        {/* ── Radar financiero ───────────────────────────────────────────────── */}
+        <HomeHighlightCarousel highlights={highlights} />
+
+        {/* ── Datos clave del mes (modal desde header) ────────────────────────── */}
+        <DatosClaveCard
+          insights={keyInsights}
+          open={showDatosClaveModal}
+          onOpen={() => setShowDatosClaveModal(true)}
+          onClose={() => setShowDatosClaveModal(false)}
+        />
 
         {/* ── Top categorías ─────────────────────────────────────────────────── */}
         <TopCategoriesCard expenses={expenses} />
@@ -1510,9 +1600,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingBottom: spacing[2],
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  logo:       { width: 36, height: 36, borderRadius: 8 },
-  avatarBtn:  { padding: spacing[1] },
+  headerLeft:  { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  logo:        { width: 36, height: 36, borderRadius: 8 },
+  avatarBtn:   { padding: spacing[1] },
+  insightBtn:  { padding: spacing[1], position: 'relative' },
+  insightBadge: {
+    position: 'absolute', top: 0, right: 0,
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: colors.neon,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  insightBadgeText: { fontFamily: 'Montserrat_700Bold', fontSize: 8, color: colors.bg.primary },
 
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

@@ -13,11 +13,30 @@
  * Máximo teórico: 100 pts
  */
 
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, View, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/theme';
+
+// ─── Hook: count-up suave ─────────────────────────────────────────────────────
+
+function useCountUp(target: number, duration = 900): number {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    if (target === 0) { setDisplay(0); return; }
+    const steps    = 40;
+    const stepTime = Math.max(16, duration / steps);
+    let   current  = 0;
+    const id = setInterval(() => {
+      current += 1;
+      setDisplay(Math.round((current / steps) * target));
+      if (current >= steps) clearInterval(id);
+    }, stepTime);
+    return () => clearInterval(id);
+  }, [target]);
+  return display;
+}
 import { Text } from '@/components/ui/Text';
 import type { SavingsGoal } from '@/store/goalsStore';
 
@@ -86,10 +105,22 @@ const STROKE     = 8;
 const CIRCUMF    = 2 * Math.PI * RADIUS;
 
 function ScoreGauge({ score, color }: { score: number; color: string }) {
-  const progress = (score / 100) * CIRCUMF;
+  // Count-up para el número (JS puro, sin worklets)
+  const displayScore = useCountUp(score, 1000);
+  const progress     = (displayScore / 100) * CIRCUMF;
+
+  // Scale + fade-in con RN Animated (no requiere worklets)
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale   = useRef(new Animated.Value(0.75)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1,  duration: 500, useNativeDriver: true }),
+      Animated.spring(scale,   { toValue: 1,  damping: 14, stiffness: 180, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   return (
-    <View style={gaugeStyles.wrap}>
+    <Animated.View style={[gaugeStyles.wrap, { opacity, transform: [{ scale }] }]}>
       <Svg width={112} height={112} viewBox="0 0 112 112">
         {/* Track */}
         <Circle
@@ -111,10 +142,10 @@ function ScoreGauge({ score, color }: { score: number; color: string }) {
         />
       </Svg>
       <View style={gaugeStyles.center}>
-        <Text style={[gaugeStyles.number, { color }]}>{score}</Text>
+        <Text style={[gaugeStyles.number, { color }]}>{displayScore}</Text>
         <Text style={gaugeStyles.max}>/100</Text>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

@@ -143,16 +143,25 @@ export const INDEC_IPC: IndecMonthEntry[] = [
   },
   // ── 2026 ──────────────────────────────────────────────────────────────────
   {
-    year: 2026, month: 1, general: 2.3,
-    divisions: { food: 2.0,  restaurants: 2.7,  clothing: 2.8,  housing: 2.5,  equipment: 1.9,  health: 2.6,  transport: 2.9,  comms: 1.8,  recreation: 2.4,  education: 2.1,  misc: 2.4  },
+    // Fuente: INDEC — acumulado ene+feb = 5.9%, por tanto enero ≈ 2.9%
+    year: 2026, month: 1, general: 2.9,
+    divisions: { food: 2.8,  restaurants: 3.0,  clothing: 1.5,  housing: 5.5,  equipment: 2.2,  health: 2.7,  transport: 1.8,  comms: 1.9,  recreation: 2.5,  education: 1.8,  misc: 2.8  },
   },
   {
-    year: 2026, month: 2, general: 2.4,
-    divisions: { food: 2.1,  restaurants: 2.8,  clothing: 2.9,  housing: 2.6,  equipment: 2.0,  health: 2.7,  transport: 3.0,  comms: 1.9,  recreation: 2.5,  education: 2.2,  misc: 2.5  },
+    // Fuente: INDEC — IPC febrero 2026 = 2.9% (publicado 14/03/2026)
+    // housing 6.8% (tarifas gas/agua/luz), food 3.3%, transport -0.4%, clothing 0.0%
+    year: 2026, month: 2, general: 2.9,
+    divisions: { food: 3.3,  restaurants: 3.0,  clothing: 0.0,  housing: 6.8,  equipment: 2.5,  health: 2.8,  transport: -0.4, comms: 2.0,  recreation: 2.5,  education: 1.5,  misc: 3.3  },
+  },
+  {
+    // Fuente: INDEC — IPC marzo 2026 = 3.4% (publicado 14/04/2026)
+    // education 12.1% (inicio clases), transport 4.1% (combustibles + transporte público), núcleo 3.2%, regulados 5.1%
+    year: 2026, month: 3, general: 3.4,
+    divisions: { food: 3.0,  restaurants: 3.5,  clothing: 3.0,  housing: 3.8,  equipment: 2.8,  health: 3.1,  transport: 4.1,  comms: 2.5,  recreation: 3.0,  education: 12.1, misc: 3.0  },
   },
   // ACTUALIZAR: agregar meses siguientes cuando el INDEC los publique
   // Template:
-  // { year: 2026, month: 3, general: 0.0, divisions: { food: 0.0, restaurants: 0.0, clothing: 0.0, housing: 0.0, equipment: 0.0, health: 0.0, transport: 0.0, comms: 0.0, recreation: 0.0, education: 0.0, misc: 0.0 } },
+  // { year: 2026, month: 4, general: 0.0, divisions: { food: 0.0, restaurants: 0.0, clothing: 0.0, housing: 0.0, equipment: 0.0, health: 0.0, transport: 0.0, comms: 0.0, recreation: 0.0, education: 0.0, misc: 0.0 } },
 ];
 
 // ─── Abstracción de fuente de datos ───────────────────────────────────────────

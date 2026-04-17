@@ -140,7 +140,6 @@ const itemStyles = StyleSheet.create({
     borderWidth:   1,
     borderRadius:  12,
     padding:       spacing[3],
-    gap:           spacing[1],
     flexDirection: 'row',
     alignItems:    'center',
     gap:           spacing[2],

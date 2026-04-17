@@ -28,6 +28,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import type { DetectedSubscription } from '@/store/expensesStore';
 import { useRoundUpStore } from '@/store/roundUpStore';
 import { useStreakStore } from '@/store/streakStore';
+import { hapticMedium, hapticWarning, hapticSuccess } from '@/lib/haptics';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency, formatDate } from '@/utils/format';
 import type { PaymentMethod, Expense, ExpenseClassification } from '@/types';
@@ -680,9 +681,17 @@ export default function ExpensesScreen() {
       const classification = (savedExpense as any).classification ?? 'necessary';
       streakStore.recordExpense(data.date, classification as any);
 
+      // Haptic según clasificación
+      if (classification === 'disposable') {
+        hapticWarning();   // vibración de alerta — es prescindible
+      } else {
+        hapticMedium();    // confirmación estándar
+      }
+
       // Redondeo automático
       const roundedUp = await roundUpStore.recordExpense(finalAmount);
       if (roundedUp > 0) {
+        hapticSuccess();   // logro — acumulaste más ahorro
         const dest = roundUpStore.destination === 'fci' ? 'FCI Money Market' : 'Ahorro en efectivo';
         Alert.alert(
           '🪙 Redondeo automático',
@@ -1477,7 +1486,7 @@ function ExpenseItem({ expense, onPress }: { expense: Expense; onPress: () => vo
             {formatCurrency(expense.amount)}
           </Text>
           {expense.classification && (
-            <Badge classification={expense.classification} label={expense.classification} small />
+            <Badge classification={expense.classification} label={expense.classification} small animated />
           )}
         </View>
       </View>

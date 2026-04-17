@@ -18,6 +18,7 @@ import { colors, spacing, layout } from '@/theme';
 import { Text, Card, Input, Button } from '@/components/ui';
 import { useGoalsStore, type SavingsGoal } from '@/store/goalsStore';
 import { notifyGoalReached, notifyGoalHalfway } from '@/lib/notifications';
+import { hapticSuccess, hapticMedium, hapticLight } from '@/lib/haptics';
 import { formatCurrency } from '@/utils/format';
 
 const EMOJIS = ['🎯', '✈️', '🏠', '🚗', '💻', '📱', '🎓', '💍', '🏖️', '💪', '🎸', '🐾'];
@@ -82,9 +83,13 @@ export function GoalsSection({ userId, projectedMonthlyFree }: GoalsSectionProps
       const newPct = newAmount / goal.target_amount;
       await addToGoal(goal.id, amount);
       if (newPct >= 1) {
+        hapticSuccess();
         notifyGoalReached(goal.title).catch(() => {});
       } else if (prevPct < 0.5 && newPct >= 0.5) {
+        hapticMedium();
         notifyGoalHalfway(goal.title, goal.target_amount - newAmount).catch(() => {});
+      } else {
+        hapticLight();
       }
       setShowAddFundsModal(null);
       setAddFundsAmount('');
