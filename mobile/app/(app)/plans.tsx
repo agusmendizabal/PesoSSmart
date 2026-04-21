@@ -5,14 +5,17 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, layout } from '@/theme';
 import { Text, Card, Button } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { usePlanStore } from '@/store/planStore';
+import { supabase } from '@/lib/supabase';
 import { PLANS, type PlanId, formatMsgLimit } from '@/lib/plans';
 import { formatCurrency } from '@/utils/format';
 
@@ -68,11 +71,13 @@ function PlanCard({
   currentPlan,
   isTrialActive,
   onSelect,
+  isLoading = false,
 }: {
   planId: PlanId;
   currentPlan: PlanId;
   isTrialActive: boolean;
   onSelect: (id: PlanId) => void;
+  isLoading?: boolean;
 }) {
   const plan      = PLANS[planId];
   const isCurrent = planId === currentPlan;
@@ -140,13 +145,17 @@ function PlanCard({
           </View>
         ) : planId === 'free' ? null : (
           <TouchableOpacity
-            style={[cardStyles.cta, { backgroundColor: plan.color }]}
+            style={[cardStyles.cta, { backgroundColor: plan.color }, isLoading && { opacity: 0.7 }]}
             onPress={() => onSelect(planId)}
             activeOpacity={0.85}
+            disabled={isLoading}
           >
-            <Text style={[cardStyles.ctaText, { color: planId === 'premium' ? colors.white : colors.black }]}>
-              {plan.ctaLabel}
-            </Text>
+            {isLoading
+              ? <ActivityIndicator size="small" color={planId === 'premium' ? colors.white : colors.black} />
+              : <Text style={[cardStyles.ctaText, { color: planId === 'premium' ? colors.white : colors.black }]}>
+                  {plan.ctaLabel}
+                </Text>
+            }
           </TouchableOpacity>
         )}
       </View>
@@ -192,6 +201,7 @@ export default function PlansScreen() {
     msgCount,
     msgLimit,
   } = usePlanStore();
+  const [checkingOut, setCheckingOut] = useState<PlanId | null>(null);
 
   useEffect(() => {
     if (user?.id) load(user.id);
@@ -200,24 +210,45 @@ export default function PlansScreen() {
   const trialActive = isTrialActive();
   const daysLeft    = daysLeftInTrial();
 
-  const handleSelectPlan = (planId: PlanId) => {
+  const handleSelectPlan = async (planId: PlanId) => {
     if (planId === effectivePlan && !trialActive) return;
     if (planId === 'free') return;
+    if (!user?.id) return;
+    if (checkingOut) return;
 
-    // Placeholder para integración de pago
-    Alert.alert(
-      `Activar plan ${PLANS[planId].name}`,
-      `Vas a ser redirigido al proceso de pago (${PLANS[planId].priceLabel}).`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Continuar',
-          onPress: () => {
-            Alert.alert('Próximamente', 'La integración de pagos estará disponible muy pronto.');
-          },
-        },
-      ]
-    );
+    setCheckingOut(planId);
+    try {
+      // Crear preferencia de pago en MercadoPago
+      const { data, error } = await (supabase as any).functions.invoke('create-payment', {
+        body: { plan_id: planId },
+      });
+
+      if (error || !data?.init_point) {
+        Alert.alert('Error', 'No pudimos iniciar el pago. Intentá de nuevo.');
+        return;
+      }
+
+      // Abrir checkout de MercadoPago en browser embebido
+      const result = await WebBrowser.openAuthSessionAsync(
+        data.init_point,
+        'pesossmart://payment-success',
+      );
+
+      if (result.type === 'success') {
+        // El webhook de MP ya actualizó el plan en DB — recargar el store
+        await load(user.id);
+        Alert.alert(
+          '¡Listo!',
+          `Tu plan ${PLANS[planId].name} fue activado correctamente.`,
+          [{ text: 'Continuar', onPress: () => router.back() }],
+        );
+      }
+      // Si fue cancel/dismiss no hacemos nada (el webhook aún puede dispararse)
+    } catch (e) {
+      Alert.alert('Error', 'Ocurrió un problema al procesar el pago.');
+    } finally {
+      setCheckingOut(null);
+    }
   };
 
   return (
@@ -278,6 +309,7 @@ export default function PlansScreen() {
             currentPlan={effectivePlan}
             isTrialActive={trialActive}
             onSelect={handleSelectPlan}
+            isLoading={checkingOut === planId}
           />
         ))}
 

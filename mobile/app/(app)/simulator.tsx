@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -13,11 +13,12 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, layout } from '@/theme';
 import { Text, Card } from '@/components/ui';
+import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/utils/format';
 
-// ─── Tasas y configuración (valores 2026 Argentina) ───────────────────────────
+// ─── Tasas base (fallback si la DB no responde) ───────────────────────────────
 
-const MONTHLY_INFLATION = 0.030; // 3% TEM estimada
+const DEFAULT_INFLATION = 0.030;
 
 interface InstrumentDef {
   id:            string;
@@ -31,7 +32,7 @@ interface InstrumentDef {
   note:          string;
 }
 
-const INSTRUMENTS: InstrumentDef[] = [
+const BASE_INSTRUMENTS: InstrumentDef[] = [
   {
     id: 'fci_mm',    name: 'FCI Money Market', shortName: 'FCI MM',
     emoji: '💵',    color: colors.neon,
@@ -47,7 +48,7 @@ const INSTRUMENTS: InstrumentDef[] = [
   {
     id: 'pf_uva',    name: 'Plazo Fijo UVA',   shortName: 'PF UVA',
     emoji: '📈',    color: colors.accent,
-    tem: MONTHLY_INFLATION + 0.005,  // inflación + 0.5% real
+    tem: DEFAULT_INFLATION + 0.005,
     riskLevel: 'bajo', minMonths: 3,
     note: 'Ajusta por inflación (CER) + tasa real. Mínimo 90 días.',
   },
@@ -95,27 +96,59 @@ export default function SimulatorScreen() {
   const [selectedInstr,  setSelectedInstr]  = useState('fci_mm');
   const [selectedPeriod, setSelectedPeriod] = useState(12);
   const [showResult,     setShowResult]     = useState(false);
+  const [instruments,    setInstruments]    = useState<InstrumentDef[]>(BASE_INSTRUMENTS);
+  const [inflation,      setInflation]      = useState(DEFAULT_INFLATION);
+  const [ratesUpdatedAt, setRatesUpdatedAt] = useState<string | null>(null);
+
+  // Cargar tasas reales desde market_rates
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('market_rates')
+        .select('instrument, rate_monthly, updated_at');
+      if (!data?.length) return;
+
+      const rateMap: Record<string, number> = {};
+      let latestUpdate = '';
+      for (const row of data) {
+        rateMap[row.instrument] = row.rate_monthly / 100; // % → decimal
+        if (!latestUpdate || row.updated_at > latestUpdate) latestUpdate = row.updated_at;
+      }
+
+      setRatesUpdatedAt(latestUpdate ? new Date(latestUpdate).toLocaleDateString('es-AR') : null);
+      if (rateMap['inflation']) setInflation(rateMap['inflation']);
+
+      setInstruments(BASE_INSTRUMENTS.map(i => ({
+        ...i,
+        tem: rateMap[i.id] ?? i.tem,
+        // PF UVA siempre = inflación + 0.5% real
+        ...(i.id === 'pf_uva' && rateMap['inflation']
+          ? { tem: rateMap['inflation'] + 0.005 }
+          : {}),
+      })));
+    })();
+  }, []);
 
   const amount = useMemo(() => {
     const n = parseFloat(amountText.replace(/\./g, '').replace(',', '.'));
     return isNaN(n) || n <= 0 ? 0 : n;
   }, [amountText]);
 
-  const instr = INSTRUMENTS.find(i => i.id === selectedInstr) ?? INSTRUMENTS[0];
+  const instr = instruments.find(i => i.id === selectedInstr) ?? instruments[0];
 
   const result = useMemo(() => {
     if (amount <= 0) return null;
     const finalValue    = compound(amount, instr.tem, selectedPeriod);
-    const inflationEnd  = compound(amount, MONTHLY_INFLATION, selectedPeriod);
+    const inflationEnd  = compound(amount, inflation, selectedPeriod);
     const nominalReturn = finalValue - amount;
     const nominalPct    = (finalValue / amount - 1) * 100;
     const realPct       = ((finalValue / inflationEnd) - 1) * 100;
     return { finalValue, inflationEnd, nominalReturn, nominalPct, realPct };
-  }, [amount, instr, selectedPeriod]);
+  }, [amount, instr, selectedPeriod, inflation]);
 
   const comparison = useMemo(() => {
     if (amount <= 0) return [];
-    return INSTRUMENTS
+    return instruments
       .filter(i => i.minMonths <= selectedPeriod)
       .map(i => {
         const final  = compound(amount, i.tem, selectedPeriod);
@@ -123,11 +156,11 @@ export default function SimulatorScreen() {
         return { ...i, final, nomPct };
       })
       .sort((a, b) => b.final - a.final);
-  }, [amount, selectedPeriod]);
+  }, [amount, instruments, selectedPeriod]);
 
   const maxFinal    = comparison[0]?.final ?? 1;
-  const inflFinal   = compound(amount > 0 ? amount : 1, MONTHLY_INFLATION, selectedPeriod);
-  const inflPct     = (Math.pow(1 + MONTHLY_INFLATION, selectedPeriod) - 1) * 100;
+  const inflFinal   = compound(amount > 0 ? amount : 1, inflation, selectedPeriod);
+  const inflPct     = (Math.pow(1 + inflation, selectedPeriod) - 1) * 100;
   const instrBlocked = instr.minMonths > selectedPeriod;
 
   const handleAmountChange = (text: string) => {
@@ -179,9 +212,16 @@ export default function SimulatorScreen() {
 
           {/* ── Instrumento ───────────────────────────────────────────────── */}
           <View style={styles.section}>
-            <Text variant="label" color={colors.text.secondary}>INSTRUMENTO</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text variant="label" color={colors.text.secondary}>INSTRUMENTO</Text>
+              {ratesUpdatedAt && (
+                <Text variant="caption" color={colors.text.tertiary}>
+                  Tasas al {ratesUpdatedAt}
+                </Text>
+              )}
+            </View>
             <View style={styles.instrGrid}>
-              {INSTRUMENTS.map(i => (
+              {instruments.map(i => (
                 <TouchableOpacity
                   key={i.id}
                   style={[
@@ -296,7 +336,7 @@ export default function SimulatorScreen() {
                   </View>
                   <View style={styles.detailRow}>
                     <Text variant="caption" color={colors.text.secondary}>
-                      Inflación estimada ({Math.round(MONTHLY_INFLATION * 100)}%/mes)
+                      Inflación estimada ({inflation.toFixed(1)}%/mes)
                     </Text>
                     <Text variant="caption" color={colors.text.tertiary}>
                       {formatCurrency(Math.round(result.inflationEnd))}
