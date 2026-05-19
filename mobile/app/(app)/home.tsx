@@ -2868,76 +2868,97 @@ export default function HomeScreen() {
           />
         )}
 
-        {/* ── ACTIVIDAD RECIENTE + OPORTUNIDAD ────────────────────────────────── */}
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          {/* Actividad reciente */}
-          <View style={[nStyles.bottomCard, { flex: 1.1 }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <Text style={nStyles.bottomCardTitle}>Actividad reciente</Text>
-              <TouchableOpacity onPress={() => router.push('/(app)/expenses' as any)}>
-                <Text style={nStyles.bottomCardLink}>Ver todo</Text>
-              </TouchableOpacity>
-            </View>
-            {expenses.slice(0, 3).map((exp, idx) => {
+        {/* ── ACTIVIDAD RECIENTE ───────────────────────────────────────────────── */}
+        <View style={nStyles.recentCard}>
+          <View style={nStyles.recentHeader}>
+            <Text style={nStyles.recentTitle}>Actividad reciente</Text>
+            <TouchableOpacity onPress={() => router.push('/(app)/expenses' as any)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={nStyles.recentLink}>Ver todo →</Text>
+            </TouchableOpacity>
+          </View>
+          {expenses.length === 0 ? (
+            <Text style={nStyles.recentEmpty}>Aún no hay gastos registrados</Text>
+          ) : (
+            expenses.slice(0, 2).map((exp, idx) => {
               const catName  = (exp as any).category?.name_es ?? 'Sin categoría';
+              const catColor = (exp as any).category?.color ?? '#9CA3AF';
               const isDisp   = exp.classification === 'disposable';
               const isNecess = exp.classification === 'necessary';
               const tagColor = isDisp ? '#EF4444' : isNecess ? '#3B82F6' : '#9CA3AF';
               const tagLabel = isDisp ? 'Prescindible' : isNecess ? 'Necesario' : 'Sin clasificar';
+              const merchant = exp.merchant || catName;
               return (
                 <View key={exp.id}>
-                  {idx > 0 && <View style={nStyles.activityDivider} />}
-                  <View style={nStyles.activityRow}>
-                    <View style={[nStyles.activityIcon, { backgroundColor: ((exp as any).category?.color ?? '#6B7280') + '18' }]}>
-                      <Ionicons name="receipt-outline" size={15} color={(exp as any).category?.color ?? '#6B7280'} />
+                  {idx > 0 && <View style={nStyles.recentDivider} />}
+                  <View style={nStyles.recentRow}>
+                    <View style={[nStyles.recentIcon, { backgroundColor: catColor + '15' }]}>
+                      <Ionicons name="receipt-outline" size={16} color={catColor} />
                     </View>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={nStyles.activityMerchant} numberOfLines={1}>{exp.merchant || catName}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Text style={nStyles.activityCat} numberOfLines={1}>{catName}</Text>
-                        <Text style={{ fontSize: 8, color: '#D1D5DB' }}>·</Text>
-                        <Text style={[nStyles.activityTag, { color: tagColor }]}>{tagLabel}</Text>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <Text style={nStyles.recentMerchant} numberOfLines={1}>{merchant}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={[nStyles.recentTagDot, { backgroundColor: tagColor }]} />
+                        <Text style={[nStyles.recentTag, { color: tagColor }]}>{tagLabel}</Text>
+                        <Text style={nStyles.recentCat} numberOfLines={1}>· {catName}</Text>
                       </View>
                     </View>
-                    <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                      <Text style={nStyles.activityAmount}>-{formatCurrency(exp.amount)}</Text>
-                      <Text style={nStyles.activityDate}>{exp.date.slice(5).replace('-', '/')}</Text>
+                    <View style={{ alignItems: 'flex-end', gap: 3 }}>
+                      <Text style={nStyles.recentAmount}>-{formatCurrency(exp.amount)}</Text>
+                      <Text style={nStyles.recentDate}>{exp.date.slice(5).replace('-', '/')}</Text>
                     </View>
                   </View>
                 </View>
               );
-            })}
-            {expenses.length === 0 && (
-              <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: 12 }}>
-                Aún no hay gastos
-              </Text>
-            )}
-          </View>
+            })
+          )}
+        </View>
 
-          {/* Oportunidad para vos */}
+        {/* ── OPORTUNIDAD PARA VOS ─────────────────────────────────────────────── */}
+        {totalDisposable > 0 && (
           <TouchableOpacity
-            style={[nStyles.bottomCard, { flex: 0.9, backgroundColor: '#FFF7ED' }]}
+            style={nStyles.oppCard}
             onPress={() => router.push('/(app)/simulator' as any)}
             activeOpacity={0.88}
           >
-            <View style={nStyles.oppIconWrap}>
-              <Text style={{ fontSize: 20 }}>💡</Text>
+            {/* Header */}
+            <View style={nStyles.oppHeader}>
+              <View style={nStyles.oppIconCircle}>
+                <Text style={{ fontSize: 22 }}>💡</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={nStyles.oppLabel}>OPORTUNIDAD</Text>
+                <Text style={nStyles.oppTitle2}>Oportunidad para vos</Text>
+              </View>
             </View>
-            <Text style={nStyles.oppTitle}>Oportunidad para vos</Text>
-            {totalDisposable > 0 ? (
-              <Text style={nStyles.oppBody}>
-                Si invertías tus gastos prescindibles de este mes ({formatCurrency(totalDisposable)}), en 12 meses podrías tener {formatCurrency(investedIn12m)}.
-              </Text>
-            ) : (
-              <Text style={nStyles.oppBody}>
-                Registrá tus gastos para ver tu oportunidad de inversión mensual.
-              </Text>
-            )}
-            <View style={nStyles.oppBtn}>
-              <Text style={nStyles.oppBtnText}>Ver simulación →</Text>
+
+            {/* Body */}
+            <Text style={nStyles.oppBody2}>
+              Si invertís tus gastos prescindibles de este mes, podrías generar{' '}
+              <Text style={nStyles.oppHighlight}>{formatCurrency(investedIn12m)}</Text>
+              {' '}en 12 meses.
+            </Text>
+
+            {/* Mini growth bar */}
+            <View style={nStyles.oppGrowthWrap}>
+              <View style={nStyles.oppGrowthTrack}>
+                <View style={[nStyles.oppGrowthFill, { width: '72%' }]} />
+              </View>
+              <View style={nStyles.oppGrowthLabels}>
+                <Text style={nStyles.oppGrowthStart}>{formatCurrency(totalDisposable)}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="trending-up" size={12} color="#16A34A" />
+                  <Text style={nStyles.oppGrowthEnd}>{formatCurrency(investedIn12m)}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* CTA */}
+            <View style={nStyles.oppCta}>
+              <Text style={nStyles.oppCtaText}>Ver simulación</Text>
+              <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
             </View>
           </TouchableOpacity>
-        </View>
+        )}
 
         {/* ── QUICKSTART ──────────────────────────────────────────────────────── */}
         {showQuickStart && expenses.length === 0 && (
@@ -3196,30 +3217,66 @@ const nStyles = StyleSheet.create({
   healthSub:        { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9CA3AF', lineHeight: 16 },
   healthTrendText:  { fontFamily: 'Montserrat_700Bold', fontSize: 14 },
 
-  // Bottom cards
-  bottomCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16,
+  // Actividad reciente (full-width)
+  recentCard: {
+    backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
   },
+  recentHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  recentTitle:    { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#1A1A1A' },
+  recentLink:     { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#22C55E' },
+  recentEmpty:    { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#9CA3AF', textAlign: 'center', paddingVertical: 12 },
+  recentDivider:  { height: 1, backgroundColor: '#F3F4F6', marginVertical: 12 },
+  recentRow:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  recentIcon:     { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  recentMerchant: { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: '#1A1A1A' },
+  recentTagDot:   { width: 6, height: 6, borderRadius: 3 },
+  recentTag:      { fontFamily: 'Montserrat_600SemiBold', fontSize: 11 },
+  recentCat:      { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9CA3AF', flex: 1 },
+  recentAmount:   { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#1A1A1A' },
+  recentDate:     { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9CA3AF' },
+
+  // Oportunidad para vos (full-width premium)
+  oppCard: {
+    backgroundColor: '#FFFBEB', borderRadius: 24, padding: 24,
+    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 4,
+    borderWidth: 1, borderColor: '#FDE68A',
+  },
+  oppHeader:      { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  oppIconCircle:  { width: 52, height: 52, borderRadius: 26, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  oppLabel:       { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: '#D97706', letterSpacing: 0.8, marginBottom: 2 },
+  oppTitle2:      { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: '#1A1A1A', letterSpacing: -0.3 },
+  oppBody2:       { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#374151', lineHeight: 21, marginBottom: 20 },
+  oppHighlight:   { fontFamily: 'Montserrat_700Bold', color: '#16A34A' },
+  oppGrowthWrap:  { marginBottom: 20, gap: 8 },
+  oppGrowthTrack: { height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' },
+  oppGrowthFill:  { height: 8, backgroundColor: '#22C55E', borderRadius: 4 },
+  oppGrowthLabels:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  oppGrowthStart: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9CA3AF' },
+  oppGrowthEnd:   { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: '#16A34A' },
+  oppCta: {
+    backgroundColor: '#1A1A1A', borderRadius: 14, paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+  },
+  oppCtaText:     { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#FFFFFF' },
+
+  // legacy (keep for any remaining refs)
+  bottomCard:      { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16 },
   bottomCardTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#1A1A1A' },
   bottomCardLink:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#22C55E' },
-
-  // Activity rows
-  activityRow:      { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  activityDivider:  { height: 1, backgroundColor: '#F3F4F6' },
-  activityIcon:     { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  activityMerchant: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#1A1A1A' },
-  activityCat:      { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#9CA3AF' },
-  activityTag:      { fontFamily: 'Montserrat_600SemiBold', fontSize: 10 },
-  activityAmount:   { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: '#1A1A1A' },
-  activityDate:     { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#9CA3AF' },
-
-  // Opportunity card
-  oppIconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  oppTitle:    { fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#1A1A1A', marginBottom: 4 },
-  oppBody:     { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6B7280', lineHeight: 16, flex: 1 },
-  oppBtn:      { backgroundColor: '#F59E0B', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start', marginTop: 8 },
-  oppBtnText:  { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: '#FFFFFF' },
+  activityRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  activityDivider: { height: 1, backgroundColor: '#F3F4F6' },
+  activityIcon:    { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  activityMerchant:{ fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#1A1A1A' },
+  activityCat:     { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#9CA3AF' },
+  activityTag:     { fontFamily: 'Montserrat_600SemiBold', fontSize: 10 },
+  activityAmount:  { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: '#1A1A1A' },
+  activityDate:    { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#9CA3AF' },
+  oppIconWrap:     { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' },
+  oppTitle:        { fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#1A1A1A' },
+  oppBody:         { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6B7280', lineHeight: 16 },
+  oppBtn:          { backgroundColor: '#F59E0B', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start' },
+  oppBtnText:      { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: '#FFFFFF' },
 
   // Income modal
   incomeOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
