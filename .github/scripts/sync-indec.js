@@ -24,6 +24,7 @@ const REGIONAL_WEIGHTS = {
 
 // Mapeo de categorías INDEC → instrument en market_rates
 const CATEGORY_MAP = {
+  'Nivel general':                      'inflation_general',
   'Alimentos y bebidas no alcohólicas': 'inflation_food',
   'Bebidas alcohólicas y tabaco':       null, // no mapeado
   'Prendas de vestir y calzado':        'inflation_clothing',
@@ -39,6 +40,7 @@ const CATEGORY_MAP = {
 
 // Labels legibles para la UI
 const LABELS = {
+  inflation_general:     'IPC Nivel general',
   inflation_food:        'IPC Alimentos y bebidas',
   inflation_clothing:    'IPC Indumentaria',
   inflation_housing:     'IPC Vivienda y servicios',
@@ -105,6 +107,8 @@ function parseXls(buffer) {
   // Acumular variaciones por categoría y región
   // Estructura: categoryData[instrument][region] = variación mensual %
   const categoryData = {};
+  // Nivel general nacional (fila sin región, aparece una sola vez antes de las regiones)
+  const nationalDirect = {};
 
   let currentRegion = null;
   for (const row of rows.slice(headerRowIdx + 1)) {
@@ -118,10 +122,18 @@ function parseXls(buffer) {
     );
     if (matchedRegion) { currentRegion = matchedRegion; continue; }
 
-    if (!currentRegion) continue;
+    // Antes de la primera región: capturar "Nivel general" directo
+    if (!currentRegion) {
+      if (trimmed.toLowerCase().includes('nivel general')) {
+        const val = row[lastDateCol];
+        if (typeof val === 'number') nationalDirect['inflation_general'] = val;
+      }
+      continue;
+    }
 
     // Detectar si es fila de categoría
     const instrument = Object.entries(CATEGORY_MAP).find(([cat]) =>
+      cat !== 'Nivel general' &&
       trimmed.toLowerCase().includes(cat.toLowerCase().split(' ')[0])
     );
     if (!instrument || !instrument[1]) continue;
@@ -134,8 +146,8 @@ function parseXls(buffer) {
     categoryData[instr][currentRegion] = val;
   }
 
-  // Calcular promedios ponderados nacionales
-  const result = {};
+  // Calcular promedios ponderados nacionales por categoría
+  const result = { ...nationalDirect };
   for (const [instr, byRegion] of Object.entries(categoryData)) {
     let totalWeight = 0;
     let weightedSum = 0;

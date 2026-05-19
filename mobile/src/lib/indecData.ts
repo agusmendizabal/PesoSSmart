@@ -160,9 +160,9 @@ export const INDEC_IPC: IndecMonthEntry[] = [
     divisions: { food: 3.0,  restaurants: 3.5,  clothing: 3.0,  housing: 3.8,  equipment: 2.8,  health: 3.1,  transport: 4.1,  comms: 2.5,  recreation: 3.0,  education: 12.1, misc: 3.0  },
   },
   {
-    // Estimado abril 2026 — INDEC aún no publicó (se publica ~15/05/2026). Dato: market_rates.
-    year: 2026, month: 4, general: 3.4,
-    divisions: { food: 3.2, restaurants: 3.6, clothing: 3.1, housing: 3.5, equipment: 2.9, health: 3.2, transport: 3.8, comms: 2.4, recreation: 3.1, education: 2.0, misc: 3.0 },
+    // Fuente: INDEC — IPC abril 2026 = 2.8% (publicado 15/05/2026)
+    year: 2026, month: 4, general: 2.8,
+    divisions: { food: 1.77, restaurants: 3.08, clothing: 2.36, housing: 2.93, equipment: 2.64, health: 2.21, transport: 2.15, comms: 4.01, recreation: 0.79, education: 2.84, misc: 2.8 },
   },
   // ACTUALIZAR: agregar meses siguientes cuando el INDEC los publique
 ];
