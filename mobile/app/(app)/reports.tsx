@@ -424,8 +424,8 @@ export default function ReportsScreen() {
   const [total,    setTotal]    = useState(0);
   const [history,  setHistory]  = useState<MonthSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [inflationRate, setInflationRate] = useState(3.4);
-  const [fciRate,       setFciRate]       = useState(3.0);
+  const [inflationRate, setInflationRate] = useState(0);
+  const [fciRate,       setFciRate]       = useState(0);
   const [allRates,      setAllRates]      = useState<Record<string, number>>({});
   const [pastOppData,   setPastOppData]   = useState<{ monthKey: string; disposable: number; categories: Record<string, number> }[]>([]);
 

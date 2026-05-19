@@ -156,9 +156,10 @@ export const INSTRUMENTS: Record<InstrumentId, Instrument> = {
       '2025-10':  2.5,
       '2025-11':  2.1,
       '2025-12':  2.4,
-      '2026-01':  2.0,
-      '2026-02':  2.1,
-      '2026-03':  2.1,
+      '2026-01':  2.6,
+      '2026-02':  2.6,
+      '2026-03':  3.1,
+      '2026-04':  2.5,
       // ACTUALIZAR: inflación mensual INDEC − 0.3%
     },
   },

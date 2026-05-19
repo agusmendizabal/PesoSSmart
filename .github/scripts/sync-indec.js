@@ -24,7 +24,7 @@ const REGIONAL_WEIGHTS = {
 
 // Mapeo de categorías INDEC → instrument en market_rates
 const CATEGORY_MAP = {
-  'Nivel general':                      'inflation_general',
+  'Nivel general':                      'inflation',
   'Alimentos y bebidas no alcohólicas': 'inflation_food',
   'Bebidas alcohólicas y tabaco':       null, // no mapeado
   'Prendas de vestir y calzado':        'inflation_clothing',
@@ -40,7 +40,7 @@ const CATEGORY_MAP = {
 
 // Labels legibles para la UI
 const LABELS = {
-  inflation_general:     'IPC Nivel general',
+  inflation:             'IPC Nivel general',
   inflation_food:        'IPC Alimentos y bebidas',
   inflation_clothing:    'IPC Indumentaria',
   inflation_housing:     'IPC Vivienda y servicios',
@@ -126,7 +126,7 @@ function parseXls(buffer) {
     if (!currentRegion) {
       if (trimmed.toLowerCase().includes('nivel general')) {
         const val = row[lastDateCol];
-        if (typeof val === 'number') nationalDirect['inflation_general'] = val;
+        if (typeof val === 'number') nationalDirect['inflation'] = val;
       }
       continue;
     }

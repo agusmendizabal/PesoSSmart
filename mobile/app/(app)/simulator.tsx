@@ -18,7 +18,7 @@ import { formatCurrency } from '@/utils/format';
 
 // ─── Tasas base (fallback si la DB no responde) ───────────────────────────────
 
-const DEFAULT_INFLATION = 0.030;
+const DEFAULT_INFLATION = 0.028;
 
 interface InstrumentDef {
   id:            string;

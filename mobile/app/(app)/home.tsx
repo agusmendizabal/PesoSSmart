@@ -2261,7 +2261,7 @@ export default function HomeScreen() {
   const { investments, fetchAll: loadSavings } = useSavingsStore();
   const streakStore  = useStreakStore();
   const roundUpStore = useRoundUpStore();
-  const [inflationRate,  setInflationRate]  = useState(3.4);
+  const [inflationRate,  setInflationRate]  = useState(0);
   const [gmailConnected, setGmailConnected] = useState(false);
   const [showQuickStart, setShowQuickStart] = useState(false);
   const [pendingCount,   setPendingCount]   = useState(0);
@@ -2276,7 +2276,7 @@ export default function HomeScreen() {
   const [prevMonthCats,     setPrevMonthCats]     = useState<Record<string, { name: string; amount: number }>>({});
   const [prevMonthTotal,    setPrevMonthTotal]    = useState(0);
   const [threeMonthAvgCats, setThreeMonthAvgCats] = useState<Record<string, number>>({});
-  const [fciRate,           setFciRate]           = useState(3.2);
+  const [fciRate,           setFciRate]           = useState(0);
   const [homeBudgets,       setHomeBudgets]       = useState<Array<{ id: string; category_id: string; monthly_limit: number }> | null>(null);
 
   const _now         = new Date();

@@ -1303,7 +1303,7 @@ export default function ExpensesScreen() {
   const [reportTotal,     setReportTotal]     = useState(0);
   const [history,         setHistory]         = useState<MonthSummary[]>([]);
   const [isReportLoading, setIsReportLoading] = useState(false);
-  const [inflationRate,   setInflationRate]   = useState(3.4);
+  const [inflationRate,   setInflationRate]   = useState(0);
   const [pastOppData,     setPastOppData]     = useState<{ monthKey: string; disposable: number; categories: Record<string, number> }[]>([]);
 
   useEffect(() => {
