@@ -2624,26 +2624,11 @@ export default function HomeScreen() {
     ? Math.round(totalDisposable * 12 * 1.03)
     : 0;
 
-  // ── Health score ─────────────────────────────────────────────────────────────
-  const totalInvested   = investments.reduce((sum, inv) => sum + inv.amount, 0);
-  const investmentTypes = new Set(investments.map(inv => inv.instrument_type)).size;
-  const healthScore = computeHealthScore({
-    totalThisMonth, totalDisposable, totalInvested, investmentTypes,
-    hasSavings: totalInvested > 0,
-    weekStreak: streakStore.weekStreak,
-    noDisposableStreak: streakStore.noDisposableStreak,
-    goals,
-  });
   const healthLabel  = healthScore >= 85 ? 'Excelente' : healthScore >= 70 ? 'Estable' : healthScore >= 50 ? 'Mejorable' : 'Atención';
   const healthColor  = healthScore >= 85 ? '#22C55E' : healthScore >= 70 ? '#22C55E' : healthScore >= 50 ? '#F59E0B' : '#EF4444';
   const prevPct      = prevMonthTotal > 0 && totalThisMonth > 0
     ? Math.round(((totalThisMonth - prevMonthTotal) / prevMonthTotal) * 100)
     : null;
-
-  // ── Highlights for banner ────────────────────────────────────────────────────
-  const highlights = buildHomeHighlights({
-    totalThisMonth, totalDisposable, totalInvestable, estimatedIncome, expenses, goals, threeMonthAvgCats,
-  });
 
   return (
     <SafeAreaView style={nStyles.safe} edges={['top']}>
