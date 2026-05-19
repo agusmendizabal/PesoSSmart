@@ -2679,16 +2679,6 @@ export default function HomeScreen() {
               onPress={() => router.push('/(app)/advisor' as any)}
               activeOpacity={0.75}
             >
-              <Ionicons name="notifications-outline" size={20} color="#1A1A1A" />
-            </TouchableOpacity>
-            <View style={nStyles.robotAvatar}>
-              <Text style={{ fontSize: 22 }}>🤖</Text>
-            </View>
-            <TouchableOpacity
-              style={nStyles.headerIconBtn}
-              onPress={() => router.push('/(app)/advisor' as any)}
-              activeOpacity={0.75}
-            >
               <Ionicons name="chatbubble-ellipses-outline" size={20} color="#1A1A1A" />
             </TouchableOpacity>
           </View>
