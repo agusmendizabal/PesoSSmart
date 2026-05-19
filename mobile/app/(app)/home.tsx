@@ -1135,6 +1135,7 @@ interface HomeHighlight {
   subtitle:  string;
   icon:      string;
   iconColor: string;
+  bg?:       string;
   cta?:      { label: string; route: string };
 }
 
@@ -1146,6 +1147,7 @@ function buildHomeHighlights({
   expenses,
   goals,
   threeMonthAvgCats,
+  pendingCount = 0,
 }: {
   totalThisMonth:    number;
   totalDisposable:   number;
@@ -1154,8 +1156,24 @@ function buildHomeHighlights({
   expenses:          Expense[];
   goals:             SavingsGoal[];
   threeMonthAvgCats: Record<string, number>;
+  pendingCount?:     number;
 }): HomeHighlight[] {
   const items: HomeHighlight[] = [];
+
+  // 0. Gastos sin clasificar (siempre primero si existen)
+  if (pendingCount > 0) {
+    items.push({
+      id: 'pending_classify',
+      tag: 'ACCIÓN REQUERIDA',
+      tagColor: '#FCD34D',
+      title: `${pendingCount} gasto${pendingCount > 1 ? 's' : ''} sin clasificar`,
+      subtitle: 'Ya están cargados. Solo falta elegir la categoría para que contabilicen bien.',
+      icon: 'time-outline',
+      iconColor: '#FCD34D',
+      bg: '#92400E',
+      cta: { label: 'Clasificar ahora', route: '/(app)/expenses' },
+    });
+  }
 
   // 1. Income status
   if (estimatedIncome && estimatedIncome > 0 && totalThisMonth > 0) {
@@ -2437,6 +2455,7 @@ export default function HomeScreen() {
     expenses,
     goals,
     threeMonthAvgCats,
+    pendingCount,
   });
 
   const keyInsights = buildKeyInsights({
@@ -2677,11 +2696,6 @@ export default function HomeScreen() {
 
         {/* ── SKELETON ────────────────────────────────────────────────────────── */}
         {isLoading && expenses.length === 0 && <HomeSkeletonLoader />}
-
-        {/* ── PENDING BANNER ──────────────────────────────────────────────────── */}
-        {pendingCount > 0 && (
-          <GmailPendingBanner count={pendingCount} onPress={() => router.push('/(app)/expenses' as any)} />
-        )}
 
         {/* ── AI BANNER CAROUSEL ──────────────────────────────────────────────── */}
         <PremiumBannerCarousel highlights={highlights} />
@@ -3061,7 +3075,7 @@ function PremiumBannerCarousel({ highlights }: { highlights: HomeHighlight[] }) 
         {highlights.map((h, i) => (
           <TouchableOpacity
             key={h.id}
-            style={[bannerS.slide, { width: W }]}
+            style={[bannerS.slide, { width: W }, h.bg ? { backgroundColor: h.bg, shadowColor: h.bg } : null]}
             onPress={h.cta ? () => router.push(h.cta!.route as any) : undefined}
             activeOpacity={0.92}
           >
