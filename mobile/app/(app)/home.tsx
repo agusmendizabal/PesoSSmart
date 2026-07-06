@@ -2649,6 +2649,7 @@ export default function HomeScreen() {
     ? Math.round(((totalThisMonth - prevMonthTotal) / prevMonthTotal) * 100)
     : null;
 
+
   return (
     <SafeAreaView style={nStyles.safe} edges={['top']}>
       <ScrollView
