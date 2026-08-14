@@ -21,10 +21,12 @@ import { Text } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/utils/format';
 import { getLatestIndecEntry } from '@/lib/indecData';
+import { applySectorReturns } from '@/lib/investmentData';
 import { deriveHorizon, type UserInvestmentProfile, type ConfidenceLevel } from '@/lib/investmentRecommendation';
 import { buildOpportunityInsights, type OpportunityInsights, type WhatIfResult, type CategoryOpportunity, type SavingsOpportunity } from '@/utils/opportunityCost';
 import { RecommendationComparison } from './RecommendationComparison';
 import { SavingsSimulator } from './SavingsSimulator';
+import { InstrumentInfoSheet } from './InstrumentInfoSheet';
 import type { RiskProfile } from '@/types';
 
 // ─── Constantes estables para SavingsSimulator (evitan re-renders infinitos) ──
@@ -82,15 +84,24 @@ function WhatIfRow({ result, uiLabel, uiColor }: { result: WhatIfResult; uiLabel
   const rColor    = RISK_COLOR[result.instrument.riskLevel];
   const rBg       = RISK_BG[result.instrument.riskLevel];
   const gainColor = result.isLoss ? colors.red : colors.primary;
+  const tutorial  = result.instrument.tutorial;
+  const [infoOpen, setInfoOpen] = useState(false);
 
   return (
     <View style={wifStyles.container}>
       {/* Header: instrumento + badges */}
       <View style={wifStyles.header}>
         <View style={{ flex: 1 }}>
-          <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }} numberOfLines={1}>
-            {result.instrument.name}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }} numberOfLines={1}>
+              {result.instrument.name}
+            </Text>
+            {tutorial && (
+              <TouchableOpacity onPress={() => setInfoOpen(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="information-circle-outline" size={15} color={colors.text.tertiary} />
+              </TouchableOpacity>
+            )}
+          </View>
           <Text variant="caption" color={colors.text.tertiary}>
             {result.instrument.description}
           </Text>
@@ -154,6 +165,15 @@ function WhatIfRow({ result, uiLabel, uiColor }: { result: WhatIfResult; uiLabel
       <Text variant="caption" color={colors.text.tertiary} style={{ lineHeight: 16 }}>
         {result.interpretation}
       </Text>
+
+      {tutorial && (
+        <InstrumentInfoSheet
+          visible={infoOpen}
+          name={result.instrument.name}
+          tutorial={tutorial}
+          onDismiss={() => setInfoOpen(false)}
+        />
+      )}
     </View>
   );
 }
@@ -529,7 +549,7 @@ async function fetchAllData(userId: string, monthsBack: number): Promise<Fetched
   const to       = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}-${lastDay}`;
 
   // risk_profiles corre separado para que un fallo no cancele todo el fetch
-  const [expensesRes, interestsRes, profileRes] = await Promise.all([
+  const [expensesRes, interestsRes, profileRes, sectorRatesRes] = await Promise.all([
     supabase
       .from('expenses')
       .select('amount, expense_categories ( name_es, color )')
@@ -548,7 +568,21 @@ async function fetchAllData(userId: string, monthsBack: number): Promise<Fetched
       .select('savings_amount')
       .eq('user_id', userId)
       .maybeSingle(),
+
+    // Retorno real del último mes cerrado para cada CEDEAR/acción de rubro,
+    // sincronizado mensualmente por la edge function cedear-sync. Sin esto,
+    // el "último mes" de las recomendaciones quedaría con el valor cargado
+    // a mano la última vez que se tocó el código.
+    (supabase as any)
+      .from('market_rates')
+      .select('instrument, rate_monthly')
+      .like('instrument', 'sector_%'),
   ]);
+
+  const toMonthKey = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}`;
+  if (sectorRatesRes.data?.length) {
+    applySectorReturns(sectorRatesRes.data, toMonthKey);
+  }
 
   const riskRes = await supabase
     .from('risk_profiles')

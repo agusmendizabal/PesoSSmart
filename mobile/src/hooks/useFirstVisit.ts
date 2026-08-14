@@ -3,6 +3,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PREFIX = '@smartpesos/visited_';
 
+/** Borra el flag de "ya visitado" de una pantalla para que su tour vuelva a mostrarse. */
+export function resetFirstVisit(key: string): Promise<void> {
+  return AsyncStorage.removeItem(PREFIX + key);
+}
+
 export function useFirstVisit(key: string) {
   const [isFirstVisit, setIsFirstVisit] = useState(false);
   const [ready,        setReady]        = useState(false);

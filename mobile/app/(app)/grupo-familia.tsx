@@ -23,6 +23,8 @@ import { colors, spacing, layout } from '@/theme';
 import { Text, Card, Button } from '@/components/ui';
 import { usePlanStore } from '@/store/planStore';
 import { supabase } from '@/lib/supabase';
+import { useFirstVisit } from '@/hooks/useFirstVisit';
+import { FirstVisitSheet } from '@/components/FirstVisitSheet';
 import { formatCurrency } from '@/utils/format';
 import type { GroupType, MemberRole, GroupTransfer, FamilyMember } from '@/types/database';
 
@@ -1079,6 +1081,7 @@ export default function GrupoFamiliaScreen() {
   const [showJoin, setShowJoin] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const { isFirstVisit, markVisited } = useFirstVisit('grupo-familia');
 
   useEffect(() => {
     if (user?.id) {
@@ -1213,6 +1216,19 @@ export default function GrupoFamiliaScreen() {
           setShowTransfer(false);
           setActiveTab('movimientos');
         }}
+      />
+
+      <FirstVisitSheet
+        visible={isFirstVisit}
+        screenTitle="Grupo Familia"
+        screenIcon="people-outline"
+        iconColor={colors.primary}
+        features={[
+          { icon: 'people-circle-outline', color: colors.primary, title: 'Roles por miembro', body: 'Cada integrante tiene un rol (padre/madre, pareja, hijo, tutor) que define qué puede ver y hacer dentro del grupo.' },
+          { icon: 'swap-horizontal-outline', color: colors.neon, title: 'Transferencias internas', body: 'Enviá dinero entre miembros del grupo y quedan registradas en Movimientos, para tener todo el historial a mano.' },
+          { icon: 'settings-outline', color: colors.yellow, title: 'Configuración del grupo', body: 'Desde la pestaña Config podés invitar gente con un código, salir del grupo o ajustar permisos.' },
+        ]}
+        onDismiss={markVisited}
       />
     </SafeAreaView>
   );

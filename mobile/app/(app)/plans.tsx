@@ -18,6 +18,8 @@ import { usePlanStore } from '@/store/planStore';
 import { supabase } from '@/lib/supabase';
 import { PLANS, type PlanId, formatMsgLimit } from '@/lib/plans';
 import { formatCurrency } from '@/utils/format';
+import { useFirstVisit } from '@/hooks/useFirstVisit';
+import { FirstVisitSheet } from '@/components/FirstVisitSheet';
 
 // ─── Feature rows para comparación ───────────────────────────────────────────
 
@@ -202,6 +204,7 @@ export default function PlansScreen() {
     msgLimit,
   } = usePlanStore();
   const [checkingOut, setCheckingOut] = useState<PlanId | null>(null);
+  const { isFirstVisit, markVisited } = useFirstVisit('plans');
 
   useEffect(() => {
     if (user?.id) load(user.id);
@@ -350,6 +353,19 @@ export default function PlansScreen() {
         </Text>
 
       </ScrollView>
+
+      <FirstVisitSheet
+        visible={isFirstVisit}
+        screenTitle="Tu plan"
+        screenIcon="star-outline"
+        iconColor={colors.neon}
+        features={[
+          { icon: 'gift-outline', color: colors.neon, title: 'Trial gratis al empezar', body: 'Los usuarios nuevos arrancan con un período de prueba del plan más completo, sin cargo.' },
+          { icon: 'apps-outline', color: colors.primary, title: 'Tres planes, distinto alcance', body: 'Free, Pro y Premium se diferencian en cuánto podés usar cada función — comparalos en la tabla de abajo.' },
+          { icon: 'card-outline', color: colors.yellow, title: 'Cambiás cuando quieras', body: 'Podés subir o bajar de plan, o cancelar la suscripción, en cualquier momento desde acá.' },
+        ]}
+        onDismiss={markVisited}
+      />
     </SafeAreaView>
   );
 }

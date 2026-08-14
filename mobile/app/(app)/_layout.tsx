@@ -95,6 +95,7 @@ export default function AppLayout() {
       <Tabs.Screen name="savings-opportunities"  options={{ href: null }} />
       <Tabs.Screen name="savings-goal"           options={{ href: null }} />
       <Tabs.Screen name="smart-alerts"           options={{ href: null }} />
+      <Tabs.Screen name="help"                   options={{ href: null }} />
     </Tabs>
   );
 }

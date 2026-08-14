@@ -197,6 +197,9 @@ function buildUiLabel(
   if (inst.id === 'crypto_btc') {
     return { uiLabel: 'Alta volatilidad', uiColor: '#f0b429' };
   }
+  if (inst.tutorial) {
+    return { uiLabel: 'Tu rubro', uiColor: '#1976D2' };
+  }
   return { uiLabel: inst.riskLabel, uiColor: '#888' };
 }
 

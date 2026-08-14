@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "tsc src/lib/recurringExpenses.ts src/lib/recurringExpenses.test.ts --outDir .test-out --module commonjs --target es2020 --esModuleInterop --skipLibCheck && node --test .test-out/recurringExpenses.test.js"
   },
   "dependencies": {
     "@expo-google-fonts/bebas-neue": "^0.4.1",

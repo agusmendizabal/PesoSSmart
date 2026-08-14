@@ -160,11 +160,28 @@ export const INDEC_IPC: IndecMonthEntry[] = [
     divisions: { food: 3.0,  restaurants: 3.5,  clothing: 3.0,  housing: 3.8,  equipment: 2.8,  health: 3.1,  transport: 4.1,  comms: 2.5,  recreation: 3.0,  education: 12.1, misc: 3.0  },
   },
   {
-    // Fuente: INDEC — IPC abril 2026 = 2.8% (publicado 15/05/2026)
-    year: 2026, month: 4, general: 2.8,
-    divisions: { food: 1.77, restaurants: 3.08, clothing: 2.36, housing: 2.93, equipment: 2.64, health: 2.21, transport: 2.15, comms: 4.01, recreation: 0.79, education: 2.84, misc: 2.8 },
+    // Fuente: INDEC — IPC abril 2026 = 2.6% (publicado 14/05/2026)
+    // Corregido: estaba cargado como 2.8% por error; coincide con supabase/migrations/indec_abril_2026.sql
+    year: 2026, month: 4, general: 2.6,
+    divisions: { food: 1.5,  restaurants: 2.6,  clothing: 3.8,  housing: 3.2,  equipment: 1.3,  health: 2.5,  transport: 4.4,  comms: 4.1,  recreation: 1.0,  education: 4.2,  misc: 2.4  },
   },
-  // ACTUALIZAR: agregar meses siguientes cuando el INDEC los publique
+  {
+    // Fuente: INDEC — IPC mayo 2026 = 2.1% (publicado 13/06/2026)
+    year: 2026, month: 5, general: 2.1,
+    divisions: { food: 2.5,  restaurants: 1.8,  clothing: 0.3,  housing: 2.6,  equipment: 1.4,  health: 2.6,  transport: 2.0,  comms: 3.4,  recreation: 2.8,  education: 2.9,  misc: 2.1  },
+  },
+  {
+    // Fuente: INDEC — IPC junio 2026 = 1.9% (publicado 14/07/2026)
+    year: 2026, month: 6, general: 1.9,
+    divisions: { food: 1.3,  restaurants: 1.6,  clothing: 0.4,  housing: 3.3,  equipment: 1.5,  health: 2.9,  transport: 1.6,  comms: 0.9,  recreation: 4.2,  education: 1.7,  misc: 1.8  },
+  },
+  {
+    // Fuente: INDEC — IPC julio 2026 = 2.1% (publicado 13/08/2026)
+    // acumulado 7 meses: 19.3% · interanual: 33.8% · núcleo: 1.8% · estacionales: 4.5% · regulados: 2.1%
+    year: 2026, month: 7, general: 2.1,
+    divisions: { food: 2.0,  restaurants: 2.8,  clothing: -1.3, housing: 2.2,  equipment: 2.1,  health: 2.5,  transport: 1.9,  comms: 2.4,  recreation: 5.0,  education: 1.9,  misc: 2.2  },
+  },
+  // ACTUALIZAR: agregar meses siguientes cuando el INDEC los publique (agosto se publica ~13/09/2026)
 ];
 
 // ─── Abstracción de fuente de datos ───────────────────────────────────────────

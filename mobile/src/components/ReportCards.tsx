@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import { colors, spacing } from '@/theme';
 import { Text, Card } from '@/components/ui';
 import { formatCurrency } from '@/utils/format';
+import { ADVISOR_ENABLED } from '@/lib/features';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -672,8 +673,6 @@ export function DineroRecuperableCard({ sugerencias, month, year }: {
 }) {
   if (sugerencias.length === 0) return null;
   const totalSaving  = sugerencias.reduce((s, sg) => s + sg.saving, 0);
-  const fciReturn    = Math.round(totalSaving * 0.02);
-  const cedearReturn = Math.round(totalSaving * 0.035);
 
   const investContext = [
     `Informe de ${MONTH_NAMES[month - 1]} ${year}.`,
@@ -691,10 +690,10 @@ export function DineroRecuperableCard({ sugerencias, month, year }: {
       </View>
 
       <View style={drStyles.headline}>
-        <Text variant="caption" color={colors.text.secondary}>Tu potencial de inversión este mes</Text>
+        <Text variant="caption" color={colors.text.secondary}>Ahorro potencial este mes</Text>
         <Text style={drStyles.amount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatCurrency(totalSaving)}</Text>
         <Text variant="caption" color={colors.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }}>
-          Podés recuperar hasta este monto
+          Ajustando estos gastos, sin eliminarlos del todo
         </Text>
       </View>
 
@@ -712,29 +711,19 @@ export function DineroRecuperableCard({ sugerencias, month, year }: {
         </View>
       ))}
 
-      <View style={drStyles.projRow}>
-        <View style={drStyles.projItem}>
-          <Text variant="caption" color={colors.text.tertiary}>FCI (2%/mes)</Text>
-          <Text variant="labelMd" color={colors.neon}>+{formatCurrency(fciReturn)}</Text>
-        </View>
-        <View style={drStyles.projDivider} />
-        <View style={drStyles.projItem}>
-          <Text variant="caption" color={colors.text.tertiary}>CEDEARs (≈3.5%)</Text>
-          <Text variant="labelMd" color={colors.neon}>+{formatCurrency(cedearReturn)}</Text>
-        </View>
-      </View>
-
-      <TouchableOpacity
-        style={drStyles.investBtn}
-        activeOpacity={0.85}
-        onPress={() => router.push({ pathname: '/(app)/advisor', params: { initialContext: investContext } } as any)}
-      >
-        <Ionicons name="trending-up-outline" size={16} color={colors.white} />
-        <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: colors.white, flex: 1 }}>
-          ¿En qué invierto y cuánto genero?
-        </Text>
-        <Ionicons name="arrow-forward" size={14} color={colors.white} />
-      </TouchableOpacity>
+      {ADVISOR_ENABLED && (
+        <TouchableOpacity
+          style={drStyles.investBtn}
+          activeOpacity={0.85}
+          onPress={() => router.push({ pathname: '/(app)/advisor', params: { initialContext: investContext } } as any)}
+        >
+          <Ionicons name="trending-up-outline" size={16} color={colors.white} />
+          <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: colors.white, flex: 1 }}>
+            ¿En qué invierto y cuánto genero?
+          </Text>
+          <Ionicons name="arrow-forward" size={14} color={colors.white} />
+        </TouchableOpacity>
+      )}
     </Card>
   );
 }
@@ -745,9 +734,6 @@ const drStyles = StyleSheet.create({
   amount:      { fontSize: 38, fontFamily: 'Montserrat_800ExtraBold', color: colors.primary, lineHeight: 48 },
   row:         { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3] },
   iconBox:     { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  projRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.elevated, borderRadius: 10, padding: spacing[3] },
-  projItem:    { flex: 1, alignItems: 'center', gap: 2 },
-  projDivider: { width: 1, height: 32, backgroundColor: colors.border.subtle },
   investBtn:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2], backgroundColor: colors.neon, borderRadius: 10, paddingHorizontal: spacing[4], paddingVertical: spacing[3] },
 });
 
@@ -830,6 +816,7 @@ const objStyles = StyleSheet.create({
 });
 
 export function AdvisorCTA({ context }: { context: string }) {
+  if (!ADVISOR_ENABLED) return null;
   return (
     <TouchableOpacity
       style={ctaStyles.card}

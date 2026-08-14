@@ -25,6 +25,9 @@ import { fetchDolarRateNow } from '@/hooks/useDolarRates';
 import { formatCurrency } from '@/utils/format';
 import { fetchBudgetPlan, type BudgetPlan } from '@/lib/budgetPlan';
 import { checkAndNotifyBudgetLimits } from '@/lib/budgetNotifications';
+import { ADVISOR_ENABLED } from '@/lib/features';
+import { useFirstVisit } from '@/hooks/useFirstVisit';
+import { FirstVisitSheet } from '@/components/FirstVisitSheet';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -452,6 +455,7 @@ export default function SavingsScreen() {
   const [editingSaving,   setEditingSaving]   = useState<Partial<Saving> | null>(null);
   const [aportarGoal,     setAportarGoal]     = useState<SavingsGoal | null>(null);
   const [isRefreshing,    setIsRefreshing]    = useState(false);
+  const { isFirstVisit, markVisited } = useFirstVisit('savings');
 
   const load = useCallback(async () => {
     if (!user?.id) return;
@@ -587,17 +591,19 @@ export default function SavingsScreen() {
         )}
 
         {/* ── Advisor CTA ────────────────────────────────────────────────── */}
-        <TouchableOpacity
-          style={s.advisorBtn}
-          onPress={() => router.push({ pathname: '/(app)/advisor', params: { initialContext: 'Quiero mejorar mis ahorros y capital.' } } as any)}
-          activeOpacity={0.85}
-        >
-          <View style={s.advisorIcon}>
-            <Ionicons name="chatbubble-ellipses-outline" size={18} color={C.blue} />
-          </View>
-          <Text style={s.advisorText}>Hablar con el asesor sobre mi capital</Text>
-          <Ionicons name="arrow-forward" size={14} color={C.blue} />
-        </TouchableOpacity>
+        {ADVISOR_ENABLED && (
+          <TouchableOpacity
+            style={s.advisorBtn}
+            onPress={() => router.push({ pathname: '/(app)/advisor', params: { initialContext: 'Quiero mejorar mis ahorros y capital.' } } as any)}
+            activeOpacity={0.85}
+          >
+            <View style={s.advisorIcon}>
+              <Ionicons name="chatbubble-ellipses-outline" size={18} color={C.blue} />
+            </View>
+            <Text style={s.advisorText}>Hablar con el asesor sobre mi capital</Text>
+            <Ionicons name="arrow-forward" size={14} color={C.blue} />
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       <AddGoalModal
@@ -616,6 +622,19 @@ export default function SavingsScreen() {
         goal={aportarGoal}
         onClose={() => setAportarGoal(null)}
         onSave={(amount) => addToGoal(aportarGoal!.id, amount)}
+      />
+
+      <FirstVisitSheet
+        visible={isFirstVisit}
+        screenTitle="Tus ahorros"
+        screenIcon="wallet-outline"
+        iconColor={C.blue}
+        features={[
+          { icon: 'flag-outline', color: C.green, title: 'Metas de ahorro', body: 'Creá metas con objetivo y plazo, y sumá aportes cuando quieras. Vas viendo el progreso en tiempo real.' },
+          { icon: 'card-outline', color: C.blue, title: 'Bolsillos separados', body: 'Guardá tu ahorro en pesos o dólares, separado de tu cuenta principal, para no gastarlo por error.' },
+          { icon: 'sparkles-outline', color: C.violet, title: 'Plan Inteligente', body: 'Si activás el Plan Inteligente, te sugerimos cuánto y dónde conviene destinar tu ahorro según tu situación.' },
+        ]}
+        onDismiss={markVisited}
       />
     </SafeAreaView>
   );

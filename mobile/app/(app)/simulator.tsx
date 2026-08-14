@@ -15,6 +15,8 @@ import { colors, spacing, layout } from '@/theme';
 import { Text, Card } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/utils/format';
+import { useFirstVisit } from '@/hooks/useFirstVisit';
+import { FirstVisitSheet } from '@/components/FirstVisitSheet';
 
 // ─── Tasas base (fallback si la DB no responde) ───────────────────────────────
 
@@ -99,6 +101,7 @@ export default function SimulatorScreen() {
   const [instruments,    setInstruments]    = useState<InstrumentDef[]>(BASE_INSTRUMENTS);
   const [inflation,      setInflation]      = useState(DEFAULT_INFLATION);
   const [ratesUpdatedAt, setRatesUpdatedAt] = useState<string | null>(null);
+  const { isFirstVisit, markVisited } = useFirstVisit('simulator');
 
   // Cargar tasas reales desde market_rates
   useEffect(() => {
@@ -434,6 +437,19 @@ export default function SimulatorScreen() {
 
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <FirstVisitSheet
+        visible={isFirstVisit}
+        screenTitle="Simulador de inversión"
+        screenIcon="trending-up-outline"
+        iconColor={colors.neon}
+        features={[
+          { icon: 'options-outline', color: colors.neon, title: 'Elegí instrumento y plazo', body: 'Comparás 5 instrumentos (FCI Money Market, Lecaps, Plazo Fijo UVA, Dólar MEP, Cedears) a distintos plazos, con tasas actualizadas.' },
+          { icon: 'bar-chart-outline', color: colors.primary, title: 'Comparación contra inflación', body: 'Vemos cada instrumento contra la inflación del período, para que sepas si tu plata realmente crece en términos reales.' },
+          { icon: 'warning-outline', color: colors.yellow, title: 'Es educativo, no consejo financiero', body: 'Las proyecciones usan tasas históricas aproximadas. No constituyen asesoramiento — sirven para entender el orden de magnitud.' },
+        ]}
+        onDismiss={markVisited}
+      />
     </SafeAreaView>
   );
 }

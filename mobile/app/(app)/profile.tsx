@@ -472,7 +472,9 @@ export default function ProfileScreen() {
             </TouchableOpacity>
 
             <View style={styles.menuDivider} />
-            <MenuItem icon="help-circle-outline" label="Centro de ayuda" onPress={() => Alert.alert('Soporte', 'Escribinos a soporte@smartpesos.app')} />
+            <MenuItem icon="help-circle-outline" label="Centro de ayuda" description="Repasá cómo funciona cada pantalla" onPress={() => router.push('/(app)/help')} />
+            <View style={styles.menuDivider} />
+            <MenuItem icon="mail-outline" label="Contactar soporte" onPress={() => Alert.alert('Soporte', 'Escribinos a soporte@smartpesos.app')} />
             <View style={styles.menuDivider} />
             <MenuItem icon="information-circle-outline" label="Sobre SmartPesos" onPress={() => Alert.alert('SmartPesos', 'v1.0 — Tu asistente financiero argentino.')} />
           </Card>

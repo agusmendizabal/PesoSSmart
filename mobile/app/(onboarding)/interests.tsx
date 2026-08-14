@@ -18,58 +18,65 @@ interface InterestOption {
 
 const interestOptions: InterestOption[] = [
   {
-    key: 'fci_money_market',
-    label: 'Fondos Comunes (Plazo Fijo digital)',
-    description: 'Rendís tu plata desde el día 1, sin bloquearla.',
-    icon: 'trending-up-outline',
-    color: colors.neon,
+    key: 'sector_autos',
+    label: 'Autos',
+    description: 'Fierros, marcas, lo último en el mercado automotor.',
+    icon: 'car-sport-outline',
+    color: '#ef5350',
   },
   {
-    key: 'fci_cer',
-    label: 'FCI ajustado por inflación',
-    description: 'Tu plata crece al ritmo de la inflación o más.',
-    icon: 'shield-checkmark-outline',
+    key: 'sector_energia',
+    label: 'Energía',
+    description: 'Petróleo, gas, combustibles.',
+    icon: 'flash-outline',
     color: colors.yellow,
   },
   {
-    key: 'dolar_mep',
-    label: 'Dólar MEP',
-    description: 'Comprar dólares legales desde tu cuenta bancaria.',
-    icon: 'cash-outline',
-    color: '#82b1ff',
-  },
-  {
-    key: 'lecap',
-    label: 'Letras del Tesoro (Lecap)',
-    description: 'Bonos de corto plazo con tasa fija en pesos.',
-    icon: 'document-text-outline',
-    color: colors.white,
-  },
-  {
-    key: 'cedears',
-    label: 'CEDEARs (acciones extranjeras)',
-    description: 'Invertí en Apple, Google o MercadoLibre desde Argentina.',
-    icon: 'globe-outline',
-    color: '#ff9800',
-  },
-  {
-    key: 'crypto',
-    label: 'Criptomonedas / Stablecoins',
-    description: 'USDT, Bitcoin y otras criptos.',
-    icon: 'logo-bitcoin',
-    color: '#f0b429',
-  },
-  {
-    key: 'real_estate',
-    label: 'Propiedades',
-    description: 'Ahorro en ladrillos, alquileres o REITs.',
-    icon: 'home-outline',
+    key: 'sector_realestate',
+    label: 'Departamentos',
+    description: 'Real estate, propiedades, alquileres.',
+    icon: 'business-outline',
     color: '#a5d6a7',
   },
   {
+    key: 'sector_tech',
+    label: 'Tecnología',
+    description: 'Celulares, gadgets, todo lo nuevo.',
+    icon: 'phone-portrait-outline',
+    color: '#82b1ff',
+  },
+  {
+    key: 'sector_moda',
+    label: 'Moda',
+    description: 'Ropa, calzado, marcas que seguís.',
+    icon: 'shirt-outline',
+    color: '#ff9800',
+  },
+  {
+    key: 'sector_gastronomia',
+    label: 'Gastronomía',
+    description: 'Comida, delivery, salidas a comer.',
+    icon: 'restaurant-outline',
+    color: '#f0b429',
+  },
+  {
+    key: 'sector_entretenimiento',
+    label: 'Entretenimiento',
+    description: 'Streaming, series, cine.',
+    icon: 'film-outline',
+    color: colors.neon,
+  },
+  {
+    key: 'sector_viajes',
+    label: 'Viajes',
+    description: 'Turismo, hospedaje, escapadas.',
+    icon: 'airplane-outline',
+    color: '#4dd0e1',
+  },
+  {
     key: 'no_idea',
-    label: 'No sé por dónde empezar',
-    description: 'Está perfecto. Te orientamos desde cero.',
+    label: 'No sé, sorprendeme',
+    description: 'Está perfecto. Te mostramos algo simple para empezar.',
     icon: 'help-circle-outline',
     color: colors.text.secondary,
   },
@@ -118,9 +125,9 @@ export default function InterestsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.titleSection}>
-          <Text variant="h3">¿Qué te interesa explorar?</Text>
+          <Text variant="h3">¿Qué rubros te gustan?</Text>
           <Text variant="body" color={colors.text.secondary}>
-            Elegí todo lo que te llame la atención. Sin compromiso, esto solo nos ayuda a mostrarte lo que es relevante para vos.
+            Elegí los que te llamen la atención como consumidor — no hace falta saber nada de inversiones. Los usamos para mostrarte ejemplos concretos y relevantes para vos, no jerga financiera.
           </Text>
         </View>
 

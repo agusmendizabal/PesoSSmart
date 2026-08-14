@@ -129,56 +129,25 @@ const bc = StyleSheet.create({
   container: { alignItems: 'center', paddingVertical: spacing[3] },
 });
 
-// ─── Smart Recommendation Card ────────────────────────────────────────────────
-
-function SmartRecommendationCard({ cat }: { cat: CategoryBudget }) {
-  if (cat.status === 'ok' || cat.avgMonthly <= 0) return null;
-
-  const saving20 = Math.round(cat.currentSpend * 0.2);
-  const targetPct = cat.status === 'over' ? 80 : 90;
-  const targetAmount = Math.round(cat.avgMonthly * (targetPct / 100));
-  const potentialSaving = Math.max(0, cat.currentSpend - targetAmount);
-
-  return (
-    <View style={rc.card}>
-      <View style={rc.header}>
-        <View style={rc.iconBox}>
-          <Ionicons name="bulb" size={18} color={C.violet} />
-        </View>
-        <Text style={rc.title}>Recomendación inteligente</Text>
-      </View>
-      <Text style={rc.text}>
-        Si reducís <Text style={rc.bold}>{cat.name}</Text> un 20%, podrías ahorrar{' '}
-        <Text style={rc.saving}>{formatCurrency(saving20)}</Text> extra este mes.
-      </Text>
-      {potentialSaving > 0 && (
-        <Text style={rc.sub}>
-          Meta sugerida: {formatCurrency(targetAmount)}/mes ({targetPct}% de tu promedio)
-        </Text>
-      )}
-    </View>
-  );
-}
-
-const rc = StyleSheet.create({
-  card:   { backgroundColor: C.violet + '08', borderWidth: 1, borderColor: C.violet + '25', borderRadius: 18, padding: spacing[4], gap: spacing[3] },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  iconBox:{ width: 36, height: 36, borderRadius: 18, backgroundColor: C.violet + '14', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  title:  { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.text },
-  text:   { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.sub, lineHeight: 20 },
-  bold:   { fontFamily: 'Montserrat_600SemiBold', color: C.text },
-  saving: { fontFamily: 'Montserrat_700Bold', color: C.green },
-  sub:    { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.muted },
-});
+// NOTA (auditoría Plan Inteligente): antes había acá una "SmartRecommendationCard"
+// que calculaba su propio monto de ahorro con una regla fija (20% de reducción,
+// sin tener en cuenta el día del mes ni el ritmo real). Convivía con el banner de
+// arriba (basado en `paceRatio`) y mostraba un número de ahorro DISTINTO para la
+// misma categoría — dos "recomendaciones inteligentes" con cifras que no
+// coincidían. Se sacó en vez de arreglarse porque el banner de arriba ya cubre
+// "qué está pasando / cuánto representa" con el mismo cálculo que el resto de la
+// pantalla; no hacía falta una segunda tarjeta con una cuenta distinta.
 
 // ─── Resumen Tab ──────────────────────────────────────────────────────────────
 
 function ResumenTab({ cat }: { cat: CategoryBudget }) {
-  const isOver    = cat.status === 'over';
-  const isWarning = cat.status === 'warning';
+  const isOver        = cat.status === 'over';
+  const isWarning     = cat.status === 'warning';
+  const isOportunidad = cat.alertLevel === 'oportunidad';
   const diff      = cat.projected - cat.avgMonthly;
   const diffSign  = diff >= 0 ? '+' : '';
   const barColor  = isOver ? C.red : isWarning ? C.amber : C.green;
+  const saved     = Math.max(0, cat.expectedByNow - cat.currentSpend);
 
   return (
     <View style={rt.container}>
@@ -199,6 +168,19 @@ function ResumenTab({ cat }: { cat: CategoryBudget }) {
             </Text>
             <Text style={rt.alertSub}>
               Gastaste {formatCurrency(cat.currentSpend)} y tu promedio mensual es {formatCurrency(cat.avgMonthly)}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Oportunidad banner */}
+      {isOportunidad && saved > 0 && (
+        <View style={[rt.alert, { backgroundColor: C.green + '0F', borderColor: C.green + '40' }]}>
+          <Text style={{ fontSize: 18 }}>✨</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[rt.alertTitle, { color: C.green }]}>Oportunidad de ahorro</Text>
+            <Text style={rt.alertSub}>
+              Vas más lento que tu ritmo habitual — ahorraste {formatCurrency(saved)} respecto a tu promedio hasta ahora
             </Text>
           </View>
         </View>
@@ -282,9 +264,6 @@ function ResumenTab({ cat }: { cat: CategoryBudget }) {
           </View>
         </View>
       </View>
-
-      {/* AI Recommendation */}
-      <SmartRecommendationCard cat={cat} />
 
       {/* CTA */}
       <TouchableOpacity style={rt.txBtn} activeOpacity={0.85} onPress={() => {}}>

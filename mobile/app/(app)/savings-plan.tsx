@@ -13,7 +13,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { spacing, layout } from '@/theme';
 import { Text } from '@/components/ui/Text';
 import { useAuthStore } from '@/store/authStore';
-import { fetchBudgetPlan, type BudgetPlan, type CategoryBudget } from '@/lib/budgetPlan';
+import { useExpensesStore } from '@/store/expensesStore';
+import { fetchBudgetPlan, computePotentialSavings, type BudgetPlan, type CategoryBudget, type AlertLevel } from '@/lib/budgetPlan';
+import { buildCategoryInsight, selectRelevantInsights, buildAllGoodInsight, type CategoryInsight } from '@/lib/budgetInsights';
+import { fetchRecurringEvaluations, applyRecurringContext, type CategoryBudgetWithRecurring } from '@/lib/recurringAdjustment';
+import { DineroRecuperableCard, buildAhorroSugerencias, type CategoryRow } from '@/components/ReportCards';
 import { formatCurrency } from '@/utils/format';
 import { checkAndNotifyBudgetLimits } from '@/lib/budgetNotifications';
 
@@ -169,29 +173,28 @@ const ic = StyleSheet.create({
 
 // ─── Category budget card ─────────────────────────────────────────────────────
 
-function CategoryBudgetCard({ cat, onPress }: { cat: CategoryBudget; onPress: () => void }) {
-  const available  = cat.avgMonthly - cat.currentSpend;
-  const isOver     = available < 0;
-  const isExact    = !isOver && available < 1;
-  const isWarning  = !isOver && !isExact && cat.pct >= 0.8;
-  const isGreen    = !isOver && !isExact && !isWarning;
-  const fillPct    = Math.min(cat.pct * 100, 100);
+const LEVEL_COLOR: Record<AlertLevel, string> = {
+  alerta:      C.red,
+  atencion:    C.amber,
+  oportunidad: C.green,
+  normal:      C.blue,
+};
 
-  const accentColor = isOver ? C.red : (isExact || isWarning) ? C.amber : C.green;
+function CategoryBudgetCard({ cat, plan, onPress }: { cat: CategoryBudgetWithRecurring; plan: BudgetPlan; onPress: () => void }) {
+  const insight     = buildCategoryInsight(cat, plan);
+  const accentColor = LEVEL_COLOR[cat.alertLevel];
+  const fillPct     = Math.min(cat.pct * 100, 100);
+  const dayMarkPct  = Math.min((plan.dayOfMonth / plan.daysInMonth) * 100, 100);
 
-  // Right-side label & amount logic
-  let rightAmount: string | null = null;
-  let rightLabel: string;
-  if (isOver) {
-    rightLabel = `Excedido por\n${formatCurrency(Math.abs(available))}`;
-  } else if (isExact) {
-    rightLabel = 'Límite\nalcanzado';
-  } else if (isWarning) {
-    rightAmount = formatCurrency(available);
-    rightLabel  = 'Te quedan';
-  } else {
-    rightLabel = 'Dentro del\nlímite';
-  }
+  // Solo mostrar la nota de "pago recurrente" cuando aporta algo que el
+  // usuario no pueda deducir solo del nivel/insight de arriba: o bien
+  // explica por qué NO hay alerta pese al monto (el ajuste cambió el
+  // nivel), o bien el pago llegó por encima de lo habitual (sí es una alerta,
+  // pero con contexto). Un "Alquiler esperado" sin ningún cambio de nivel no
+  // suma nada — se omite a propósito para no saturar la tarjeta.
+  const showRecurringNote = cat.recurring && (
+    cat.recurring.status === 'desviado' || cat.originalAlertLevel !== cat.alertLevel
+  );
 
   return (
     <TouchableOpacity style={cb.card} onPress={onPress} activeOpacity={0.82}>
@@ -205,18 +208,38 @@ function CategoryBudgetCard({ cat, onPress }: { cat: CategoryBudget; onPress: ()
             Gastaste {formatCurrency(cat.currentSpend)} de {formatCurrency(cat.avgMonthly)}
           </Text>
         </View>
-        <View style={{ alignItems: 'flex-end', gap: 1, maxWidth: 120 }}>
-          {rightAmount && (
-            <Text style={[cb.available, { color: accentColor }]}>{rightAmount}</Text>
-          )}
-          <Text style={[cb.availLabel, { color: accentColor }]}>{rightLabel}</Text>
+        <View style={{ alignItems: 'flex-end', gap: 1 }}>
+          <Text style={{ fontSize: 16 }}>{insight.emoji}</Text>
+          <Text style={[cb.pctLabel, { color: accentColor }]}>{Math.round(cat.pct * 100)}%</Text>
         </View>
         <Ionicons name="chevron-forward" size={14} color={C.muted} style={{ marginLeft: spacing[1] }} />
       </View>
 
       <View style={cb.track}>
         <View style={[cb.fill, { width: `${fillPct}%` as any, backgroundColor: accentColor }]} />
+        {cat.hasHistory && (
+          <View style={[cb.dayMark, { left: `${dayMarkPct}%` as any }]} />
+        )}
       </View>
+      {cat.hasHistory && (
+        <Text style={cb.dayLabel}>Día {plan.dayOfMonth} de {plan.daysInMonth}</Text>
+      )}
+
+      <View style={cb.insightRow}>
+        <Text style={[cb.insightHeadline, { color: accentColor }]}>{insight.headline}</Text>
+        <Text style={cb.insightBody} numberOfLines={2}>{insight.body}</Text>
+      </View>
+
+      {showRecurringNote && cat.recurring && (
+        <View style={[cb.recurringNote, { backgroundColor: (cat.recurring.status === 'desviado' ? C.red : C.blue) + '0D' }]}>
+          <Text style={{ fontSize: 13 }}>{cat.recurring.status === 'desviado' ? '⚠️' : '🔵'}</Text>
+          <Text style={cb.recurringText}>
+            {cat.recurring.status === 'desviado'
+              ? `"${cat.recurring.description}" es un pago recurrente, pero este mes (${formatCurrency(cat.recurring.currentAmount ?? 0)}) está muy por encima de tu habitual (${formatCurrency(cat.recurring.historicalAmount)}).`
+              : `"${cat.recurring.description}" es un pago recurrente habitual (~${formatCurrency(cat.recurring.historicalAmount)}) — por eso no cuenta como desvío de ritmo.`}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -227,48 +250,51 @@ const cb = StyleSheet.create({
   iconBox:   { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   name:      { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.text, marginBottom: 2 },
   spent:     { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: C.muted },
-  available: { fontFamily: 'Montserrat_800ExtraBold', fontSize: 16, lineHeight: 20 },
-  availLabel:{ fontFamily: 'Montserrat_600SemiBold', fontSize: 10, lineHeight: 14, textAlign: 'right' },
-  track:     { height: 5, backgroundColor: C.light, borderRadius: 3, overflow: 'hidden' },
+  pctLabel:  { fontFamily: 'Montserrat_700Bold', fontSize: 12 },
+  track:     { height: 5, backgroundColor: C.light, borderRadius: 3, overflow: 'visible', position: 'relative' },
   fill:      { height: '100%', borderRadius: 3 },
+  dayMark:   { position: 'absolute', top: -2, width: 2, height: 9, backgroundColor: C.text + '50', borderRadius: 1 },
+  dayLabel:  { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: C.muted, marginTop: -spacing[2] },
+  insightRow:      { gap: 2, paddingTop: spacing[1], borderTopWidth: 1, borderTopColor: C.border },
+  insightHeadline: { fontFamily: 'Montserrat_700Bold', fontSize: 12 },
+  insightBody:     { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.sub, lineHeight: 17 },
+  recurringNote:   { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2], borderRadius: 10, padding: spacing[2] },
+  recurringText:   { flex: 1, fontFamily: 'Montserrat_400Regular', fontSize: 11, color: C.sub, lineHeight: 15 },
 });
 
-// ─── Consejo inteligente card ─────────────────────────────────────────────────
+// ─── Insights inteligentes (reemplaza el "Consejo inteligente" genérico) ──────
 
-function ConsejoCard({ categories }: { categories: CategoryBudget[] }) {
-  const over = categories.filter(c => c.status === 'over').slice(0, 2);
-  if (over.length === 0) return null;
-
-  const names = over.map(c => c.name).join(' y ');
-
+function InsightsSection({ insights }: { insights: CategoryInsight[] }) {
   return (
-    <View style={cc.card}>
-      <View style={cc.header}>
-        <View style={cc.iconBox}>
-          <Ionicons name="bulb-outline" size={18} color={C.violet} />
+    <View style={{ gap: spacing[3] }}>
+      {insights.map(ins => (
+        <View key={ins.categoryId} style={[ic2.card, { borderColor: LEVEL_COLOR[ins.level] + '30' }]}>
+          <Text style={ic2.emoji}>{ins.emoji}</Text>
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text style={[ic2.headline, { color: LEVEL_COLOR[ins.level] }]}>{ins.headline}</Text>
+            <Text style={ic2.body}>{ins.body}</Text>
+          </View>
         </View>
-        <Text style={cc.title}>Consejo inteligente</Text>
-      </View>
-      <Text style={cc.body}>
-        Reduciendo gastos en {names} podrías mejorar tu presupuesto este mes.
-      </Text>
+      ))}
     </View>
   );
 }
 
-const cc = StyleSheet.create({
-  card:    { backgroundColor: C.violet + '0D', borderWidth: 1, borderColor: C.violet + '25', borderRadius: 18, padding: spacing[5], gap: spacing[3] },
-  header:  { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  iconBox: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.violet + '18', alignItems: 'center', justifyContent: 'center' },
-  title:   { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.violet },
-  body:    { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.sub, lineHeight: 20 },
+const ic2 = StyleSheet.create({
+  card:     { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3], backgroundColor: C.card, borderWidth: 1, borderRadius: 16, padding: spacing[4], ...shadow },
+  emoji:    { fontSize: 20, lineHeight: 24 },
+  headline: { fontFamily: 'Montserrat_700Bold', fontSize: 13 },
+  body:     { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.sub, lineHeight: 19 },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+/** BudgetPlan cuyas categorías ya pasaron por el ajuste de recurrencia. */
+type PlanWithRecurring = Omit<BudgetPlan, 'categories'> & { categories: CategoryBudgetWithRecurring[] };
+
 export default function SavingsPlanScreen() {
   const { user }       = useAuthStore();
-  const [plan,         setPlan]        = useState<BudgetPlan | null>(null);
+  const [plan,         setPlan]        = useState<PlanWithRecurring | null>(null);
   const [loading,      setLoading]     = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showAll,      setShowAll]     = useState(false);
@@ -276,9 +302,23 @@ export default function SavingsPlanScreen() {
   const load = useCallback(async () => {
     if (!user?.id) return;
     const data = await fetchBudgetPlan(user.id);
-    setPlan(data);
+    if (!data) { setPlan(null); setLoading(false); return; }
+
+    // Capa de recurrencia: ajusta el ritmo de las categorías con un pago
+    // grande esperado (alquiler, gimnasio, suscripciones...) para que no
+    // disparen una alerta falsa solo por llegar temprano en el mes. No
+    // reemplaza el motor de ritmo — lo alimenta con el remanente correcto.
+    const evaluations = await fetchRecurringEvaluations(user.id);
+    const categories  = applyRecurringContext(data, evaluations);
+    const adjusted: PlanWithRecurring = {
+      ...data,
+      categories,
+      potentialSavings: computePotentialSavings(categories),
+    };
+
+    setPlan(adjusted);
     setLoading(false);
-    if (data) checkAndNotifyBudgetLimits(data);
+    checkAndNotifyBudgetLimits(adjusted);
   }, [user?.id]);
 
   useEffect(() => { load(); }, [load]);
@@ -300,6 +340,25 @@ export default function SavingsPlanScreen() {
     ? (plan?.categories ?? [])
     : (plan?.categories ?? []).slice(0, 6);
 
+  const { totalDisposable, estimatedIncome } = useExpensesStore();
+
+  const insights = plan
+    ? (selectRelevantInsights(plan).length > 0 ? selectRelevantInsights(plan) : [buildAllGoodInsight()])
+    : [];
+
+  const ahorroSugerencias = plan
+    ? (() => {
+        const rows: CategoryRow[] = plan.categories
+          .filter(c => c.currentSpend > 0)
+          .map(c => ({ id: c.categoryId, name: c.name, color: c.color ?? '#888888', amount: c.currentSpend, pct: 0 }))
+          .sort((a, b) => b.amount - a.amount)
+          .map(r => ({ ...r, pct: plan.totalCurrentSpend > 0 ? r.amount / plan.totalCurrentSpend : 0 }));
+        return buildAhorroSugerencias({ rows, disposable: totalDisposable, total: plan.totalCurrentSpend, estimatedIncome });
+      })()
+    : [];
+
+  const now = new Date();
+
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
       {/* Header */}
@@ -318,7 +377,7 @@ export default function SavingsPlanScreen() {
           <ActivityIndicator size="large" color={C.violet} />
           <Text style={st.loadingText}>Calculando tu presupuesto...</Text>
         </View>
-      ) : !plan ? (
+      ) : !plan || plan.categories.length === 0 ? (
         <View style={st.centered}>
           <Text style={{ fontSize: 48 }}>📊</Text>
           <Text style={st.emptyTitle}>Sin datos suficientes</Text>
@@ -351,6 +410,7 @@ export default function SavingsPlanScreen() {
             <CategoryBudgetCard
               key={cat.categoryId}
               cat={cat}
+              plan={plan}
               onPress={() => handleCategoryPress(cat)}
             />
           ))}
@@ -362,11 +422,19 @@ export default function SavingsPlanScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Consejo inteligente */}
-          <ConsejoCard categories={plan.categories} />
+          {/* Insights inteligentes por categoría */}
+          <View style={st.sectionHeader}>
+            <Text style={st.sectionTitle}>Lo que está pasando</Text>
+          </View>
+          <InsightsSection insights={insights} />
+
+          {/* Potencial de inversión (antes en Gastos → Análisis) */}
+          {ahorroSugerencias.length > 0 && (
+            <DineroRecuperableCard sugerencias={ahorroSugerencias} month={now.getMonth() + 1} year={now.getFullYear()} />
+          )}
 
           <Text style={st.footnote}>
-            Límites calculados con tu promedio de los últimos 3 meses.
+            Límites calculados con tu promedio de los últimos 3 meses. Ritmo calculado según el día {plan.dayOfMonth} de {plan.daysInMonth}.
           </Text>
         </ScrollView>
       )}

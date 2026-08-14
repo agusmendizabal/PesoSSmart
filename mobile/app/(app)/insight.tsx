@@ -16,6 +16,7 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/utils/format';
 import type { WidgetType } from '@/lib/widgetEngine';
+import { ADVISOR_ENABLED, ADVISOR_FALLBACK_CTA } from '@/lib/features';
 
 const db = supabase as any;
 
@@ -528,19 +529,21 @@ export default function InsightScreen() {
               onPress={() => {
                 if (cfg.ctaPath) {
                   router.push(cfg.ctaPath as any);
-                } else {
+                } else if (ADVISOR_ENABLED) {
                   router.push({
                     pathname: '/(app)/advisor',
                     params:   { initialContext: `Analizá mi situación de ${cfg.title.toLowerCase()}` },
                   } as any);
+                } else {
+                  router.push(ADVISOR_FALLBACK_CTA.route as any);
                 }
               }}
               activeOpacity={0.85}
             >
               <Text style={s.ctaBtnText}>
-                {cfg.ctaLabel ?? 'Hablá con la IA'}
+                {cfg.ctaLabel ?? (ADVISOR_ENABLED ? 'Hablá con la IA' : ADVISOR_FALLBACK_CTA.label)}
               </Text>
-              {!cfg.ctaLabel && <Ionicons name="sparkles-outline" size={16} color="#000" />}
+              {!cfg.ctaLabel && ADVISOR_ENABLED && <Ionicons name="sparkles-outline" size={16} color="#000" />}
             </TouchableOpacity>
           </View>
         </ScrollView>

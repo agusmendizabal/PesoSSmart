@@ -39,6 +39,7 @@ import { FirstVisitSheet } from '@/components/FirstVisitSheet';
 import Svg, { Path as SvgPath } from 'react-native-svg';
 import { calculatePersonalInflation } from '@/utils/inflationCalc';
 import { HomeSkeletonLoader } from '@/components/ui/SkeletonLoader';
+import { ADVISOR_ENABLED, ADVISOR_FALLBACK_CTA } from '@/lib/features';
 import { SmartWidget } from '@/components/SmartWidget';
 import { computeAllWidgets } from '@/lib/widgetEngine';
 
@@ -510,7 +511,7 @@ function QuickActions({ healthScore }: { healthScore: number }) {
   const items = [
     { label: 'Ingresar\ngasto', icon: 'add-circle-outline',          color: colors.neon,    onPress: () => router.push('/(app)/expenses' as any),  scoreValue: undefined },
     { label: 'Simulador',       icon: 'trending-up-outline',         color: colors.primary, onPress: () => router.push('/(app)/simulator' as any), scoreValue: undefined },
-    { label: 'Asesor\nIA',      icon: 'chatbubble-ellipses-outline', color: colors.yellow,  onPress: () => router.push('/(app)/advisor' as any),   scoreValue: undefined },
+    ...(ADVISOR_ENABLED ? [{ label: 'Asesor\nIA', icon: 'chatbubble-ellipses-outline', color: colors.yellow, onPress: () => router.push('/(app)/advisor' as any), scoreValue: undefined }] : []),
     { label: 'Salud\nfinanc.',  icon: 'heart-outline',               color: scoreColor,     onPress: () => router.push('/(app)/expenses' as any),  scoreValue: healthScore },
   ];
 
@@ -944,7 +945,7 @@ function buildKeyInsights({
       iconColor: colors.primary,
       title: 'Costo de oportunidad de tus prescindibles',
       body: `Si hubieras invertido la mitad de lo que gastaste en prescindibles este mes (${formatCurrency(half)}), hoy tendrías ${formatCurrency(half + fciGain)} más. Dato para reflexionar, no para culparte.`,
-      cta: { label: 'Hablar con asesor', route: '/(app)/advisor' },
+      cta: ADVISOR_ENABLED ? { label: 'Hablar con asesor', route: '/(app)/advisor' } : ADVISOR_FALLBACK_CTA,
     });
   }
 
@@ -988,7 +989,7 @@ function buildKeyInsights({
       iconColor: colors.primary,
       title: 'Primer día del mes',
       body: 'Es el primer día del mes. El mes pasado dijiste que ibas a gastar menos en salidas. ¿Arrancamos con el mismo objetivo o lo ajustamos?',
-      cta: { label: 'Hablar con asesor', route: '/(app)/advisor' },
+      cta: ADVISOR_ENABLED ? { label: 'Hablar con asesor', route: '/(app)/advisor' } : ADVISOR_FALLBACK_CTA,
     });
   }
 
@@ -1213,7 +1214,7 @@ function buildHomeHighlights({
       title: `Podrías recuperar ${formatCurrency(recoverable)}`,
       subtitle: `Ajustando la mitad de tus gastos prescindibles de este mes.`,
       icon: 'cash-outline', iconColor: colors.neon,
-      cta: { label: 'Hablar con asesor', route: '/(app)/advisor' },
+      cta: ADVISOR_ENABLED ? { label: 'Hablar con asesor', route: '/(app)/advisor' } : ADVISOR_FALLBACK_CTA,
     });
   }
 
@@ -2202,7 +2203,7 @@ function QuickActionsSection({
   const shortName  = topCatName?.split(' ')[0].toLowerCase() ?? 'gastos';
 
   const actions = [
-    { label: `Limitar\n${shortName}`,   icon: 'time-outline' as const,         onPress: () => router.push('/(app)/advisor' as any) },
+    ...(ADVISOR_ENABLED ? [{ label: `Limitar\n${shortName}`, icon: 'time-outline' as const, onPress: () => router.push('/(app)/advisor' as any) }] : []),
     { label: 'Crear meta\nde ahorro',   icon: 'flag-outline' as const,         onPress: () => router.push('/(app)/savings' as any) },
     { label: 'Invertir\neste mes',      icon: 'bar-chart-outline' as const,    onPress: () => router.push('/(app)/simulator' as any) },
     { label: 'Ver todos\nlos gastos',   icon: 'receipt-outline' as const,      onPress: () => router.push('/(app)/expenses' as any) },
@@ -2673,15 +2674,17 @@ export default function HomeScreen() {
             </View>
             <Text style={nStyles.greetingSub}>Este es tu resumen del mes</Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <TouchableOpacity
-              style={nStyles.headerIconBtn}
-              onPress={() => router.push('/(app)/advisor' as any)}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="chatbubble-ellipses-outline" size={20} color="#1A1A1A" />
-            </TouchableOpacity>
-          </View>
+          {ADVISOR_ENABLED && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <TouchableOpacity
+                style={nStyles.headerIconBtn}
+                onPress={() => router.push('/(app)/advisor' as any)}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#1A1A1A" />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* ── SKELETON ────────────────────────────────────────────────────────── */}
@@ -2693,7 +2696,7 @@ export default function HomeScreen() {
         {/* ── 4-COLUMN FINANCIAL SUMMARY ──────────────────────────────────────── */}
         <View style={nStyles.summaryCard}>
           {/* Ahorro posible */}
-          <TouchableOpacity style={nStyles.summaryBlock} onPress={() => router.push('/(app)/advisor' as any)} activeOpacity={0.8}>
+          <TouchableOpacity style={nStyles.summaryBlock} onPress={() => router.push((ADVISOR_ENABLED ? '/(app)/advisor' : ADVISOR_FALLBACK_CTA.route) as any)} activeOpacity={0.8}>
             <View style={[nStyles.summaryIcon, { backgroundColor: '#DCFCE7' }]}>
               <Ionicons name="wallet-outline" size={16} color="#22C55E" />
             </View>

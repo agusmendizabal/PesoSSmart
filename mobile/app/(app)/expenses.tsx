@@ -44,6 +44,7 @@ import { FirstVisitSheet } from '@/components/FirstVisitSheet';
 import { useSavingsStore } from '@/store/savingsStore';
 import { InflationThermometer } from '@/components/InflationThermometer';
 import { DecisionHistorySection, buildOpportunities } from '@/components/DecisionHistory';
+import { fetchBudgetPlan, type BudgetPlan } from '@/lib/budgetPlan';
 import {
   MONTH_NAMES, PALETTE, getCategoryColor, type CategoryRow, type MonthSummary,
   buildComparacion, buildAhorroSugerencias, buildPlanProximoMes, buildObjetivo,
@@ -1305,6 +1306,11 @@ export default function ExpensesScreen() {
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [inflationRate,   setInflationRate]   = useState(0);
   const [pastOppData,     setPastOppData]     = useState<{ monthKey: string; disposable: number; categories: Record<string, number> }[]>([]);
+  const [smartPlan,       setSmartPlan]       = useState<BudgetPlan | null>(null);
+
+  useEffect(() => {
+    if (user?.id) fetchBudgetPlan(user.id).then(setSmartPlan);
+  }, [user?.id]);
 
   useEffect(() => {
     if (user?.id) {
@@ -1963,7 +1969,6 @@ export default function ExpensesScreen() {
           ) : (
             <>
               {reportTab === 'resumen' && (() => {
-                const DOT_COLORS = [colors.red, '#F59E0B', colors.accent, colors.primary];
                 const donutRows  = reportRows.length > 0 ? reportRows : catBreakdown;
                 const donutTotal = reportRows.length > 0 ? (reportTotal || displayTotal) : totalThisMonth;
                 return (
@@ -1974,22 +1979,36 @@ export default function ExpensesScreen() {
                         <CategoryDonut rows={donutRows} total={donutTotal} />
                       </View>
                     )}
-                    <View style={reportS.heroCard}>
-                      <Text variant="label" color={colors.text.tertiary}>TU POTENCIAL DE INVERSIÓN</Text>
-                      <Text style={reportS.heroAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{formatCurrency(totalRecuperable)}</Text>
-                      <Text variant="bodySmall" color={colors.text.secondary}>
-                        Ajustando estos gastos podés invertir esta plata
-                      </Text>
-                      {ahorroSugerencias.slice(0, 4).map((sg, i) => (
-                        <View key={i} style={reportS.investRow}>
-                          <View style={[reportS.investDot, { backgroundColor: DOT_COLORS[i % DOT_COLORS.length] }]} />
-                          <Text variant="bodySmall" color={colors.text.secondary} style={{ flex: 1 }}>{sg.text}</Text>
-                          <Text variant="bodySmall" style={{ fontFamily: 'Montserrat_600SemiBold', color: colors.primary }}>
-                            {formatCurrency(sg.saving)}
+                    <TouchableOpacity
+                      style={reportS.heroCard}
+                      activeOpacity={0.85}
+                      onPress={() => router.push('/(app)/savings-plan' as any)}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+                        <Ionicons name="sparkles" size={14} color={colors.accent} />
+                        <Text variant="label" color={colors.text.tertiary}>PLAN INTELIGENTE</Text>
+                      </View>
+                      {smartPlan && smartPlan.potentialSavings > 500 ? (
+                        <>
+                          <Text style={reportS.heroAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+                            {formatCurrency(smartPlan.potentialSavings)}
                           </Text>
-                        </View>
-                      ))}
-                    </View>
+                          <Text variant="bodySmall" color={colors.text.secondary}>
+                            Es lo que podrías liberar este mes según tu ritmo de gasto
+                          </Text>
+                        </>
+                      ) : (
+                        <Text variant="bodySmall" color={colors.text.secondary}>
+                          Mirá cómo viene tu ritmo de gasto este mes, categoría por categoría
+                        </Text>
+                      )}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginTop: spacing[1] }}>
+                        <Text variant="bodySmall" style={{ fontFamily: 'Montserrat_600SemiBold', color: colors.primary }}>
+                          Ver Plan Inteligente
+                        </Text>
+                        <Ionicons name="arrow-forward" size={14} color={colors.primary} />
+                      </View>
+                    </TouchableOpacity>
                     <InflationThermometer userId={user!.id} year={reportYear} month={reportMonth} />
                     <AdvisorCTA context={`Informe de ${MONTH_NAMES[reportMonth - 1]} ${reportYear}. Gasté ${formatCurrency(displayTotal)}.`} />
                   </>

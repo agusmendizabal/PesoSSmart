@@ -14,6 +14,7 @@ import { spacing, layout } from '@/theme';
 import { Text } from '@/components/ui/Text';
 import { useAuthStore } from '@/store/authStore';
 import { fetchBudgetPlan, type BudgetPlan, type CategoryBudget } from '@/lib/budgetPlan';
+import { buildCategoryInsight } from '@/lib/budgetInsights';
 import { formatCurrency } from '@/utils/format';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -82,21 +83,45 @@ const hc = StyleSheet.create({
 function OpportunityRow({ cat, excess, onPress }: {
   cat: CategoryBudget; excess: number; onPress: () => void;
 }) {
-  const isOver = cat.status === 'over';
+  const isAlerta = cat.alertLevel === 'alerta';
 
   return (
     <TouchableOpacity style={or.row} onPress={onPress} activeOpacity={0.82}>
-      <View style={[or.iconBox, { backgroundColor: (isOver ? C.red : C.amber) + '14' }]}>
-        <CategoryIcon icon={cat.icon} color={isOver ? C.red : C.amber} size={20} />
+      <View style={[or.iconBox, { backgroundColor: (isAlerta ? C.red : C.amber) + '14' }]}>
+        <CategoryIcon icon={cat.icon} color={isAlerta ? C.red : C.amber} size={20} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={or.name} numberOfLines={1}>{cat.name}</Text>
         <Text style={or.detail}>
-          Estás {formatCurrency(excess)} por encima de tu promedio
+          Vas más rápido que tu ritmo habitual — proyectado {formatCurrency(excess)} por encima de tu promedio
         </Text>
       </View>
-      <Text style={[or.excess, { color: isOver ? C.red : C.amber }]}>
+      <Text style={[or.excess, { color: isAlerta ? C.red : C.amber }]}>
         +{formatCurrency(excess)}
+      </Text>
+      <Ionicons name="chevron-forward" size={14} color={C.muted} />
+    </TouchableOpacity>
+  );
+}
+
+// ─── Opportunity Row (categorías por debajo de su ritmo — ahorro ya logrado) ──
+
+function SavingsRow({ cat, saved, onPress }: {
+  cat: CategoryBudget; saved: number; onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={or.row} onPress={onPress} activeOpacity={0.82}>
+      <View style={[or.iconBox, { backgroundColor: C.green + '14' }]}>
+        <CategoryIcon icon={cat.icon} color={C.green} size={20} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={or.name} numberOfLines={1}>{cat.name}</Text>
+        <Text style={or.detail}>
+          Vas más lento que tu ritmo habitual — ya ahorraste respecto de tu promedio
+        </Text>
+      </View>
+      <Text style={[or.excess, { color: C.green }]}>
+        -{formatCurrency(saved)}
       </Text>
       <Ionicons name="chevron-forward" size={14} color={C.muted} />
     </TouchableOpacity>
@@ -161,14 +186,28 @@ export default function SavingsOpportunitiesScreen() {
     });
   };
 
-  // Categories where spending exceeds average
-  const overCats = (plan?.categories ?? [])
-    .filter(c => c.status === 'over' || (c.status === 'warning' && c.projected > c.avgMonthly))
-    .map(c => ({ cat: c, excess: Math.max(c.projected - c.avgMonthly, c.currentSpend - c.avgMonthly, 0) }))
-    .filter(({ excess }) => excess > 0)
-    .sort((a, b) => b.excess - a.excess);
+  // Los montos salen de `buildCategoryInsight` — el mismo cálculo que usa el
+  // resto de la app (tarjetas de categoría, notificaciones) — para que esta
+  // pantalla nunca muestre un número distinto para la misma categoría.
+  const overCats = plan
+    ? plan.categories
+        .filter(c => c.alertLevel === 'alerta' || c.alertLevel === 'atencion')
+        .map(c => ({ cat: c, excess: buildCategoryInsight(c, plan).amount ?? 0 }))
+        .filter(({ excess }) => excess > 0)
+        .sort((a, b) => b.excess - a.excess)
+    : [];
 
-  const totalSavings = overCats.reduce((s, { excess }) => s + excess, 0);
+  // Categorías donde el usuario ya está gastando menos de lo esperado a esta altura del mes
+  const opportunityCats = plan
+    ? plan.categories
+        .filter(c => c.alertLevel === 'oportunidad')
+        .map(c => ({ cat: c, saved: buildCategoryInsight(c, plan).amount ?? 0 }))
+        .filter(({ saved }) => saved > 0)
+        .sort((a, b) => b.saved - a.saved)
+    : [];
+
+  const totalSavings = overCats.reduce((s, { excess }) => s + excess, 0)
+    + opportunityCats.reduce((s, { saved }) => s + saved, 0);
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
@@ -187,7 +226,7 @@ export default function SavingsOpportunitiesScreen() {
         <View style={st.centered}>
           <ActivityIndicator size="large" color={C.green} />
         </View>
-      ) : !plan || overCats.length === 0 ? (
+      ) : !plan || (overCats.length === 0 && opportunityCats.length === 0) ? (
         <View style={st.centered}>
           <Text style={{ fontSize: 52 }}>🎉</Text>
           <Text style={st.emptyTitle}>¡Sin excesos este mes!</Text>
@@ -205,19 +244,41 @@ export default function SavingsOpportunitiesScreen() {
             text="Si reducís estos gastos al nivel de tu promedio histórico, podés ahorrar significativamente sin cambiar mucho tu estilo de vida."
           />
 
-          <View style={st.sectionRow}>
-            <Text style={st.sectionTitle}>Categorías a ajustar</Text>
-            <Text style={st.sectionCount}>{overCats.length} categorías</Text>
-          </View>
+          {overCats.length > 0 && (
+            <>
+              <View style={st.sectionRow}>
+                <Text style={st.sectionTitle}>Categorías a ajustar</Text>
+                <Text style={st.sectionCount}>{overCats.length} categorías</Text>
+              </View>
 
-          {overCats.map(({ cat, excess }) => (
-            <OpportunityRow
-              key={cat.categoryId}
-              cat={cat}
-              excess={excess}
-              onPress={() => handleCategoryPress(cat)}
-            />
-          ))}
+              {overCats.map(({ cat, excess }) => (
+                <OpportunityRow
+                  key={cat.categoryId}
+                  cat={cat}
+                  excess={excess}
+                  onPress={() => handleCategoryPress(cat)}
+                />
+              ))}
+            </>
+          )}
+
+          {opportunityCats.length > 0 && (
+            <>
+              <View style={st.sectionRow}>
+                <Text style={st.sectionTitle}>Ya estás ahorrando</Text>
+                <Text style={st.sectionCount}>{opportunityCats.length} categorías</Text>
+              </View>
+
+              {opportunityCats.map(({ cat, saved }) => (
+                <SavingsRow
+                  key={cat.categoryId}
+                  cat={cat}
+                  saved={saved}
+                  onPress={() => handleCategoryPress(cat)}
+                />
+              ))}
+            </>
+          )}
 
           <View style={st.divider} />
 

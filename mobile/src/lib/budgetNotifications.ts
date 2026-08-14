@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { type BudgetPlan } from './budgetPlan';
-import { formatCurrency } from '@/utils/format';
+import { buildCategoryInsight } from './budgetInsights';
 
 // Show notifications even when app is in foreground
 Notifications.setNotificationHandler({
@@ -29,41 +29,35 @@ export async function checkAndNotifyBudgetLimits(plan: BudgetPlan): Promise<void
   const raw  = await AsyncStorage.getItem(STORAGE_KEY);
   const sent: Record<string, number> = raw ? JSON.parse(raw) : {};
   const now  = Date.now();
-  let   dirty = false;
 
-  for (const cat of plan.categories) {
-    if (cat.status === 'ok') continue;
+  // Solo se notifica en el nivel más severo — evita saturar de avisos
+  // (atención/oportunidad se ven dentro de la app, no ameritan una push).
+  // Y como mucho UNA notificación por corrida, la más relevante — un usuario
+  // con 4-5 categorías en alerta a la vez no debería recibir 4-5 pushes juntas.
+  const candidates = plan.categories
+    .filter(c => c.alertLevel === 'alerta')
+    .sort((a, b) => (b.projected - b.avgMonthly) - (a.projected - a.avgMonthly));
 
-    // Skip if already notified within cooldown window
-    const lastSent = sent[cat.categoryId] ?? 0;
-    if (now - lastSent < COOLDOWN_MS) continue;
+  const toNotify = candidates.find(c => now - (sent[c.categoryId] ?? 0) >= COOLDOWN_MS);
+  if (!toNotify) return;
 
-    const isOver = cat.status === 'over';
+  const insight = buildCategoryInsight(toNotify, plan);
 
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: isOver
-          ? `⚠️ Superaste el límite en ${cat.name}`
-          : `📊 Te estás acercando al límite en ${cat.name}`,
-        body: isOver
-          ? `Gastaste ${formatCurrency(cat.currentSpend)} de un promedio de ${formatCurrency(cat.avgMonthly)}. Proyección: ${formatCurrency(cat.projected)}.`
-          : `Llevás el ${Math.round(cat.pct * 100)}% de tu promedio mensual en ${cat.name}.`,
-        data: {
-          screen:     'category-detail',
-          categoryId: cat.categoryId,
-        },
-        sound: true,
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: `${insight.emoji} ${insight.headline} en ${toNotify.name}`,
+      body:  insight.body,
+      data: {
+        screen:     'category-detail',
+        categoryId: toNotify.categoryId,
       },
-      trigger: null, // immediate
-    });
+      sound: true,
+    },
+    trigger: null, // immediate
+  });
 
-    sent[cat.categoryId] = now;
-    dirty = true;
-  }
-
-  if (dirty) {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sent));
-  }
+  sent[toNotify.categoryId] = now;
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sent));
 }
 
 // Call once at app startup to handle taps on notifications
