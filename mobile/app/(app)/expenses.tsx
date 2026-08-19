@@ -27,7 +27,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { colors, spacing, layout } from '@/theme';
-import { Text, Button, Input, Badge } from '@/components/ui';
+import { Text, Button, Input, Badge, FormSheetModal } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useRoundUpStore } from '@/store/roundUpStore';
@@ -1151,8 +1151,12 @@ export default function ExpensesScreen() {
       );
       const data = await response.json();
       if (data.expenses && data.expenses.length > 0) {
-        // Auto-guardar todos los gastos detectados sin pedir confirmación
+        // Auto-guardar todos los gastos detectados sin pedir confirmación.
+        // process-screenshot ya devuelve classification/category (mismo criterio
+        // que gmail-poll) — antes se descartaban acá, a diferencia del flujo de
+        // Gmail (PendingTransactions.tsx), que sí los conserva.
         for (const e of data.expenses) {
+          const matchedCategory = categories.find((c: any) => c.name === e.category);
           await addExpense(user.id, {
             description: e.description,
             amount: e.amount,
@@ -1160,6 +1164,8 @@ export default function ExpensesScreen() {
             payment_method: 'digital_wallet',
             notes: null,
             is_recurring: false,
+            classification: e.classification ?? null,
+            category_id: matchedCategory?.id ?? null,
           });
         }
         fetchExpenses(user.id);
@@ -1379,7 +1385,7 @@ export default function ExpensesScreen() {
       }
       setPastOppData(Object.values(oppMap));
 
-      supabase.from('market_rates').select('instrument, rate_monthly').in('instrument', ['inflation', 'fci_mm']).then(({ data }) => {
+      (supabase as any).from('market_rates').select('instrument, rate_monthly').in('instrument', ['inflation', 'fci_mm']).then(({ data }: { data: { instrument: string; rate_monthly: number }[] | null }) => {
         if (!data) return;
         for (const row of data) {
           if (row.instrument === 'inflation') setInflationRate(Number(row.rate_monthly));
@@ -2058,29 +2064,12 @@ export default function ExpensesScreen() {
       )}
 
       {/* Modal agregar gasto */}
-      <Modal
+      <FormSheetModal
         visible={showAddModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowAddModal(false)}
+        title="Nuevo gasto"
+        onClose={() => setShowAddModal(false)}
+        contentContainerStyle={styles.modalScroll}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modal}
-        >
-          <SafeAreaView style={styles.modal}>
-            <View style={styles.modalHeader}>
-              <Text variant="h4">Nuevo gasto</Text>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              contentContainerStyle={styles.modalScroll}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
               {/* ── Monto prominente ── */}
               <Controller
                 control={control}
@@ -2280,31 +2269,18 @@ export default function ExpensesScreen() {
                 onPress={handleSubmit(onSubmit)}
                 style={{ marginTop: spacing[4] }}
               />
-            </ScrollView>
-          </SafeAreaView>
-        </KeyboardAvoidingView>
-      </Modal>
+      </FormSheetModal>
 
       {/* Modal clasificar gasto — diseño premium */}
-      <Modal
+      <FormSheetModal
         visible={!!editingExpense}
-        animationType="slide"
+        title="Clasificar gasto"
+        onClose={() => { setEditingExpense(null); setEditExpenseValues(null); setCategorySearch(''); }}
         presentationStyle="formSheet"
-        onRequestClose={() => { setEditingExpense(null); setEditExpenseValues(null); setCategorySearch(''); }}
+        backgroundColor="#FFFFFF"
+        scrollable={false}
+        contentContainerStyle={{ flex: 1, padding: 0, gap: 0 }}
       >
-        <SafeAreaView style={clsModal.safe}>
-          {/* Header */}
-          <View style={clsModal.header}>
-            <Text style={clsModal.headerTitle}>Clasificar gasto</Text>
-            <TouchableOpacity
-              onPress={() => { setEditingExpense(null); setEditExpenseValues(null); setCategorySearch(''); }}
-              style={clsModal.closeBtn}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={20} color="#1A1A1A" />
-            </TouchableOpacity>
-          </View>
-
           {editExpenseValues && (() => {
             const pastExpenses = expenses.filter(e => e.category_id && e.id !== editingExpense?.id);
             const bestMatches = computeCategoryMatches(editingExpense?.description ?? '', categories, pastExpenses);
@@ -2314,8 +2290,8 @@ export default function ExpensesScreen() {
               : categories;
             return (
               <>
-                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                   <ScrollView
+                    style={{ flex: 1 }}
                     contentContainerStyle={clsModal.scroll}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
@@ -2472,7 +2448,6 @@ export default function ExpensesScreen() {
 
                     <View style={{ height: 20 }} />
                   </ScrollView>
-                </KeyboardAvoidingView>
 
                 {/* Bottom fixed */}
                 <View style={clsModal.bottomBar}>
@@ -2499,8 +2474,7 @@ export default function ExpensesScreen() {
               </>
             );
           })()}
-        </SafeAreaView>
-      </Modal>
+      </FormSheetModal>
 
       <ShareInGroupModal
         visible={showShareModal}
@@ -2956,16 +2930,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[3],
   },
   // Modal
-  modal: { flex: 1, backgroundColor: colors.bg.primary },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: layout.screenPadding,
-    paddingVertical: spacing[4],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
-  },
   modalScroll: {
     paddingHorizontal: layout.screenPadding,
     paddingVertical: spacing[6],
@@ -3402,19 +3366,6 @@ const smS = StyleSheet.create({
 // ─── Clasificar gasto modal styles (light theme) ─────────────────────────────
 
 const clsModal = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
-
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 22, paddingBottom: 16,
-  },
-  headerTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 22, color: '#111827' },
-  closeBtn: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center', justifyContent: 'center',
-  },
-
   scroll: { paddingHorizontal: 20, paddingBottom: 24, gap: 22 },
 
   // AI banner

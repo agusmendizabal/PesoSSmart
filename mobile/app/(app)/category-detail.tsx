@@ -21,27 +21,21 @@ import { formatCurrency } from '@/utils/format';
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:     '#F7F9FC',
+  bg:     '#F6F7F9',
   card:   '#FFFFFF',
-  blue:   '#2563EB',
-  green:  '#16A34A',
-  violet: '#8B5CF6',
+  blue:   '#1976D2',
+  green:  '#2E7D32',
+  violet: '#7B61FF',
   red:    '#EF4444',
   amber:  '#F59E0B',
-  text:   '#111827',
-  sub:    '#6B7280',
-  muted:  '#9CA3AF',
-  border: '#E5E7EB',
-  light:  '#F3F4F6',
+  text:   '#212121',
+  sub:    '#757575',
+  muted:  '#9E9E9E',
+  border: '#E0E0E0',
+  light:  '#F2F2F2',
 } as const;
 
-const shadow = {
-  shadowColor: '#1F2937',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.06,
-  shadowRadius: 10,
-  elevation: 3,
-} as const;
+const shadow = layout.cardShadow;
 
 // ─── Category Icon helper ─────────────────────────────────────────────────────
 
@@ -216,7 +210,7 @@ function ResumenTab({ cat }: { cat: CategoryBudget }) {
             {Math.round(cat.pct * 100)}% del promedio
           </Text>
         </View>
-        <Text style={[rt.mainAmount, { color: isOver ? C.red : C.text }]}>
+        <Text style={[rt.mainAmount, { color: isOver ? C.red : C.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
           {formatCurrency(cat.currentSpend)}
         </Text>
         <View style={rt.track}>

@@ -540,10 +540,10 @@ export default function ReportsScreen() {
 
   useEffect(() => {
     if (user?.id) loadSavings(user.id);
-    supabase
+    (supabase as any)
       .from('market_rates')
       .select('instrument, rate_monthly')
-      .then(({ data }) => {
+      .then(({ data }: { data: { instrument: string; rate_monthly: number }[] | null }) => {
         if (!data) return;
         const ratesMap: Record<string, number> = {};
         for (const row of data) {

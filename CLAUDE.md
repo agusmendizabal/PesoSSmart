@@ -53,8 +53,11 @@ Detailed architecture is documented in [mobile/CLAUDE.md](mobile/CLAUDE.md). Key
 - The `profiles` row is created by a DB trigger on `auth.users` insert — missing profile = FK violation on all expense inserts.
 
 ### Edge Functions
-- All edge functions do their own JWT validation. **"Verify JWT with legacy secret" must be OFF** in Supabase → Edge Functions → Settings.
+- Two auth patterns, by function type: user-facing functions (`ai-advisor`, `investment-advisor`, `gmail-poll`, `mp-poll`, `transcribe`) are deployed with Gateway JWT verification **ON** (`verify_jwt=true` — Supabase rejects invalid/missing JWTs before the function code runs); server-to-server functions with no end-user session (cron jobs `fetch-market-rates`/`cedear-sync`/`indec-sync`, webhooks `mp-webhook`, internal calls `send-push`/`advisor-sunday`) are deployed with `--no-verify-jwt` and instead check a shared secret in the `Authorization` header (`MARKET_RATES_SYNC_SECRET`, `CEDEAR_SYNC_SECRET`, `INDEC_SYNC_SECRET`, `MP_WEBHOOK_SECRET`, `INTERNAL_FN_SECRET`) — always fail-closed (reject if the secret env var is missing) with an exact string comparison, never `.includes()`.
+- The 3 cron secrets are stored in Supabase Vault, not hardcoded in migration SQL — `cron_secrets_vault.sql` reads them via `vault.decrypted_secrets` at execution time.
+- `INTERNAL_FN_SECRET` gates `send-push`/`advisor-sunday`; any function that calls them (`gmail-poll`, `mp-poll`, `mp-webhook`) must send it, not the service role key.
 - The `ai-advisor` function returns HTTP 429 `{ error: 'limit_reached' }` when the monthly message limit is exceeded. The client shows a paywall Alert — not a chat error bubble.
+- RPCs invoked from an edge function with a client-supplied `user_id` (e.g. `increment_ai_usage`) must be called with the ANON key + the caller's real `Authorization` header (not the service role key) so `auth.uid()` inside the RPC reflects the real caller — the RPC itself then validates `auth.uid() = p_user_id`.
 
 ### Freemium
 - Plans: `free` (15 msg/mo), `pro` (100 msg/mo), `premium` (unlimited). New users get a 30-day premium trial via DB trigger.
@@ -73,4 +76,9 @@ Edge function secrets (Supabase dashboard or `supabase secrets set`):
 GROQ_API_KEY
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
+MARKET_RATES_SYNC_SECRET
+CEDEAR_SYNC_SECRET
+INDEC_SYNC_SECRET
+MP_WEBHOOK_SECRET
+INTERNAL_FN_SECRET
 ```

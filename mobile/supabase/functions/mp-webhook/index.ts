@@ -6,6 +6,7 @@ const MP_ACCESS_TOKEN = Deno.env.get('MP_ACCESS_TOKEN')!;
 const MP_WEBHOOK_SECRET = Deno.env.get('MP_WEBHOOK_SECRET')!; // configurar en MP dashboard
 const SUPABASE_URL    = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SECRET = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const INTERNAL_FN_SECRET = Deno.env.get('INTERNAL_FN_SECRET');
 
 // Días de suscripción por plan
 const PLAN_DURATION_DAYS: Record<string, number> = {
@@ -24,17 +25,33 @@ serve(async (req) => {
   const urlParams   = new URL(req.url).searchParams;
   const dataId      = urlParams.get('data.id') ?? JSON.parse(body)?.data?.id ?? '';
 
-  if (MP_WEBHOOK_SECRET) {
-    const signedTemplate = `id:${dataId};request-id:${xRequestId};ts:${xSignature.split('ts=')[1]?.split(',')[0] ?? ''};`;
-    const [, signaturePart] = xSignature.split('v1=');
-    const expectedSig = createHmac('sha256', MP_WEBHOOK_SECRET)
-      .update(signedTemplate)
-      .digest('hex');
+  // Fail-closed: sin secret configurado, se rechaza en vez de saltear la verificación.
+  if (!MP_WEBHOOK_SECRET) {
+    console.error('[mp-webhook] MP_WEBHOOK_SECRET no configurado');
+    return new Response('Secret no configurado', { status: 500 });
+  }
 
-    if (signaturePart !== expectedSig) {
-      console.warn('[mp-webhook] Firma inválida');
-      return new Response('Firma inválida', { status: 401 });
-    }
+  const ts = xSignature.split('ts=')[1]?.split(',')[0] ?? '';
+  const signedTemplate = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+  const [, signaturePart] = xSignature.split('v1=');
+  const expectedSig = createHmac('sha256', MP_WEBHOOK_SECRET)
+    .update(signedTemplate)
+    .digest('hex');
+
+  if (signaturePart !== expectedSig) {
+    console.warn('[mp-webhook] Firma inválida');
+    return new Response('Firma inválida', { status: 401 });
+  }
+
+  // Protección anti-replay: una firma válida capturada una vez no debe poder
+  // reenviarse indefinidamente. MP envía `ts` como epoch — normaliza a ms
+  // sin asumir la unidad exacta (10 dígitos ≈ segundos, 13 ≈ milisegundos).
+  const tsNum = Number(ts);
+  const tsMs = ts.length <= 10 ? tsNum * 1000 : tsNum;
+  const MAX_SKEW_MS = 5 * 60 * 1000; // 5 minutos
+  if (!ts || !Number.isFinite(tsNum) || Math.abs(Date.now() - tsMs) > MAX_SKEW_MS) {
+    console.warn('[mp-webhook] Timestamp de firma fuera de rango (posible replay)');
+    return new Response('Firma expirada', { status: 401 });
   }
 
   const payload = JSON.parse(body);
@@ -100,7 +117,7 @@ serve(async (req) => {
       // Notificar al usuario por push
       await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_SECRET}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${INTERNAL_FN_SECRET}` },
         body: JSON.stringify({
           userId,
           title: '⚠️ Problema con tu pago',

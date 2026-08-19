@@ -17,12 +17,12 @@ const C = {
   white:    '#FFFFFF',
   green:    '#2E7D32',
   greenLt:  '#EEF7EF',
-  purple:   '#7C3AED',
+  purple:   '#7B61FF',
   purpleLt: '#F5F0FF',
-  text:     '#111111',
-  text2:    '#444444',
+  text:     '#212121',
+  text2:    '#757575',
   muted:    '#9E9E9E',
-  border:   '#E5E7EB',
+  border:   '#E0E0E0',
 } as const;
 
 const sp = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 } as const;

@@ -270,7 +270,7 @@ export function computeFinancialDiagnosis(input: DiagnosisInput): FinancialDiagn
       } else {
         insights.push({
           id: 'savings_low', type: 'warning',
-          icon: 'trending-flat-outline',
+          icon: 'remove-outline',
           title: `Ahorrás el ${savingPct}% — objetivo: 20%`,
           body: `Quedaron ${formatCurrency(saving)} sin gastar. Para preservar poder adquisitivo en Argentina, necesitás al menos el 20% en instrumentos que ajusten (FCI, UVA, MEP). Hoy estás debajo de ese umbral.`,
           metric: formatCurrency(saving),

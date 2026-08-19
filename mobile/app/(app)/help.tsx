@@ -21,7 +21,6 @@ const GUIDE_ITEMS: GuideItem[] = [
   { key: 'reports',       route: '/(app)/reports',       label: 'Reportes',        description: 'Salud financiera, análisis con IA e inflación',    icon: 'bar-chart-outline' },
   { key: 'savings',       route: '/(app)/savings',       label: 'Ahorros',         description: 'Metas, bolsillos y Plan Inteligente',              icon: 'trending-up-outline' },
   { key: 'simulator',     route: '/(app)/simulator',     label: 'Simulador',       description: 'Comparar instrumentos de inversión',               icon: 'calculator-outline' },
-  { key: 'grupo-familia', route: '/(app)/grupo-familia', label: 'Familia',         description: 'Coordinar finanzas con tu grupo',                  icon: 'people-outline' },
   { key: 'plans',         route: '/(app)/plans',         label: 'Tu plan',         description: 'Comparar y cambiar de plan',                       icon: 'star-outline' },
 ];
 

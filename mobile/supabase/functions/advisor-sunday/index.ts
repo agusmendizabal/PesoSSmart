@@ -15,6 +15,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL    = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SECRET = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const INTERNAL_FN_SECRET = Deno.env.get('INTERNAL_FN_SECRET');
 
 function weekRange(weeksAgo = 0): { start: string; end: string } {
   const now  = new Date();
@@ -40,6 +41,16 @@ function fmt(n: number): string {
 }
 
 serve(async (req) => {
+  // Función server-to-server: cron/invocación manual con secret propio.
+  // Fail-closed: si el secret no está configurado, se rechaza.
+  if (!INTERNAL_FN_SECRET) {
+    return new Response(JSON.stringify({ error: 'Secret no configurado' }), { status: 500 });
+  }
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (authHeader !== `Bearer ${INTERNAL_FN_SECRET}`) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+  }
+
   // Accepts GET (from Supabase cron) or POST (manual trigger)
   const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET);
 
@@ -79,7 +90,7 @@ serve(async (req) => {
           .gte('date', lastWeek.start)
           .lte('date', lastWeek.end),
         supabase
-          .from('goals')
+          .from('savings_goals')
           .select('title, current_amount, target_amount')
           .eq('user_id', user.id)
           .order('current_amount', { ascending: false })
@@ -116,7 +127,7 @@ serve(async (req) => {
         method: 'POST',
         headers: {
           'Content-Type':  'application/json',
-          'Authorization': `Bearer ${SUPABASE_SECRET}`,
+          'Authorization': `Bearer ${INTERNAL_FN_SECRET}`,
         },
         body: JSON.stringify({
           token: user.push_token,

@@ -7,7 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text } from '@/components/ui';
+import { Text, FormSheetModal, FormSheetButton } from '@/components/ui';
 import { CategoryIcon } from '@/components/CategoryIcon';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
@@ -20,20 +20,20 @@ const { width: SW } = Dimensions.get('window');
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
 const C = {
-  bg:       '#F0F2F5',
+  bg:       '#F6F7F9',
   white:    '#FFFFFF',
-  purple:   '#7C3AED',
+  purple:   '#7B61FF',
   purpleLt: '#EDE9FE',
-  purpleMd: '#8B5CF6',
-  green:    '#12B76A',
+  purpleMd: '#7B61FF',
+  green:    '#2E7D32',
   greenLt:  '#ECFDF3',
-  text:     '#101828',
-  text2:    '#344054',
-  muted:    '#667085',
-  border:   '#EAECF0',
-  red:      '#F04438',
+  text:     '#212121',
+  text2:    '#757575',
+  muted:    '#9E9E9E',
+  border:   '#E0E0E0',
+  red:      '#EF4444',
   redLt:    '#FEF3F2',
-  orange:   '#D97706',
+  orange:   '#F59E0B',
   orangeLt: '#FFFAEB',
   card:     '#FFFFFF',
 } as const;
@@ -704,67 +704,51 @@ function MemberEditModal({
   if (!member) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <SafeAreaView style={s.modal} edges={['top', 'bottom']}>
-        <View style={s.modalHeader}>
-          <View style={{ width: 30 }} />
-          <Text style={s.modalTitle}>Editar miembro</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close" size={22} color={C.muted} />
-          </TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false}>
-          <View style={{ alignItems: 'center', gap: sp.sm }}>
-            <Avatar name={member.name} color={member.color} size={72} />
-            <Text style={s.editName}>{member.name}</Text>
-            {member.email ? <Text style={s.editEmail}>{member.email}</Text> : null}
-          </View>
-          <View style={{ gap: sp.md }}>
-            <Text style={s.sectionLabel}>ROL EN EL GRUPO</Text>
-            {([
-              { role: 'Miembro' as MemberRole, desc: 'Puede ver su información y los gastos que el admin permita.' },
-              { role: 'Admin'   as MemberRole, desc: 'Puede ver los gastos de todos los miembros y administrar el grupo.' },
-            ]).map(({ role, desc }) => (
-              <TouchableOpacity
-                key={role}
-                style={[s.radioRow, selectedRole === role && { borderColor: C.purple + '80', backgroundColor: C.purpleLt }]}
-                onPress={() => setSelectedRole(role)} activeOpacity={0.8}
-              >
-                <View style={[s.radioCircle, selectedRole === role && { borderColor: C.purple }]}>
-                  {selectedRole === role && <View style={[s.radioDot, { backgroundColor: C.purple }]} />}
-                </View>
-                <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={[s.radioTitle, selectedRole === role && { color: C.purple }]}>{role}</Text>
-                  <Text style={s.radioDesc}>{desc}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={{ gap: sp.md }}>
-            <Text style={s.sectionLabel}>PERMISOS ADICIONALES</Text>
-            <View style={s.card}>
-              {PERM_LABELS.map((p, i) => (
-                <View key={p.key}>
-                  {i > 0 && <View style={s.divider} />}
-                  <TouchableOpacity style={s.checkRow} onPress={() => setPerms(prev => ({ ...prev, [p.key]: !prev[p.key] }))} activeOpacity={0.8}>
-                    <View style={[s.checkbox, perms[p.key] && { backgroundColor: C.purple, borderColor: C.purple }]}>
-                      {perms[p.key] && <Ionicons name="checkmark" size={13} color={C.white} />}
-                    </View>
-                    <Text style={s.checkLabel}>{p.label}</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          </View>
+    <FormSheetModal visible={visible} title="Editar miembro" onClose={onClose} presentationStyle="formSheet">
+      <View style={{ alignItems: 'center', gap: sp.sm }}>
+        <Avatar name={member.name} color={member.color} size={72} />
+        <Text style={s.editName}>{member.name}</Text>
+        {member.email ? <Text style={s.editEmail}>{member.email}</Text> : null}
+      </View>
+      <View style={{ gap: sp.md }}>
+        <Text style={s.sectionLabel}>ROL EN EL GRUPO</Text>
+        {([
+          { role: 'Miembro' as MemberRole, desc: 'Puede ver su información y los gastos que el admin permita.' },
+          { role: 'Admin'   as MemberRole, desc: 'Puede ver los gastos de todos los miembros y administrar el grupo.' },
+        ]).map(({ role, desc }) => (
           <TouchableOpacity
-            style={[s.purpleBtn, saving && { opacity: 0.5 }]}
-            onPress={handleSave} disabled={saving} activeOpacity={0.85}
+            key={role}
+            style={[s.radioRow, selectedRole === role && { borderColor: C.purple + '80', backgroundColor: C.purpleLt }]}
+            onPress={() => setSelectedRole(role)} activeOpacity={0.8}
           >
-            {saving ? <ActivityIndicator color={C.white} size="small" /> : <Text style={s.purpleBtnText}>Guardar cambios</Text>}
+            <View style={[s.radioCircle, selectedRole === role && { borderColor: C.purple }]}>
+              {selectedRole === role && <View style={[s.radioDot, { backgroundColor: C.purple }]} />}
+            </View>
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={[s.radioTitle, selectedRole === role && { color: C.purple }]}>{role}</Text>
+              <Text style={s.radioDesc}>{desc}</Text>
+            </View>
           </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
+        ))}
+      </View>
+      <View style={{ gap: sp.md }}>
+        <Text style={s.sectionLabel}>PERMISOS ADICIONALES</Text>
+        <View style={s.card}>
+          {PERM_LABELS.map((p, i) => (
+            <View key={p.key}>
+              {i > 0 && <View style={s.divider} />}
+              <TouchableOpacity style={s.checkRow} onPress={() => setPerms(prev => ({ ...prev, [p.key]: !prev[p.key] }))} activeOpacity={0.8}>
+                <View style={[s.checkbox, perms[p.key] && { backgroundColor: C.purple, borderColor: C.purple }]}>
+                  {perms[p.key] && <Ionicons name="checkmark" size={13} color={C.white} />}
+                </View>
+                <Text style={s.checkLabel}>{p.label}</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      </View>
+      <FormSheetButton label="Guardar cambios" color={C.purple} loading={saving} onPress={handleSave} />
+    </FormSheetModal>
   );
 }
 
@@ -1264,16 +1248,16 @@ function ExpenseDetailModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <SafeAreaView style={[s.modal, { backgroundColor: C.bg }]} edges={['top', 'bottom']}>
-        <View style={[s.modalHeader, { backgroundColor: C.white }]}>
-          <View style={{ width: 22 }} />
-          <Text style={s.modalTitle}>Detalle del gasto</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close" size={22} color={C.muted} />
-          </TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+    <FormSheetModal
+      visible={visible}
+      title="Detalle del gasto"
+      onClose={onClose}
+      presentationStyle="formSheet"
+      backgroundColor={C.bg}
+      contentContainerStyle={{ padding: 0, gap: 0 }}
+    >
+      {(
+        <>
           {/* Hero */}
           <View style={{ backgroundColor: C.white, alignItems: 'center', paddingVertical: sp.xxl, paddingHorizontal: sp.xl, gap: sp.md }}>
             <View style={s.expEmojiBox}>
@@ -1419,9 +1403,9 @@ function ExpenseDetailModal({
               )}
             </View>
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
+        </>
+      )}
+    </FormSheetModal>
   );
 }
 
@@ -1526,7 +1510,7 @@ function MemberProfileSheet({
                   ].map((col, i) => (
                     <View key={col.label} style={{ flex: 1, alignItems: i === 1 ? 'center' : i === 2 ? 'flex-end' : 'flex-start', gap: 3 }}>
                       <Text style={s.summaryLabel}>{col.label}</Text>
-                      <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 15, color: col.color }}>{col.value}</Text>
+                      <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 15, color: col.color }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{col.value}</Text>
                     </View>
                   ))}
                 </View>
@@ -1636,65 +1620,57 @@ function RecordarModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <SafeAreaView style={[s.modal, { backgroundColor: C.bg }]} edges={['top', 'bottom']}>
-        <View style={[s.modalHeader, { backgroundColor: C.white }]}>
-          {step === 'preview' ? (
-            <TouchableOpacity onPress={() => setStep('tone')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="arrow-back" size={22} color={C.muted} />
-            </TouchableOpacity>
-          ) : <View style={{ width: 22 }} />}
-          <Text style={s.modalTitle}>
-            {step === 'tone' ? `Recordar a ${member.name.split(' ')[0]}` : 'Mensaje para ' + member.name.split(' ')[0]}
-          </Text>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="close" size={22} color={C.muted} />
-          </TouchableOpacity>
-        </View>
+    <FormSheetModal
+      visible={visible}
+      title={step === 'tone' ? `Recordar a ${member.name.split(' ')[0]}` : 'Mensaje para ' + member.name.split(' ')[0]}
+      onClose={onClose}
+      onBack={step === 'preview' ? () => setStep('tone') : undefined}
+      presentationStyle="formSheet"
+      backgroundColor={C.bg}
+    >
+      {step === 'tone' && (
+        <>
+          <Text style={s.sectionLabel}>ELEGÍ EL TONO DEL MENSAJE</Text>
+          <View style={{ flexDirection: 'row', gap: sp.md }}>
+            {TONE_CONFIG.map(t => (
+              <TouchableOpacity
+                key={t.val}
+                style={[s.toneCard, tone === t.val && { borderColor: C.purple, backgroundColor: C.purpleLt }]}
+                onPress={() => { setTone(t.val); hapticLight(); }} activeOpacity={0.8}>
+                <Text style={{ fontSize: 26 }}>{t.emoji}</Text>
+                <Text style={[s.toneName, tone === t.val && { color: C.purple }]}>{t.label}</Text>
+                <Text style={s.toneDesc}>{t.desc}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <FormSheetButton
+            label="Generar mensaje"
+            color="#25D366"
+            icon="logo-whatsapp"
+            onPress={() => setStep('preview')}
+          />
+        </>
+      )}
 
-        {step === 'tone' && (
-          <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false}>
-            <Text style={s.sectionLabel}>ELEGÍ EL TONO DEL MENSAJE</Text>
-            <View style={{ flexDirection: 'row', gap: sp.md }}>
-              {TONE_CONFIG.map(t => (
-                <TouchableOpacity
-                  key={t.val}
-                  style={[s.toneCard, tone === t.val && { borderColor: C.purple, backgroundColor: C.purpleLt }]}
-                  onPress={() => { setTone(t.val); hapticLight(); }} activeOpacity={0.8}>
-                  <Text style={{ fontSize: 26 }}>{t.emoji}</Text>
-                  <Text style={[s.toneName, tone === t.val && { color: C.purple }]}>{t.label}</Text>
-                  <Text style={s.toneDesc}>{t.desc}</Text>
-                </TouchableOpacity>
-              ))}
+      {step === 'preview' && (
+        <>
+          <Text style={s.sectionLabel}>VISTA PREVIA</Text>
+          <View style={s.waBubbleContainer}>
+            <View style={s.waBubble}>
+              <Text style={s.waBubbleText}>{message}</Text>
+              <Text style={s.waBubbleTime}>11:30 ✓✓</Text>
             </View>
-            <TouchableOpacity style={s.whatsappBtn} onPress={() => setStep('preview')} activeOpacity={0.85}>
-              <Ionicons name="logo-whatsapp" size={20} color={C.white} />
-              <Text style={s.whatsappBtnText}>Generar mensaje</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        )}
-
-        {step === 'preview' && (
-          <ScrollView contentContainerStyle={s.modalBody} showsVerticalScrollIndicator={false}>
-            <Text style={s.sectionLabel}>VISTA PREVIA</Text>
-            <View style={s.waBubbleContainer}>
-              <View style={s.waBubble}>
-                <Text style={s.waBubbleText}>{message}</Text>
-                <Text style={s.waBubbleTime}>11:30 ✓✓</Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={[s.whatsappBtn, sending && { opacity: 0.6 }]}
-              onPress={handleSend} disabled={sending} activeOpacity={0.85}>
-              {sending ? <ActivityIndicator color={C.white} size="small" /> : (
-                <><Ionicons name="logo-whatsapp" size={20} color={C.white} />
-                <Text style={s.whatsappBtnText}>Enviar por WhatsApp</Text></>
-              )}
-            </TouchableOpacity>
-          </ScrollView>
-        )}
-      </SafeAreaView>
-    </Modal>
+          </View>
+          <FormSheetButton
+            label="Enviar por WhatsApp"
+            color={C.purple}
+            icon="logo-whatsapp"
+            loading={sending}
+            onPress={handleSend}
+          />
+        </>
+      )}
+    </FormSheetModal>
   );
 }
 
@@ -2004,18 +1980,18 @@ function FriendsMainTab({
       {/* Summary card */}
       <View style={s.summaryCard}>
         <Text style={s.scMonthLabel}>Este mes</Text>
-        <Text style={s.scTotal}>{formatCurrency(detail.totalMonth)}</Text>
+        <Text style={s.scTotal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatCurrency(detail.totalMonth)}</Text>
         <Text style={s.scTotalLabel}>Total compartido</Text>
         <View style={s.scDivider} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <View style={{ gap: 4 }}>
+          <View style={{ flex: 1, gap: 4, marginRight: 8 }}>
             <Text style={s.summaryLabel}>Te deben</Text>
-            <Text style={[s.scBalAmt, { color: C.green }]}>{formatCurrency(owedAmt)}</Text>
+            <Text style={[s.scBalAmt, { color: C.green }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatCurrency(owedAmt)}</Text>
           </View>
           <View style={{ width: 1, backgroundColor: C.border }} />
-          <View style={{ gap: 4, alignItems: 'flex-end' }}>
+          <View style={{ flex: 1, gap: 4, alignItems: 'flex-end', marginLeft: 8 }}>
             <Text style={s.summaryLabel}>Debés</Text>
-            <Text style={[s.scBalAmt, { color: C.red }]}>{formatCurrency(iOweAmt)}</Text>
+            <Text style={[s.scBalAmt, { color: C.red }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatCurrency(iOweAmt)}</Text>
           </View>
         </View>
       </View>
@@ -2743,49 +2719,39 @@ export default function GroupDetailScreen() {
               members={detail.members} groupId={id!} userId={user!.id} onSaved={load} />
           )}
           {/* Modal miembros */}
-          <Modal visible={showMembers} animationType="slide" presentationStyle="formSheet" onRequestClose={() => setShowMembers(false)}>
-            <SafeAreaView style={s.modal} edges={['top']}>
-              <View style={s.modalHeader}>
-                <Text style={s.modalTitle}>Miembros</Text>
-                <TouchableOpacity onPress={() => setShowMembers(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close" size={24} color={C.text} />
-                </TouchableOpacity>
-              </View>
-              <ScrollView contentContainerStyle={s.modalBody}>
-                <View style={s.card}>
-                  {detail.members.map((m, i) => {
-                    const canEdit = isAdmin && !m.isMe && !isFriends;
-                    return (
-                      <View key={m.userId}>
-                        {i > 0 && <View style={s.divider} />}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg }}>
-                          <Avatar name={m.name} color={m.color} size={44} />
-                          <View style={{ flex: 1, gap: 3 }}>
-                            <Text style={s.memberName} numberOfLines={1}>{m.isMe ? `Vos (${m.name})` : m.name}</Text>
-                            {m.email ? <Text style={s.memberMeta} numberOfLines={1}>{m.email}</Text> : null}
-                          </View>
-                          {!isFriends && (
-                            <View style={[s.badge, { backgroundColor: m.role === 'Admin' ? '#DCFCE7' : C.purpleLt }]}>
-                              <Text style={[s.badgeText, { color: m.role === 'Admin' ? C.green : C.purple }]}>{m.role}</Text>
-                            </View>
-                          )}
-                          {canEdit && (
-                            <TouchableOpacity onPress={() => { setShowMembers(false); setEditingMember(m); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} activeOpacity={0.7}>
-                              <Ionicons name="ellipsis-horizontal" size={20} color={C.muted} />
-                            </TouchableOpacity>
-                          )}
-                        </View>
+          <FormSheetModal visible={showMembers} title="Miembros" onClose={() => setShowMembers(false)} presentationStyle="formSheet">
+            <View style={s.card}>
+              {detail.members.map((m, i) => {
+                const canEdit = isAdmin && !m.isMe && !isFriends;
+                return (
+                  <View key={m.userId}>
+                    {i > 0 && <View style={s.divider} />}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg }}>
+                      <Avatar name={m.name} color={m.color} size={44} />
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <Text style={s.memberName} numberOfLines={1}>{m.isMe ? `Vos (${m.name})` : m.name}</Text>
+                        {m.email ? <Text style={s.memberMeta} numberOfLines={1}>{m.email}</Text> : null}
                       </View>
-                    );
-                  })}
-                </View>
-                <TouchableOpacity style={s.remindAllBtn} onPress={() => { setShowMembers(false); handleInvite(); }} activeOpacity={0.85}>
-                  <Ionicons name="enter-outline" size={18} color={C.purple} />
-                  <Text style={s.remindAllText}>Invitar con código</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </SafeAreaView>
-          </Modal>
+                      {!isFriends && (
+                        <View style={[s.badge, { backgroundColor: m.role === 'Admin' ? '#DCFCE7' : C.purpleLt }]}>
+                          <Text style={[s.badgeText, { color: m.role === 'Admin' ? C.green : C.purple }]}>{m.role}</Text>
+                        </View>
+                      )}
+                      {canEdit && (
+                        <TouchableOpacity onPress={() => { setShowMembers(false); setEditingMember(m); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} activeOpacity={0.7}>
+                          <Ionicons name="ellipsis-horizontal" size={20} color={C.muted} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+            <TouchableOpacity style={s.remindAllBtn} onPress={() => { setShowMembers(false); handleInvite(); }} activeOpacity={0.85}>
+              <Ionicons name="enter-outline" size={18} color={C.purple} />
+              <Text style={s.remindAllText}>Invitar con código</Text>
+            </TouchableOpacity>
+          </FormSheetModal>
 
           <MemberEditModal visible={editingMember !== null} member={editingMember}
             groupId={id!} allMembers={detail.members}
@@ -2923,14 +2889,6 @@ const s = StyleSheet.create({
     paddingVertical: 14, backgroundColor: C.white,
   },
   remindBtnText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.purple },
-
-  whatsappBtn: {
-    backgroundColor: '#25D366', borderRadius: 16,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.sm,
-    paddingVertical: 16,
-    shadowColor: '#25D366', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4,
-  },
-  whatsappBtnText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: C.white },
 
   addSmallBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 3,

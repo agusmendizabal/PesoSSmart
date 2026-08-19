@@ -1,14 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, ScrollView, StyleSheet, TouchableOpacity,
-  Modal, TextInput, KeyboardAvoidingView, Platform,
-  Alert, ActivityIndicator, RefreshControl,
+  TextInput, Alert, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { Text } from '@/components/ui';
+import { Text, FormSheetModal, FormSheetButton } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/utils/format';
@@ -18,14 +17,14 @@ import { formatCurrency } from '@/utils/format';
 const C = {
   bg:       '#F6F7F9',
   white:    '#FFFFFF',
-  purple:   '#7C3AED',
+  purple:   '#7B61FF',
   purpleLt: '#F5F0FF',
   green:    '#2E7D32',
   greenLt:  '#EEF7EF',
-  text:     '#111111',
-  text2:    '#444444',
-  muted:    '#757575',
-  border:   '#E5E7EB',
+  text:     '#212121',
+  text2:    '#757575',
+  muted:    '#9E9E9E',
+  border:   '#E0E0E0',
   red:      '#EF4444',
 } as const;
 
@@ -182,13 +181,13 @@ function GroupCard({ group, onPress }: { group: Group; onPress: () => void }) {
       <View style={s.gcDivider} />
 
       <View style={s.gcFooter}>
-        <View>
+        <View style={{ flex: 1, marginRight: 8 }}>
           <Text style={s.gcAmtLabel}>Total del mes</Text>
-          <Text style={[s.gcAmt, { color: accentColor }]}>{formatCurrency(group.totalMonth)}</Text>
+          <Text style={[s.gcAmt, { color: accentColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatCurrency(group.totalMonth)}</Text>
         </View>
-        <View style={{ alignItems: 'flex-end' }}>
+        <View style={{ flex: 1, alignItems: 'flex-end' }}>
           <Text style={s.gcAmtLabel}>Mi parte</Text>
-          <Text style={s.gcAmt}>{formatCurrency(group.myMonthTotal)}</Text>
+          <Text style={s.gcAmt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatCurrency(group.myMonthTotal)}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -527,120 +526,84 @@ export default function FamilyScreen() {
       </ScrollView>
 
       {/* MODAL: Unirme ──────────────────────────────────────────────────────── */}
-      <Modal
-        visible={showJoin} animationType="slide" presentationStyle="formSheet"
-        onRequestClose={() => setShowJoin(false)}
+      <FormSheetModal
+        visible={showJoin}
+        title="Unirme a un grupo"
+        onClose={() => setShowJoin(false)}
+        presentationStyle="formSheet"
       >
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <SafeAreaView style={s.modal} edges={['top', 'bottom']}>
+        <Text style={s.modalSub}>
+          Ingresá el código de 6 caracteres que te compartió el admin del grupo.
+        </Text>
 
-            <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Unirme a un grupo</Text>
-              <TouchableOpacity onPress={() => setShowJoin(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close" size={22} color={C.text2} />
-              </TouchableOpacity>
+        <View style={s.codeBoxRow}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <View
+              key={i}
+              style={[
+                s.codeBox,
+                joinCode.length > i && { borderColor: C.purple, backgroundColor: C.purpleLt },
+              ]}
+            >
+              <Text style={s.codeChar}>{joinCode[i] ?? ''}</Text>
             </View>
+          ))}
+        </View>
 
-            <View style={s.modalBody}>
-              <Text style={s.modalSub}>
-                Ingresá el código de 6 caracteres que te compartió el admin del grupo.
-              </Text>
+        <TextInput
+          style={s.hiddenInput}
+          value={joinCode}
+          onChangeText={t => {
+            setJoinError(null);
+            setJoinCode(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6));
+          }}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          autoFocus
+          maxLength={6}
+        />
 
-              <View style={s.codeBoxRow}>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      s.codeBox,
-                      joinCode.length > i && { borderColor: C.purple, backgroundColor: C.purpleLt },
-                    ]}
-                  >
-                    <Text style={s.codeChar}>{joinCode[i] ?? ''}</Text>
-                  </View>
-                ))}
-              </View>
+        {joinError && (
+          <View style={s.errorBox}>
+            <Ionicons name="alert-circle-outline" size={14} color={C.red} />
+            <Text style={s.errorText}>{joinError}</Text>
+          </View>
+        )}
 
-              <TextInput
-                style={s.hiddenInput}
-                value={joinCode}
-                onChangeText={t => {
-                  setJoinError(null);
-                  setJoinCode(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6));
-                }}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                autoFocus
-                maxLength={6}
-              />
-
-              {joinError && (
-                <View style={s.errorBox}>
-                  <Ionicons name="alert-circle-outline" size={14} color={C.red} />
-                  <Text style={s.errorText}>{joinError}</Text>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={[s.primaryBtn, (joinCode.length < 6 || joiningLoad) && s.primaryBtnOff]}
-                onPress={handleJoin}
-                disabled={joinCode.length < 6 || joiningLoad}
-                activeOpacity={0.85}
-              >
-                {joiningLoad
-                  ? <ActivityIndicator color={C.white} size="small" />
-                  : <Text style={s.primaryBtnText}>Confirmar</Text>
-                }
-              </TouchableOpacity>
-            </View>
-
-          </SafeAreaView>
-        </KeyboardAvoidingView>
-      </Modal>
+        <FormSheetButton
+          label="Confirmar"
+          color={C.purple}
+          loading={joiningLoad}
+          disabled={joinCode.length < 6}
+          onPress={handleJoin}
+        />
+      </FormSheetModal>
 
       {/* MODAL: Crear ───────────────────────────────────────────────────────── */}
-      <Modal
-        visible={showCreate} animationType="slide" presentationStyle="pageSheet"
-        onRequestClose={() => setShowCreate(false)}
+      <FormSheetModal
+        visible={showCreate}
+        title={createStep === 0 ? 'Elegir tipo' : 'Nombre del grupo'}
+        onClose={() => setShowCreate(false)}
+        presentationStyle="pageSheet"
+        scrollable={false}
       >
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <SafeAreaView style={s.modal} edges={['top', 'bottom']}>
-
-            <View style={s.modalHeader}>
-              <TouchableOpacity
-                onPress={() => {
-                  if (createStep === 1) { setCreateStep(0); }
-                  else { setShowCreate(false); }
-                }}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name={createStep === 1 ? 'arrow-back' : 'close'} size={22} color={C.text2} />
-              </TouchableOpacity>
-              <Text style={s.modalTitle}>
-                {createStep === 0 ? 'Elegir tipo' : 'Nombre del grupo'}
-              </Text>
-              <View style={{ width: 22 }} />
-            </View>
-
-            {createStep === 0 ? (
-              <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-                <TypeSelectorStep onCreate={handleTypeSelected} />
-              </ScrollView>
-            ) : (
-              <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-                <NameInputStep
-                  kind={createKind}
-                  groupName={groupName}
-                  setGroupName={setGroupName}
-                  loading={creatingLoad}
-                  onCreate={handleCreate}
-                  onBack={() => setCreateStep(0)}
-                />
-              </ScrollView>
-            )}
-
-          </SafeAreaView>
-        </KeyboardAvoidingView>
-      </Modal>
+        {createStep === 0 ? (
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+            <TypeSelectorStep onCreate={handleTypeSelected} />
+          </ScrollView>
+        ) : (
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+            <NameInputStep
+              kind={createKind}
+              groupName={groupName}
+              setGroupName={setGroupName}
+              loading={creatingLoad}
+              onCreate={handleCreate}
+              onBack={() => setCreateStep(0)}
+            />
+          </ScrollView>
+        )}
+      </FormSheetModal>
 
     </SafeAreaView>
   );
@@ -710,14 +673,6 @@ const s = StyleSheet.create({
   createDashedText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 15, color: C.muted },
 
   // Modal
-  modal: { flex: 1, backgroundColor: C.white },
-  modalHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: sp.xl, paddingVertical: sp.lg,
-    borderBottomWidth: 1, borderBottomColor: C.border,
-  },
-  modalTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: C.text },
-  modalBody:  { paddingHorizontal: sp.xl, paddingTop: sp.xl, gap: sp.xl },
   modalSub:   { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.text2, lineHeight: 20 },
 
   codeBoxRow: { flexDirection: 'row', gap: sp.sm, justifyContent: 'center' },
@@ -736,12 +691,4 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: '#ef444430',
   },
   errorText: { fontFamily: 'Montserrat_500Medium', fontSize: 13, color: C.red, flex: 1 },
-
-  primaryBtn: {
-    backgroundColor: C.purple, borderRadius: 14, paddingVertical: sp.md + 2,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: C.purple, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
-  },
-  primaryBtnOff:  { opacity: 0.4 },
-  primaryBtnText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: C.white },
 });

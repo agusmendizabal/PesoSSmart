@@ -429,7 +429,7 @@ Generá el reporte en JSON.`;
         const [profileRes, financialRes, riskRes, expensesRes, expCatRes, sub90Res, ratesRes] = await Promise.all([
           sb.from('profiles').select('full_name').eq('id', user_id).single(),
           sb.from('financial_profiles').select('income_range').eq('user_id', user_id).single(),
-          sb.from('risk_profiles').select('risk_level').eq('user_id', user_id).maybeSingle(),
+          sb.from('risk_profiles').select('profile').eq('user_id', user_id).maybeSingle(),
           sb.from('expenses').select('amount, classification').eq('user_id', user_id).is('deleted_at', null).gte('date', monthStart),
           sb.from('expenses').select('amount, category:expense_categories(name_es)').eq('user_id', user_id).is('deleted_at', null).gte('date', monthStart),
           sb.from('expenses').select('description, amount, date').eq('user_id', user_id).is('deleted_at', null).gte('date', since90),
@@ -474,7 +474,7 @@ Generá el reporte en JSON.`;
         ctx = {
           has_data:     totalSpent > 0 || income != null,
           name:         profileRes.data?.full_name,
-          risk_profile: riskRes.data?.risk_level ?? null,
+          risk_profile: riskRes.data?.profile ?? null,
           income,
           total_spent:  totalSpent,
           necessary,
@@ -594,11 +594,15 @@ Generá el reporte en JSON.`;
     const reply    = groqData.choices?.[0]?.message?.content ?? 'No pude procesar esa pregunta. Probá de nuevo.';
 
     // ── Incrementar uso ───────────────────────────────────────────────────────
+    // Se usa el cliente ANON + el Authorization real del caller (no service role)
+    // para que auth.uid() dentro de increment_ai_usage refleje al usuario real
+    // del JWT — la RPC valida auth.uid() = p_user_id y rechaza si no coinciden.
     if (!generate_welcome && user_id) {
       try {
         const sb = createClient(
           Deno.env.get('SUPABASE_URL')!,
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_ANON_KEY')!,
+          Deno.env.get('SUPABASE_ANON_KEY')!,
+          { global: { headers: { Authorization: authHeader } } },
         );
         const month = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
         await sb.rpc('increment_ai_usage', { p_user_id: user_id, p_month: month });

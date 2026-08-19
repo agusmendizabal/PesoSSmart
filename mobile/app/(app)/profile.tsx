@@ -6,9 +6,6 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
-  Modal,
-  KeyboardAvoidingView,
-  Platform,
   Linking,
   ActivityIndicator,
 } from 'react-native';
@@ -22,7 +19,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { colors, spacing, layout } from '@/theme';
-import { Text, Card, Button, Input } from '@/components/ui';
+import { Text, Card, Button, Input, FormSheetModal } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { usePlanStore } from '@/store/planStore';
 import { useRoundUpStore } from '@/store/roundUpStore';
@@ -282,7 +279,7 @@ export default function ProfileScreen() {
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 
       // Resetear al inicio del mes para capturar todos los movimientos del mes
-      await supabase
+      await (supabase as any)
         .from('mp_connections')
         .update({ last_checked_at: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString() })
         .eq('user_id', user!.id);
@@ -443,6 +440,8 @@ export default function ProfileScreen() {
           <Text variant="label" color={colors.text.tertiary} style={styles.sectionTitle}>MI CUENTA</Text>
           <Card style={styles.menuCard}>
             <MenuItem icon="person-outline" label="Datos personales" onPress={openEditModal} />
+            <View style={styles.menuDivider} />
+            <MenuItem icon="wallet-outline" label="Perfil financiero" description="Ingreso, ahorro y deuda declarados" onPress={handleReOnboarding} />
             <View style={styles.menuDivider} />
             <MenuItem icon="mail-outline" label="Correo y contraseña" onPress={() => Alert.alert('Correo', profile?.email ?? '')} />
             <View style={styles.menuDivider} />
@@ -638,20 +637,12 @@ export default function ProfileScreen() {
       </ScrollView>
 
       {/* Modal redondeo automático */}
-      <Modal
+      <FormSheetModal
         visible={showRoundUpModal}
-        animationType="slide"
-        presentationStyle="formSheet"
-        onRequestClose={() => setShowRoundUpModal(false)}
+        title="Redondeo automático"
+        onClose={() => setShowRoundUpModal(false)}
+        contentContainerStyle={styles.modalScroll}
       >
-        <SafeAreaView style={styles.modal}>
-          <View style={styles.modalHeader}>
-            <Text variant="h4">Redondeo automático</Text>
-            <TouchableOpacity onPress={() => setShowRoundUpModal(false)}>
-              <Ionicons name="close" size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={styles.modalScroll}>
             {/* Enable toggle */}
             <View style={ruStyles.row}>
               <View style={{ flex: 1, gap: 4 }}>
@@ -738,30 +729,15 @@ export default function ProfileScreen() {
               onPress={() => setShowRoundUpModal(false)}
               style={{ marginTop: spacing[4] }}
             />
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+      </FormSheetModal>
 
       {/* Modal editar perfil */}
-      <Modal
+      <FormSheetModal
         visible={showEditModal}
-        animationType="slide"
-        presentationStyle="formSheet"
-        onRequestClose={() => setShowEditModal(false)}
+        title="Editar perfil"
+        onClose={() => setShowEditModal(false)}
+        contentContainerStyle={styles.modalScroll}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <SafeAreaView style={styles.modal}>
-            <View style={styles.modalHeader}>
-              <Text variant="h4">Editar perfil</Text>
-              <TouchableOpacity onPress={() => setShowEditModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              contentContainerStyle={styles.modalScroll}
-              keyboardShouldPersistTaps="handled"
-            >
               {/* Avatar preview */}
               <View style={styles.modalAvatarRow}>
                 <View style={styles.modalAvatar}>
@@ -823,10 +799,7 @@ export default function ProfileScreen() {
                 onPress={handleSubmit(onSave)}
                 style={{ marginTop: spacing[4] }}
               />
-            </ScrollView>
-          </SafeAreaView>
-        </KeyboardAvoidingView>
-      </Modal>
+      </FormSheetModal>
     </SafeAreaView>
   );
 }
@@ -910,16 +883,6 @@ const styles = StyleSheet.create({
     marginLeft: spacing[5] + 24 + spacing[4],
   },
   version: { marginTop: spacing[4] },
-  modal: { flex: 1, backgroundColor: colors.bg.primary },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: layout.screenPadding,
-    paddingVertical: spacing[4],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.subtle,
-  },
   modalScroll: {
     paddingHorizontal: layout.screenPadding,
     paddingVertical: spacing[6],

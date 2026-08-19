@@ -6,68 +6,22 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui';
+import QRCode from 'react-native-qrcode-svg';
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
 const C = {
   bg:       '#F6F7F9',
   white:    '#FFFFFF',
-  purple:   '#8B5CF6',
+  purple:   '#7B61FF',
   purpleLt: '#F3EEFF',
-  text:     '#111111',
-  text2:    '#444444',
-  muted:    '#757575',
-  border:   '#E5E7EB',
+  text:     '#212121',
+  text2:    '#757575',
+  muted:    '#9E9E9E',
+  border:   '#E0E0E0',
 } as const;
 
 const sp = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32 } as const;
-
-// ─── QR placeholder (visual decorative grid) ──────────────────────────────────
-
-function QRPlaceholder({ code }: { code: string }) {
-  // Deterministic pattern based on code characters
-  const bits = code.split('').flatMap(c => {
-    const n = c.charCodeAt(0);
-    return [n & 1, (n >> 1) & 1, (n >> 2) & 1, (n >> 3) & 1,
-            (n >> 4) & 1, (n >> 5) & 1, (n >> 6) & 1, (n >> 7) & 1];
-  });
-
-  const size = 7;
-  const cellSize = 22;
-
-  // Build a 7x7 matrix
-  const grid: number[][] = Array.from({ length: size }, (_, row) =>
-    Array.from({ length: size }, (_, col) => {
-      // Force corners (QR finder patterns)
-      if ((row < 2 && col < 2) || (row < 2 && col >= size - 2) || (row >= size - 2 && col < 2)) return 1;
-      return bits[(row * size + col) % bits.length] ?? 0;
-    })
-  );
-
-  return (
-    <View style={qr.wrapper}>
-      {grid.map((row, ri) => (
-        <View key={ri} style={qr.row}>
-          {row.map((cell, ci) => (
-            <View
-              key={ci}
-              style={[
-                qr.cell,
-                { backgroundColor: cell ? C.purple : 'transparent', width: cellSize, height: cellSize },
-              ]}
-            />
-          ))}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-const qr = StyleSheet.create({
-  wrapper: { gap: 2 },
-  row:     { flexDirection: 'row', gap: 2 },
-  cell:    { borderRadius: 3 },
-});
 
 // ─── Pantalla ─────────────────────────────────────────────────────────────────
 
@@ -140,9 +94,11 @@ export default function GroupCodeScreen() {
           </View>
           <Text style={s.codeSub}>Código de tu grupo</Text>
 
-          <View style={s.qrArea}>
-            <QRPlaceholder code={code} />
-          </View>
+          {!!code && (
+            <View style={s.qrArea}>
+              <QRCode value={code} size={154} color={C.purple} backgroundColor={C.bg} />
+            </View>
+          )}
         </View>
 
         <Text style={s.disclaimer}>

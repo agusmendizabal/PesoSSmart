@@ -43,10 +43,10 @@ export const layout = {
 
   // Card shadow (usado via StyleSheet en cada pantalla)
   cardShadow: {
-    shadowColor:   '#000',
+    shadowColor:   '#1F2937',
     shadowOffset:  { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius:  8,
+    shadowRadius:  10,
     elevation:     3,
   },
 } as const;

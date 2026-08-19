@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL    = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SECRET = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const INTERNAL_FN_SECRET = Deno.env.get('INTERNAL_FN_SECRET');
 const EXPO_PUSH_URL   = 'https://exp.host/--/api/v2/push/send';
 
 interface PushPayload {
@@ -16,6 +17,20 @@ interface PushPayload {
 
 serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+
+  // Función server-to-server: solo otras edge functions de este proyecto deben
+  // poder invocarla. Fail-closed: si el secret no está configurado, se rechaza.
+  if (!INTERNAL_FN_SECRET) {
+    return new Response(JSON.stringify({ error: 'Secret no configurado' }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (authHeader !== `Bearer ${INTERNAL_FN_SECRET}`) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401, headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET);
 

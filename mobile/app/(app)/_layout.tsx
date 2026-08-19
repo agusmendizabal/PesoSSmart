@@ -82,20 +82,18 @@ export default function AppLayout() {
       />
       <Tabs.Screen name="reports"        options={{ href: null }} />
       <Tabs.Screen name="advisor"        options={{ href: null }} />
-      <Tabs.Screen name="grupo-familia"  options={{ href: null }} />
       <Tabs.Screen name="group-detail"   options={{ href: null }} />
       <Tabs.Screen name="group-code"     options={{ href: null }} />
       <Tabs.Screen name="member-detail"  options={{ href: null }} />
       <Tabs.Screen name="plans"          options={{ href: null }} />
       <Tabs.Screen name="simulator"      options={{ href: null }} />
       <Tabs.Screen name="gmail-connect"  options={{ href: null }} />
-      <Tabs.Screen name="insight"         options={{ href: null }} />
       <Tabs.Screen name="savings-plan"    options={{ href: null }} />
       <Tabs.Screen name="category-detail"        options={{ href: null }} />
       <Tabs.Screen name="savings-opportunities"  options={{ href: null }} />
       <Tabs.Screen name="savings-goal"           options={{ href: null }} />
-      <Tabs.Screen name="smart-alerts"           options={{ href: null }} />
       <Tabs.Screen name="help"                   options={{ href: null }} />
+      <Tabs.Screen name="investment-alternatives" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -30,15 +30,22 @@ function monthsAgo(n: number): string {
 }
 
 async function fetchBcraVariable(variableId: number): Promise<number | null> {
-  const url = `https://api.bcra.gob.ar/estadisticas/v2.0/datosvariable/${variableId}/${monthsAgo(2)}/${today()}`;
+  // v2.0/v3.0 fueron discontinuadas por el BCRA (HTTP 410) — confirmado
+  // probando directamente contra la API. v4.0 cambia tanto la URL (query
+  // params `desde`/`hasta` en vez de path segments) como la forma de la
+  // respuesta: ya no es un array plano de {valor}, sino
+  // { results: [{ idVariable, detalle: [{fecha, valor}, ...] }] }.
+  const url = `https://api.bcra.gob.ar/estadisticas/v4.0/monetarias/${variableId}?desde=${monthsAgo(2)}&hasta=${today()}`;
   try {
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
     if (!res.ok) return null;
     const json = await res.json();
-    // La API devuelve un array; el último es el más reciente
-    const results: { valor: number }[] = json.results ?? [];
-    if (!results.length) return null;
-    return results[results.length - 1].valor;
+    const detalle: { fecha: string; valor: number }[] = json.results?.[0]?.detalle ?? [];
+    if (!detalle.length) return null;
+    // La API ya lo devuelve más reciente primero, pero no confiamos en el
+    // orden — elegimos explícitamente el de fecha más reciente.
+    const latest = detalle.reduce((a, b) => (b.fecha > a.fecha ? b : a));
+    return latest.valor;
   } catch {
     return null;
   }
@@ -56,6 +63,23 @@ async function fetchBluelytics(): Promise<{ mep: number | null }> {
 }
 
 serve(async (req) => {
+  // Secret propio en vez de "Verify JWT" (server-to-server, sin usuario final).
+  // Fail-closed: si el secret no está configurado, se rechaza en vez de dejar
+  // pasar todo — y la comparación es exacta, no `.includes()` (antes permitía
+  // que cualquier header que CONTUVIERA el secret como substring pasara).
+  const cronSecret = Deno.env.get('MARKET_RATES_SYNC_SECRET');
+  if (!cronSecret) {
+    return new Response(JSON.stringify({ error: 'Secret no configurado' }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401, headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   // Permitir llamada manual (GET) o por cron (POST desde Supabase Hooks)
   const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET);
   const updates: { instrument: string; rate_monthly: number; source: string }[] = [];

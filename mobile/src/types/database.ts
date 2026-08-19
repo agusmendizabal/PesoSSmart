@@ -27,10 +27,6 @@ export type IncomeRange =
 export type ExpenseClassification = 'necessary' | 'disposable' | 'investable';
 export type PaymentMethod = 'cash' | 'debit' | 'credit' | 'transfer' | 'digital_wallet' | 'other';
 export type ReceiptStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type ChatRole = 'user' | 'assistant';
-export type InstrumentType = 'fci_money_market' | 'fci_cer' | 'lecap' | 'dolar_mep' | 'cedear' | 'bond' | 'other';
-export type FamilyGroupType = 'couple' | 'family';
-export type FamilyRole = 'admin' | 'member';
 export type SavingCurrency = 'ARS' | 'USD';
 
 // ---- Tipos de fila (Row types) ----
@@ -136,120 +132,18 @@ export interface ExpenseReceipt {
   updated_at: string;
 }
 
-export interface MonthlyReport {
-  id: string;
-  user_id: string;
-  year: number;
-  month: number;
-  total_expenses: number;
-  total_by_category: Json;
-  total_necessary: number;
-  total_disposable: number;
-  total_investable: number;
-  previous_month_total: number | null;
-  inflation_rate: number | null;
-  inflation_adjusted_comparison: number | null;
-  ai_insights: Json | null;
-  generated_at: string;
-  pdf_storage_path: string | null;
-  created_at: string;
-}
-
-export interface MarketInstrument {
-  id: string;
-  type: InstrumentType;
-  name: string;
-  name_es: string;
-  description_es: string | null;
-  ticker: string | null;
-  is_active: boolean;
-  metadata: Json | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface InstrumentPriceHistory {
-  id: string;
-  instrument_id: string;
-  date: string;
-  open_price: number | null;
-  close_price: number;
-  currency: string;
-  source: string | null;
-  created_at: string;
-}
-
-export interface InvestmentSimulation {
-  id: string;
-  user_id: string;
-  instrument_id: string;
-  amount: number;
-  start_date: string;
-  end_date: string;
-  initial_value_ars: number;
-  final_value_ars: number;
-  return_pct: number;
-  inflation_during_period: number | null;
-  real_return_pct: number | null;
-  simulation_data: Json;
-  created_at: string;
-}
-
-export interface AIChatThread {
-  id: string;
-  user_id: string;
-  title: string | null;
-  is_active: boolean;
-  message_count: number;
-  last_message_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AIChatMessage {
-  id: string;
-  thread_id: string;
-  user_id: string;
-  role: ChatRole;
-  content: string;
-  tokens_used: number | null;
-  model: string | null;
-  created_at: string;
-}
-
-export interface Subscription {
-  id: string;
-  user_id: string;
-  plan: SubscriptionPlan;
-  status: SubscriptionStatus;
-  started_at: string;
-  expires_at: string | null;
-  cancelled_at: string | null;
-  payment_provider: string | null;
-  payment_reference: string | null;
-  metadata: Json | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface FeatureUsageLog {
-  id: string;
-  user_id: string;
-  feature: string;
-  used_at: string;
-  metadata: Json | null;
-}
-
 // ---- Grupo Familiar / Pareja ----
 
-export type GroupType = 'family' | 'couple';
+export type GroupType = 'family' | 'couple' | 'friends';
 
 export type MemberRole =
   | 'parent'
   | 'child'
   | 'partner'
   | 'guardian'
-  | 'other_adult';
+  | 'other_adult'
+  | 'admin'
+  | 'member';
 
 export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
   parent: 'Padre / Madre',
@@ -257,6 +151,8 @@ export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
   partner: 'Pareja',
   guardian: 'Tutor/a',
   other_adult: 'Otro adulto',
+  admin: 'Administrador/a',
+  member: 'Miembro',
 };
 
 export const MEMBER_ROLE_ICONS: Record<MemberRole, string> = {
@@ -265,6 +161,8 @@ export const MEMBER_ROLE_ICONS: Record<MemberRole, string> = {
   partner: 'heart-outline',
   guardian: 'shield-outline',
   other_adult: 'person-outline',
+  admin: 'shield-checkmark-outline',
+  member: 'person-outline',
 };
 
 /** Roles considerados "adultos responsables" — pueden ver gastos de hijos */
@@ -288,6 +186,7 @@ export interface FamilyMember {
   user_id: string;
   role: MemberRole;
   joined_at: string;
+  permissions: Json | null;
   // joined
   profile?: Pick<Profile, 'id' | 'full_name' | 'email' | 'avatar_url'>;
 }
@@ -307,17 +206,13 @@ export interface GroupTransfer {
   to_profile?: Pick<Profile, 'id' | 'full_name'>;
 }
 
-export interface UserAlert {
-  id: string;
-  user_id: string;
-  type: string;
-  title: string;
-  message: string;
-  is_read: boolean;
-  action_url: string | null;
-  metadata: Json | null;
-  created_at: string;
-  expires_at: string | null;
+export interface MarketRate {
+  instrument: string;
+  rate_monthly: number;
+  rate_annual: number | null;
+  source: string;
+  label: string | null;
+  updated_at: string;
 }
 
 export interface GmailConnection {
@@ -327,9 +222,21 @@ export interface GmailConnection {
   refresh_token: string;
   access_token: string | null;
   token_expired: boolean;
-  last_synced_at: string | null;
+  last_checked_at: string | null;
   created_at: string;
-  updated_at: string;
+}
+
+export interface MpConnection {
+  id: string;
+  user_id: string;
+  access_token: string;
+  refresh_token: string;
+  mp_user_id: string | null;
+  mp_email: string | null;
+  last_checked_at: string | null;
+  created_at: string;
+  last_sync_count: number | null;
+  last_sync_status: string | null;
 }
 
 export interface PendingTransaction {
@@ -347,22 +254,6 @@ export interface PendingTransaction {
   created_at: string;
 }
 
-export interface FamilyGroup {
-  id: string;
-  name: string;
-  invite_code: string;
-  group_type: FamilyGroupType;
-  created_by: string;
-  created_at: string;
-}
-
-export interface FamilyMember {
-  id: string;
-  group_id: string;
-  user_id: string;
-  role: FamilyRole;
-  joined_at: string;
-}
 
 export interface SavingsGoalRow {
   id: string;
@@ -437,64 +328,22 @@ export interface Database {
         Update: Partial<ExpenseReceipt>;
         Relationships: [];
       };
-      monthly_reports: {
-        Row: MonthlyReport;
-        Insert: Omit<MonthlyReport, 'id' | 'created_at'>;
-        Update: Partial<MonthlyReport>;
-        Relationships: [];
-      };
-      market_instruments: {
-        Row: MarketInstrument;
-        Insert: Omit<MarketInstrument, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<MarketInstrument>;
-        Relationships: [];
-      };
-      instrument_price_history: {
-        Row: InstrumentPriceHistory;
-        Insert: Omit<InstrumentPriceHistory, 'id' | 'created_at'>;
-        Update: Partial<InstrumentPriceHistory>;
-        Relationships: [];
-      };
-      investment_simulations: {
-        Row: InvestmentSimulation;
-        Insert: Omit<InvestmentSimulation, 'id' | 'created_at'>;
-        Update: Partial<InvestmentSimulation>;
-        Relationships: [];
-      };
-      ai_chat_threads: {
-        Row: AIChatThread;
-        Insert: Omit<AIChatThread, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<AIChatThread>;
-        Relationships: [];
-      };
-      ai_chat_messages: {
-        Row: AIChatMessage;
-        Insert: Omit<AIChatMessage, 'id' | 'created_at'>;
-        Update: Partial<AIChatMessage>;
-        Relationships: [];
-      };
-      subscriptions: {
-        Row: Subscription;
-        Insert: Omit<Subscription, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Subscription>;
-        Relationships: [];
-      };
-      feature_usage_logs: {
-        Row: FeatureUsageLog;
-        Insert: Omit<FeatureUsageLog, 'id' | 'used_at'>;
-        Update: Partial<FeatureUsageLog>;
-        Relationships: [];
-      };
-      user_alerts: {
-        Row: UserAlert;
-        Insert: Omit<UserAlert, 'id' | 'created_at'>;
-        Update: Partial<UserAlert>;
-        Relationships: [];
-      };
       gmail_connections: {
         Row: GmailConnection;
-        Insert: Omit<GmailConnection, 'id' | 'created_at' | 'updated_at'>;
+        Insert: Omit<GmailConnection, 'id' | 'created_at'>;
         Update: Partial<GmailConnection>;
+        Relationships: [];
+      };
+      mp_connections: {
+        Row: MpConnection;
+        Insert: Omit<MpConnection, 'id' | 'created_at'>;
+        Update: Partial<MpConnection>;
+        Relationships: [];
+      };
+      market_rates: {
+        Row: MarketRate;
+        Insert: MarketRate;
+        Update: Partial<MarketRate>;
         Relationships: [];
       };
       pending_transactions: {

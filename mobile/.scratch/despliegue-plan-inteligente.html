@@ -1,0 +1,493 @@
+<title>Despliegue Plan Inteligente</title>
+<style>
+  :root {
+    --bg: #0A0A0B;
+    --surface: #141417;
+    --surface-2: #1B1B1F;
+    --border: #29292E;
+    --border-soft: #202024;
+    --text: #F3F3F1;
+    --text-dim: #98989F;
+    --text-faint: #6C6C74;
+    --accent: #C6F135;
+    --accent-ink: #0A0A0B;
+    --pending: #FFB020;
+    --ok: #4ADE80;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--accent); color: var(--accent-ink); }
+
+  a { color: var(--accent); }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+  }
+
+  /* ── Header ─────────────────────────────────────────────────────── */
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    padding: 5px 10px;
+    border-radius: 3px;
+  }
+
+  h1 {
+    font-size: clamp(28px, 4.5vw, 38px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 18px 0 8px;
+    text-wrap: balance;
+  }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 16px;
+    max-width: 56ch;
+    margin: 0 0 32px;
+  }
+
+  /* ── Progress strip ─────────────────────────────────────────────── */
+
+  .progress {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+
+  .progress-item {
+    background: var(--surface);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .progress-num {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--pending);
+    border: 1px solid color-mix(in srgb, var(--pending) 45%, transparent);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .progress-label {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* ── Steps ──────────────────────────────────────────────────────── */
+
+  .step {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    margin-bottom: 28px;
+    overflow: hidden;
+  }
+
+  .step-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 22px 24px 4px;
+  }
+
+  .step-badge {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--accent-ink);
+    background: var(--accent);
+    width: 30px;
+    height: 30px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .step-title-wrap { flex: 1; min-width: 0; }
+
+  .step-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 2px 0 4px;
+  }
+
+  .step-why {
+    color: var(--text-dim);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .step-body {
+    padding: 16px 24px 24px;
+  }
+
+  .substep {
+    margin-top: 18px;
+  }
+
+  .substep:first-child { margin-top: 8px; }
+
+  .substep-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 8px;
+  }
+
+  .where {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin: 6px 0 0;
+  }
+
+  .where strong { color: var(--text); font-weight: 600; }
+
+  /* ── Code blocks ────────────────────────────────────────────────── */
+
+  .code-block {
+    position: relative;
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+
+  .code-block pre {
+    margin: 0;
+    padding: 14px 52px 14px 16px;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #D8D8DE;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .code-block.inline pre { padding-right: 52px; white-space: pre-wrap; word-break: break-all; }
+
+  .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 9px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .copy-btn:hover { color: var(--text); border-color: var(--text-faint); }
+  .copy-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .copy-btn.copied { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+
+  .kv {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+
+  .kv .k { color: var(--text-faint); }
+  .kv .v { color: var(--accent); font-weight: 600; }
+
+  /* ── Verify / footnote panels ───────────────────────────────────── */
+
+  .panel {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+
+  .panel-ok {
+    background: color-mix(in srgb, var(--ok) 6%, var(--surface));
+    border-color: color-mix(in srgb, var(--ok) 28%, var(--border));
+  }
+
+  .panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot-ok { background: var(--ok); }
+  .dot-pending { background: var(--pending); }
+
+  .panel ul {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+
+  .panel li { margin-bottom: 6px; }
+  .panel li:last-child { margin-bottom: 0; }
+  .panel code {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--text);
+  }
+
+  .verify-check {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-top: 1px solid var(--border-soft);
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+  .verify-check:first-of-type { border-top: none; padding-top: 4px; }
+
+  .verify-box {
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--text-faint);
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 12.5px;
+    color: var(--text-faint);
+    text-align: center;
+  }
+
+  @media (max-width: 520px) {
+    .progress { grid-template-columns: 1fr; }
+    .step-head { padding: 18px 18px 4px; }
+    .step-body { padding: 14px 18px 20px; }
+  }
+</style>
+
+<div class="page">
+  <span class="eyebrow">● 3 pasos pendientes</span>
+  <h1>Despliegue Plan Inteligente</h1>
+  <p class="subtitle">Todo lo que falta cargar en Supabase para que la etapa de Plan Inteligente + ahorro + inversión + IA quede funcionando en producción. Hacelo en este orden.</p>
+
+  <div class="progress">
+    <div class="progress-item">
+      <span class="progress-num">1</span>
+      <span class="progress-label">Migraciones SQL</span>
+    </div>
+    <div class="progress-item">
+      <span class="progress-num">2</span>
+      <span class="progress-label">Secret nuevo</span>
+    </div>
+    <div class="progress-item">
+      <span class="progress-num">3</span>
+      <span class="progress-label">Deploy funciones</span>
+    </div>
+  </div>
+
+  <!-- PASO 1 -->
+  <div class="step">
+    <div class="step-head">
+      <span class="step-badge">1</span>
+      <div class="step-title-wrap">
+        <p class="step-title">Correr las migraciones SQL</p>
+        <p class="step-why">Andá a Supabase → <strong>SQL Editor</strong> → <em>New query</em>, pegá cada bloque completo y ejecutalo. Primero uno, después el otro — no importa mucho el orden entre estos dos, pero corré los dos.</p>
+      </div>
+    </div>
+    <div class="step-body">
+
+      <div class="substep">
+        <div class="substep-label">1a · market_rates_sync_cron.sql</div>
+        <p class="where">Programa que el BCRA (inflación y tasas) se sincronice solo, todos los lunes. Sin esto, esos datos se quedan congelados en la fecha en que los cargaste a mano.</p>
+        <div class="code-block">
+          <button class="copy-btn" data-copy="c1">Copiar</button>
+          <pre id="c1">CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
+SELECT cron.schedule(
+  'market-rates-weekly-sync',
+  '0 10 * * 1',
+  $$
+  SELECT net.http_post(
+    url     := 'https://gqflukmlaonkgxfdbedq.supabase.co/functions/v1/fetch-market-rates',
+    headers := '{"Authorization":"Bearer marketrates2026pesossmart","Content-Type":"application/json"}'::jsonb,
+    body    := '{}'::jsonb
+  ) AS request_id;
+  $$
+);</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">1b · chat_threads_context_fingerprint.sql</div>
+        <p class="where">Agrega una columna a <code style="font-family:var(--font-mono); background:var(--surface-2); padding:1px 5px; border-radius:3px;">chat_threads</code> para que el asistente sepa si tu situación financiera cambió desde la última conversación.</p>
+        <div class="code-block">
+          <button class="copy-btn" data-copy="c2">Copiar</button>
+          <pre id="c2">ALTER TABLE public.chat_threads
+  ADD COLUMN IF NOT EXISTS context_fingerprint text;</pre>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PASO 2 -->
+  <div class="step">
+    <div class="step-head">
+      <span class="step-badge">2</span>
+      <div class="step-title-wrap">
+        <p class="step-title">Cargar el secret nuevo</p>
+        <p class="step-why">Andá a Supabase → <strong>Edge Functions → Secrets</strong> → <em>Add new secret</em>. Es el mismo patrón que ya usaste con INDEC y CEDEAR: sin este secret, el cron del Paso 1a no se puede autenticar contra la función.</p>
+      </div>
+    </div>
+    <div class="step-body">
+      <div class="substep" style="margin-top:8px;">
+        <div class="kv">
+          <span class="k">Nombre:</span>
+          <span class="v">MARKET_RATES_SYNC_SECRET</span>
+        </div>
+        <div class="kv" style="margin-top:6px;">
+          <span class="k">Valor:</span>
+          <span class="v">marketrates2026pesossmart</span>
+        </div>
+        <div class="code-block" style="margin-top:12px;">
+          <button class="copy-btn" data-copy="c3">Copiar</button>
+          <pre id="c3">marketrates2026pesossmart</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 3 -->
+  <div class="step">
+    <div class="step-head">
+      <span class="step-badge">3</span>
+      <div class="step-title-wrap">
+        <p class="step-title">Desplegar las Edge Functions</p>
+        <p class="step-why">Desde una terminal, parado en la carpeta <code style="font-family:var(--font-mono); background:var(--surface-2); padding:1px 5px; border-radius:3px;">mobile/</code> del proyecto.</p>
+      </div>
+    </div>
+    <div class="step-body">
+
+      <div class="substep">
+        <div class="substep-label">3a · fetch-market-rates</div>
+        <p class="where">Le agregamos la validación del secret del Paso 2 — sin este redeploy, sigue corriendo la versión vieja que no lo valida.</p>
+        <div class="code-block">
+          <button class="copy-btn" data-copy="c4">Copiar</button>
+          <pre id="c4">cd mobile
+npx supabase functions deploy fetch-market-rates</pre>
+        </div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">3b · investment-advisor</div>
+        <p class="where"><strong style="color:var(--pending);">Esta es la más importante.</strong> Es la función nueva completa del asistente de inversión — todavía nunca se desplegó. Sin esto, el chat de "Alternativas de inversión" no responde.</p>
+        <div class="code-block">
+          <button class="copy-btn" data-copy="c5">Copiar</button>
+          <pre id="c5">npx supabase functions deploy investment-advisor</pre>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- VERIFICACIÓN -->
+  <div class="panel">
+    <div class="panel-title"><span class="dot dot-pending"></span>Cómo confirmar que quedó bien</div>
+    <div class="verify-check"><span class="verify-box"></span>En SQL Editor: <code>SELECT * FROM cron.job WHERE jobname = 'market-rates-weekly-sync';</code> tiene que devolver una fila.</div>
+    <div class="verify-check"><span class="verify-box"></span>En la app: entrá a Plan Inteligente → Alternativas de inversión → mandale un mensaje al chat. Si responde, el deploy de <code>investment-advisor</code> funcionó.</div>
+    <div class="verify-check"><span class="verify-box"></span>Si el chat tira error: revisá en Supabase → Edge Functions → Logs de <code>investment-advisor</code>.</div>
+  </div>
+
+  <!-- NO HACE FALTA -->
+  <div class="panel panel-ok">
+    <div class="panel-title"><span class="dot dot-ok"></span>Esto NO hace falta tocar</div>
+    <ul>
+      <li><code>GROQ_API_KEY</code> ya está configurada — <code>investment-advisor</code> reusa la misma, no se crea una nueva.</li>
+      <li>Nada de INDEC ni CEDEAR — esos cron y secrets ya estaban configurados de antes y siguen vigentes.</li>
+      <li>No hay tablas nuevas que crear a mano: las dos migraciones del Paso 1 son las únicas.</li>
+    </ul>
+  </div>
+
+  <footer>Plan Inteligente · ahorro · inversión · IA — etapa congelada, lista para desplegar</footer>
+</div>
+
+<script>
+  document.querySelectorAll('.copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = document.getElementById(btn.getAttribute('data-copy'));
+      var text = target ? target.textContent : '';
+      navigator.clipboard.writeText(text).then(function () {
+        var original = btn.textContent;
+        btn.textContent = 'Copiado ✓';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = original;
+          btn.classList.remove('copied');
+        }, 1600);
+      });
+    });
+  });
+</script>

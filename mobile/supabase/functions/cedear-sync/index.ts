@@ -92,9 +92,14 @@ async function fetchMepVenta(dateStr: string): Promise<number | null> {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
-  const cronSecret = Deno.env.get('CEDEAR_SYNC_SECRET') ?? '';
-  const authHeader  = req.headers.get('Authorization') ?? '';
-  if (cronSecret && !authHeader.includes(cronSecret)) {
+  const cronSecret = Deno.env.get('CEDEAR_SYNC_SECRET');
+  if (!cronSecret) {
+    return new Response(JSON.stringify({ error: 'Secret no configurado' }), {
+      status: 500, headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { ...CORS, 'Content-Type': 'application/json' },
     });

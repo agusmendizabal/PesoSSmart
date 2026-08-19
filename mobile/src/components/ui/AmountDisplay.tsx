@@ -38,7 +38,13 @@ export function AmountDisplay({
           {label}
         </Text>
       )}
-      <Text variant={sizeMap[size]} color={displayColor}>
+      <Text
+        variant={sizeMap[size]}
+        color={displayColor}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
+      >
         {prefix}{formatCurrency(amount)}
       </Text>
     </View>

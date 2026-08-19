@@ -4,22 +4,19 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   TextInput,
   Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   RefreshControl,
 } from 'react-native';
-import Svg, { Polyline, Circle } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, layout } from '@/theme';
 import { Text } from '@/components/ui/Text';
+import { MiniLineChart } from '@/components/ui/MiniLineChart';
+import { FormSheetModal, FormSheetButton } from '@/components/ui/FormSheetModal';
 import { useAuthStore } from '@/store/authStore';
-import { useSavingsStore, type Saving, type SavingCurrency } from '@/store/savingsStore';
+import { useSavingsStore, type Saving, type SavingCurrency, type Investment, type InstrumentType } from '@/store/savingsStore';
 import { useGoalsStore, type SavingsGoal } from '@/store/goalsStore';
 import { fetchDolarRateNow } from '@/hooks/useDolarRates';
 import { formatCurrency } from '@/utils/format';
@@ -32,46 +29,26 @@ import { FirstVisitSheet } from '@/components/FirstVisitSheet';
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:      '#F7F9FC',
+  bg:      '#F6F7F9',
   card:    '#FFFFFF',
-  blue:    '#2563EB',
-  green:   '#16A34A',
-  violet:  '#8B5CF6',
+  blue:    '#1976D2',
+  green:   '#2E7D32',
+  violet:  '#7B61FF',
   red:     '#EF4444',
-  text:    '#111827',
-  sub:     '#6B7280',
-  muted:   '#9CA3AF',
-  border:  '#E5E7EB',
-  light:   '#F3F4F6',
+  text:    '#212121',
+  sub:     '#757575',
+  muted:   '#9E9E9E',
+  border:  '#E0E0E0',
+  light:   '#F2F2F2',
 } as const;
 
-const shadow = {
-  shadowColor: '#1F2937',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.06,
-  shadowRadius: 10,
-  elevation: 3,
-} as const;
+const shadow = layout.cardShadow;
 
 const GOAL_EMOJIS = ['🎯','🏖️','🚗','🏠','✈️','📱','👶','💍','🎓','💪','🐕','🌱','💻','🎸','🏋️','🍕'];
 
-// ─── Mini Line Chart ──────────────────────────────────────────────────────────
-
-function MiniLineChart() {
-  return (
-    <Svg width={90} height={34}>
-      <Polyline
-        points="0,28 14,22 30,18 46,20 62,10 76,6 90,2"
-        fill="none"
-        stroke={C.green}
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Circle cx={90} cy={2} r={3.5} fill={C.green} />
-    </Svg>
-  );
-}
+// Serie ilustrativa de tendencia (ahorro creciente) para el sparkline del
+// SmartPlanCard — no hay datos históricos reales disponibles en este scope.
+const ILLUSTRATIVE_TREND = [8, 12, 16, 14, 22, 26, 32];
 
 // ─── Smart Plan Card ──────────────────────────────────────────────────────────
 
@@ -90,14 +67,14 @@ function SmartPlanCard({ amount, onPress }: { amount: number; onPress: () => voi
           <Text style={spc.desc}>
             Descubrí cuánto podés ahorrar en base a tus hábitos
           </Text>
-          <Text style={spc.amount}>{formatCurrency(amount > 0 ? amount : 0)}</Text>
+          <Text style={spc.amount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatCurrency(amount > 0 ? amount : 0)}</Text>
           <Text style={spc.amountLabel}>Podrías ahorrar este mes</Text>
         </View>
         <View style={spc.rightCol}>
           <View style={spc.aiCircle}>
             <Ionicons name="sparkles" size={18} color={C.violet} />
           </View>
-          <MiniLineChart />
+          <MiniLineChart data={ILLUSTRATIVE_TREND} color={C.green} width={90} height={34} />
         </View>
       </View>
       <View style={spc.footer}>
@@ -221,7 +198,7 @@ function SavingItem({ saving, usdRate, onEdit, onDelete }: {
         <Text style={si.label} numberOfLines={1}>{saving.label}</Text>
         <Text style={si.currency}>{saving.currency === 'USD' ? `${saving.amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })} USD` : 'Pesos ARS'}</Text>
       </View>
-      <Text style={si.amount}>{formatCurrency(arsValue)}</Text>
+      <Text style={si.amount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatCurrency(arsValue)}</Text>
       <Ionicons name="chevron-forward" size={14} color={C.muted} />
     </TouchableOpacity>
   );
@@ -232,8 +209,120 @@ const si = StyleSheet.create({
   iconBox: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   label:   { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.text, marginBottom: 1 },
   currency:{ fontFamily: 'Montserrat_400Regular', fontSize: 11, color: C.muted },
-  amount:  { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.text },
+  amount:  { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.text, flexShrink: 1, maxWidth: 120, textAlign: 'right' },
 });
+
+// ─── Investment Item ──────────────────────────────────────────────────────────
+
+const INSTRUMENT_LABELS: Record<InstrumentType, string> = {
+  fci: 'FCI', cedear: 'Cedears', plazo_fijo: 'Plazo Fijo',
+  crypto: 'Cripto', bonds: 'Bonos', acciones: 'Acciones', other: 'Otro',
+};
+
+function InvestmentItem({ investment, onEdit, onDelete }: {
+  investment: Investment; onEdit: (i: Investment) => void; onDelete: (id: string) => void;
+}) {
+  return (
+    <TouchableOpacity style={si.row} onPress={() => onEdit(investment)} activeOpacity={0.78}>
+      <View style={[si.iconBox, { backgroundColor: C.violet + '14' }]}>
+        <Ionicons name="trending-up-outline" size={18} color={C.violet} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={si.label} numberOfLines={1}>{investment.name}</Text>
+        <Text style={si.currency}>
+          {INSTRUMENT_LABELS[investment.instrument_type]}
+          {investment.annual_return != null ? ` · ${investment.annual_return}% anual` : ''}
+        </Text>
+      </View>
+      <Text style={si.amount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+        {investment.currency === 'USD' ? `US$ ${investment.amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}` : formatCurrency(investment.amount)}
+      </Text>
+      <TouchableOpacity onPress={() => onDelete(investment.id)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+        <Ionicons name="trash-outline" size={14} color={C.muted} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Add Investment Modal ─────────────────────────────────────────────────────
+
+function AddInvestmentModal({ visible, initial, onClose, onSave }: {
+  visible: boolean; initial: Partial<Investment> | null; onClose: () => void;
+  onSave: (data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+}) {
+  const [name,           setName]           = useState('');
+  const [instrumentType, setInstrumentType] = useState<InstrumentType>('fci');
+  const [amount,         setAmount]         = useState('');
+  const [currency,       setCurrency]       = useState<SavingCurrency>('ARS');
+  const [annualReturn,   setAnnualReturn]   = useState('');
+  const [notes,          setNotes]          = useState('');
+  const [saving,         setSaving]         = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setName(initial?.name ?? '');
+      setInstrumentType(initial?.instrument_type ?? 'fci');
+      setAmount(initial?.amount?.toString() ?? '');
+      setCurrency(initial?.currency ?? 'ARS');
+      setAnnualReturn(initial?.annual_return != null ? String(initial.annual_return) : '');
+      setNotes(initial?.notes ?? '');
+    }
+  }, [visible, initial]);
+
+  const handleSave = async () => {
+    const amt = parseFloat(amount.replace(',', '.'));
+    if (!name.trim()) { Alert.alert('', 'Ingresá un nombre para la inversión.'); return; }
+    if (isNaN(amt) || amt <= 0) { Alert.alert('', 'Ingresá un monto válido.'); return; }
+    const retVal = annualReturn.trim() ? parseFloat(annualReturn.replace(',', '.')) : null;
+    setSaving(true);
+    try {
+      await onSave({
+        name: name.trim(), instrument_type: instrumentType, amount: amt, currency,
+        annual_return: retVal != null && !isNaN(retVal) ? retVal : null,
+        start_date: initial?.start_date ?? null,
+        notes: notes.trim() || null,
+      });
+      onClose();
+    } catch { Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <FormSheetModal visible={visible} title={initial?.id ? 'Editar inversión' : 'Nueva inversión'} onClose={onClose}>
+      <Text style={m.label}>TIPO DE INSTRUMENTO</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+        {(Object.keys(INSTRUMENT_LABELS) as InstrumentType[]).map(t => (
+          <TouchableOpacity
+            key={t}
+            style={[m.seg, { flex: undefined, paddingHorizontal: spacing[3] }, instrumentType === t && m.segActive]}
+            onPress={() => setInstrumentType(t)}
+          >
+            <Text style={[m.segText, instrumentType === t && m.segTextActive]}>{INSTRUMENT_LABELS[t]}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={m.label}>NOMBRE</Text>
+      <TextInput style={m.input} value={name} onChangeText={setName} placeholder="FCI Money Market, Cedear AAPL..." placeholderTextColor={C.muted} maxLength={60} />
+      <Text style={m.label}>MONEDA</Text>
+      <View style={m.segRow}>
+        {(['ARS', 'USD'] as SavingCurrency[]).map(c => (
+          <TouchableOpacity key={c} style={[m.seg, currency === c && m.segActive]} onPress={() => setCurrency(c)}>
+            <Text style={[m.segText, currency === c && m.segTextActive]}>
+              {c === 'ARS' ? '🇦🇷 Pesos' : '💵 Dólares'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={m.label}>MONTO INVERTIDO ({currency})</Text>
+      <TextInput style={m.input} value={amount} onChangeText={setAmount} placeholder={currency === 'USD' ? '500' : '200000'} placeholderTextColor={C.muted} keyboardType="decimal-pad" />
+      <Text style={m.label}>RENDIMIENTO ANUAL % (opcional)</Text>
+      <TextInput style={m.input} value={annualReturn} onChangeText={setAnnualReturn} placeholder="35" placeholderTextColor={C.muted} keyboardType="decimal-pad" />
+      <Text style={m.label}>NOTAS (opcional)</Text>
+      <TextInput style={m.input} value={notes} onChangeText={setNotes} placeholder="Broker, ticker, comentarios..." placeholderTextColor={C.muted} maxLength={200} />
+      <FormSheetButton label="Guardar" color={C.blue} loading={saving} onPress={handleSave} />
+    </FormSheetModal>
+  );
+}
 
 // ─── Add Goal Modal ───────────────────────────────────────────────────────────
 
@@ -269,38 +358,23 @@ function AddGoalModal({ visible, initial, onClose, onSave }: {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <SafeAreaView style={m.sheet}>
-          <View style={m.handle} />
-          <View style={m.header}>
-            <Text style={m.headerTitle}>{initial?.id ? 'Editar meta' : 'Nueva meta'}</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={22} color={C.sub} />
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={m.body} keyboardShouldPersistTaps="handled">
-            <Text style={m.label}>EMOJI</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-              {GOAL_EMOJIS.map(e => (
-                <TouchableOpacity key={e} style={[m.emojiBtn, emoji === e && m.emojiBtnActive]} onPress={() => setEmoji(e)}>
-                  <Text style={{ fontSize: 22 }}>{e}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={m.label}>NOMBRE</Text>
-            <TextInput style={m.input} value={title} onChangeText={setTitle} placeholder="Vacaciones, Auto, Emergencias..." placeholderTextColor={C.muted} autoCapitalize="sentences" maxLength={60} />
-            <Text style={m.label}>MONTO OBJETIVO (ARS)</Text>
-            <TextInput style={m.input} value={targetAmount} onChangeText={setTargetAmount} placeholder="1000000" placeholderTextColor={C.muted} keyboardType="decimal-pad" />
-            <Text style={m.label}>FECHA LÍMITE (YYYY-MM-DD, opcional)</Text>
-            <TextInput style={m.input} value={deadline} onChangeText={setDeadline} placeholder="2025-12-31" placeholderTextColor={C.muted} />
-            <TouchableOpacity style={[m.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={m.saveBtnText}>Guardar meta</Text>}
-            </TouchableOpacity>
-          </ScrollView>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </Modal>
+    <FormSheetModal visible={visible} title={initial?.id ? 'Editar meta' : 'Nueva meta'} onClose={onClose}>
+      <Text style={m.label}>EMOJI</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+        {GOAL_EMOJIS.map(e => (
+          <TouchableOpacity key={e} style={[m.emojiBtn, emoji === e && m.emojiBtnActive]} onPress={() => setEmoji(e)}>
+            <Text style={{ fontSize: 22 }}>{e}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={m.label}>NOMBRE</Text>
+      <TextInput style={m.input} value={title} onChangeText={setTitle} placeholder="Vacaciones, Auto, Emergencias..." placeholderTextColor={C.muted} autoCapitalize="sentences" maxLength={60} />
+      <Text style={m.label}>MONTO OBJETIVO (ARS)</Text>
+      <TextInput style={m.input} value={targetAmount} onChangeText={setTargetAmount} placeholder="1000000" placeholderTextColor={C.muted} keyboardType="decimal-pad" />
+      <Text style={m.label}>FECHA LÍMITE (YYYY-MM-DD, opcional)</Text>
+      <TextInput style={m.input} value={deadline} onChangeText={setDeadline} placeholder="2025-12-31" placeholderTextColor={C.muted} />
+      <FormSheetButton label="Guardar meta" color={C.blue} loading={saving} onPress={handleSave} />
+    </FormSheetModal>
   );
 }
 
@@ -327,31 +401,24 @@ function AportarModal({ goal, onClose, onSave }: {
   const remaining = goal.target_amount - goal.current_amount;
 
   return (
-    <Modal visible={!!goal} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <SafeAreaView style={m.sheet}>
-          <View style={m.handle} />
-          <View style={m.header}>
-            <View style={{ gap: 2 }}>
-              <Text style={m.headerTitle}>Aportar a meta</Text>
-              <Text style={[m.label, { marginBottom: 0, fontSize: 12, textTransform: 'none', letterSpacing: 0 }]}>
-                {goal.emoji} {goal.title} · faltan {formatCurrency(remaining)}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={C.sub} /></TouchableOpacity>
-          </View>
-          <View style={{ padding: spacing[5], gap: spacing[4] }}>
-            <View style={m.amountBox}>
-              <Text style={m.prefix}>$</Text>
-              <TextInput style={m.amountInput} value={amount} onChangeText={setAmount} placeholder="0" placeholderTextColor={C.muted} keyboardType="decimal-pad" autoFocus />
-            </View>
-            <TouchableOpacity style={[m.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={m.saveBtnText}>Aportar</Text>}
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </Modal>
+    <FormSheetModal
+      visible={!!goal}
+      title="Aportar a meta"
+      subtitle={
+        <Text style={[m.label, { marginBottom: 0, fontSize: 12, textTransform: 'none', letterSpacing: 0 }]}>
+          {goal.emoji} {goal.title} · faltan {formatCurrency(remaining)}
+        </Text>
+      }
+      onClose={onClose}
+      presentationStyle="formSheet"
+      scrollable={false}
+    >
+      <View style={m.amountBox}>
+        <Text style={m.prefix}>$</Text>
+        <TextInput style={m.amountInput} value={amount} onChangeText={setAmount} placeholder="0" placeholderTextColor={C.muted} keyboardType="decimal-pad" autoFocus />
+      </View>
+      <FormSheetButton label="Aportar" color={C.blue} loading={saving} onPress={handleSave} />
+    </FormSheetModal>
   );
 }
 
@@ -385,45 +452,27 @@ function AddSavingModal({ visible, initial, onClose, onSave }: {
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <SafeAreaView style={m.sheet}>
-          <View style={m.handle} />
-          <View style={m.header}>
-            <Text style={m.headerTitle}>{initial?.id ? 'Editar ahorro' : 'Agregar bolsillo'}</Text>
-            <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={C.sub} /></TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={m.body} keyboardShouldPersistTaps="handled">
-            <Text style={m.label}>MONEDA</Text>
-            <View style={m.segRow}>
-              {(['ARS', 'USD'] as SavingCurrency[]).map(c => (
-                <TouchableOpacity key={c} style={[m.seg, currency === c && m.segActive]} onPress={() => setCurrency(c)}>
-                  <Text style={[m.segText, currency === c && m.segTextActive]}>
-                    {c === 'ARS' ? '🇦🇷 Pesos' : '💵 Dólares'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={m.label}>DESCRIPCIÓN</Text>
-            <TextInput style={m.input} value={label} onChangeText={setLabel} placeholder={currency === 'USD' ? 'Dólares billete...' : 'Cuenta bancaria, Efectivo...'} placeholderTextColor={C.muted} maxLength={60} />
-            <Text style={m.label}>MONTO ({currency})</Text>
-            <TextInput style={m.input} value={amount} onChangeText={setAmount} placeholder={currency === 'USD' ? '500' : '200000'} placeholderTextColor={C.muted} keyboardType="decimal-pad" />
-            <TouchableOpacity style={[m.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={m.saveBtnText}>Guardar</Text>}
-            </TouchableOpacity>
-          </ScrollView>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </Modal>
+    <FormSheetModal visible={visible} title={initial?.id ? 'Editar ahorro' : 'Agregar bolsillo'} onClose={onClose}>
+      <Text style={m.label}>MONEDA</Text>
+      <View style={m.segRow}>
+        {(['ARS', 'USD'] as SavingCurrency[]).map(c => (
+          <TouchableOpacity key={c} style={[m.seg, currency === c && m.segActive]} onPress={() => setCurrency(c)}>
+            <Text style={[m.segText, currency === c && m.segTextActive]}>
+              {c === 'ARS' ? '🇦🇷 Pesos' : '💵 Dólares'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={m.label}>DESCRIPCIÓN</Text>
+      <TextInput style={m.input} value={label} onChangeText={setLabel} placeholder={currency === 'USD' ? 'Dólares billete...' : 'Cuenta bancaria, Efectivo...'} placeholderTextColor={C.muted} maxLength={60} />
+      <Text style={m.label}>MONTO ({currency})</Text>
+      <TextInput style={m.input} value={amount} onChangeText={setAmount} placeholder={currency === 'USD' ? '500' : '200000'} placeholderTextColor={C.muted} keyboardType="decimal-pad" />
+      <FormSheetButton label="Guardar" color={C.blue} loading={saving} onPress={handleSave} />
+    </FormSheetModal>
   );
 }
 
 const m = StyleSheet.create({
-  sheet:         { flex: 1, backgroundColor: C.card },
-  handle:        { width: 36, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginTop: spacing[3] },
-  header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing[5], paddingTop: spacing[3] },
-  headerTitle:   { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: C.text },
-  body:          { padding: spacing[5], gap: spacing[3], paddingBottom: spacing[10] },
   label:         { fontFamily: 'Montserrat_600SemiBold', fontSize: 11, color: C.muted, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: -spacing[1] },
   input:         { backgroundColor: C.light, borderRadius: 12, paddingHorizontal: spacing[4], paddingVertical: spacing[4], color: C.text, fontFamily: 'Montserrat_400Regular', fontSize: 15, borderWidth: 1, borderColor: C.border },
   segRow:        { flexDirection: 'row', gap: spacing[2] },
@@ -431,8 +480,6 @@ const m = StyleSheet.create({
   segActive:     { backgroundColor: C.blue, borderColor: C.blue },
   segText:       { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: C.sub },
   segTextActive: { color: '#FFF' },
-  saveBtn:       { marginTop: spacing[2], backgroundColor: C.blue, borderRadius: 14, height: 54, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText:   { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#FFF' },
   amountBox:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], backgroundColor: C.light, borderRadius: 16, padding: spacing[5], borderWidth: 1.5, borderColor: C.border },
   prefix:        { fontFamily: 'Montserrat_700Bold', fontSize: 32, color: C.muted },
   amountInput:   { fontFamily: 'Montserrat_700Bold', fontSize: 40, color: C.text, minWidth: 80, textAlign: 'center' },
@@ -444,7 +491,11 @@ const m = StyleSheet.create({
 
 export default function SavingsScreen() {
   const { user } = useAuthStore();
-  const { savings, isLoading: isSavingsLoading, fetchAll, addSaving, updateSaving, deleteSaving } = useSavingsStore();
+  const {
+    savings, investments, isLoading: isSavingsLoading, fetchAll,
+    addSaving, updateSaving, deleteSaving,
+    addInvestment, updateInvestment, deleteInvestment,
+  } = useSavingsStore();
   const { goals, fetchGoals, addGoal, updateGoal, deleteGoal, addToGoal } = useGoalsStore();
 
   const [usdRate,         setUsdRate]        = useState<number | null>(null);
@@ -453,6 +504,8 @@ export default function SavingsScreen() {
   const [showSavingModal, setShowSavingModal] = useState(false);
   const [editingGoal,     setEditingGoal]     = useState<Partial<SavingsGoal> | null>(null);
   const [editingSaving,   setEditingSaving]   = useState<Partial<Saving> | null>(null);
+  const [showInvestmentModal, setShowInvestmentModal] = useState(false);
+  const [editingInvestment,   setEditingInvestment]   = useState<Partial<Investment> | null>(null);
   const [aportarGoal,     setAportarGoal]     = useState<SavingsGoal | null>(null);
   const [isRefreshing,    setIsRefreshing]    = useState(false);
   const { isFirstVisit, markVisited } = useFirstVisit('savings');
@@ -484,6 +537,8 @@ export default function SavingsScreen() {
   const openEditGoal   = (g: SavingsGoal) => { setEditingGoal(g); setShowGoalModal(true); };
   const openAddSaving  = () => { setEditingSaving(null); setShowSavingModal(true); };
   const openEditSaving = (s: Saving) => { setEditingSaving(s); setShowSavingModal(true); };
+  const openAddInvestment  = () => { setEditingInvestment(null); setShowInvestmentModal(true); };
+  const openEditInvestment = (i: Investment) => { setEditingInvestment(i); setShowInvestmentModal(true); };
 
   const handleSaveGoal = async (data: Omit<SavingsGoal, 'id' | 'user_id' | 'created_at'>) => {
     if (!user?.id) return;
@@ -497,8 +552,15 @@ export default function SavingsScreen() {
     else await addSaving(user.id, data);
   };
 
+  const handleSaveInvestment = async (data: Omit<Investment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    if (!user?.id) return;
+    if (editingInvestment?.id) await updateInvestment(editingInvestment.id, data);
+    else await addInvestment(user.id, data);
+  };
+
   const confirmDeleteGoal   = (id: string) => Alert.alert('Eliminar meta', '¿Seguro?', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Eliminar', style: 'destructive', onPress: () => deleteGoal(id) }]);
   const confirmDeleteSaving = (id: string) => Alert.alert('Eliminar ahorro', '¿Seguro?', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Eliminar', style: 'destructive', onPress: () => deleteSaving(id) }]);
+  const confirmDeleteInvestment = (id: string) => Alert.alert('Eliminar inversión', '¿Seguro?', [{ text: 'Cancelar', style: 'cancel' }, { text: 'Eliminar', style: 'destructive', onPress: () => deleteInvestment(id) }]);
 
   const totalARS      = savings.filter(s => s.currency === 'ARS').reduce((s, v) => s + v.amount, 0);
   const totalUSDInARS = savings.filter(s => s.currency === 'USD').reduce((s, v) => s + (usdRate ? v.amount * usdRate : 0), 0);
@@ -590,6 +652,35 @@ export default function SavingsScreen() {
           ))
         )}
 
+        {/* ── Inversiones ────────────────────────────────────────────────── */}
+        <View style={s.sectionRow}>
+          <Text style={s.sectionTitle}>Inversiones</Text>
+          <TouchableOpacity onPress={openAddInvestment}>
+            <Text style={s.seeAll}>Ver todas</Text>
+          </TouchableOpacity>
+        </View>
+
+        {investments.length === 0 ? (
+          <TouchableOpacity style={s.emptyCard} onPress={openAddInvestment} activeOpacity={0.8}>
+            <View style={[s.emptyIcon, { backgroundColor: C.violet + '14' }]}>
+              <Ionicons name="trending-up-outline" size={20} color={C.violet} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.emptyTitle}>Registrar una inversión</Text>
+              <Text style={s.emptySub}>FCI, Cedears, plazo fijo, cripto...</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={C.muted} />
+          </TouchableOpacity>
+        ) : (
+          investments.map(inv => (
+            <InvestmentItem
+              key={inv.id} investment={inv}
+              onEdit={openEditInvestment}
+              onDelete={confirmDeleteInvestment}
+            />
+          ))
+        )}
+
         {/* ── Advisor CTA ────────────────────────────────────────────────── */}
         {ADVISOR_ENABLED && (
           <TouchableOpacity
@@ -622,6 +713,12 @@ export default function SavingsScreen() {
         goal={aportarGoal}
         onClose={() => setAportarGoal(null)}
         onSave={(amount) => addToGoal(aportarGoal!.id, amount)}
+      />
+      <AddInvestmentModal
+        visible={showInvestmentModal}
+        initial={editingInvestment}
+        onClose={() => setShowInvestmentModal(false)}
+        onSave={handleSaveInvestment}
       />
 
       <FirstVisitSheet

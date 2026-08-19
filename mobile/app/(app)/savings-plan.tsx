@@ -17,34 +17,32 @@ import { useExpensesStore } from '@/store/expensesStore';
 import { fetchBudgetPlan, computePotentialSavings, type BudgetPlan, type CategoryBudget, type AlertLevel } from '@/lib/budgetPlan';
 import { buildCategoryInsight, selectRelevantInsights, buildAllGoodInsight, type CategoryInsight } from '@/lib/budgetInsights';
 import { fetchRecurringEvaluations, applyRecurringContext, type CategoryBudgetWithRecurring } from '@/lib/recurringAdjustment';
-import { DineroRecuperableCard, buildAhorroSugerencias, type CategoryRow } from '@/components/ReportCards';
+import {
+  determineSavingsDestinations, describeSavingsOrigin, computeGoalCoverage, pickFeaturedGoal, projectAnnualSaving,
+  type SavingsDestinationResult, type SavingsOrigin, type GoalCoverage, type SavingsDestinationType,
+} from '@/lib/savingsDestination';
+import { fetchUserFinancialContext } from '@/lib/savingsDestinationContext';
 import { formatCurrency } from '@/utils/format';
 import { checkAndNotifyBudgetLimits } from '@/lib/budgetNotifications';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:     '#F7F9FC',
+  bg:     '#F6F7F9',
   card:   '#FFFFFF',
-  blue:   '#2563EB',
-  green:  '#16A34A',
-  violet: '#7C3AED',
+  blue:   '#1976D2',
+  green:  '#2E7D32',
+  violet: '#7B61FF',
   red:    '#EF4444',
   amber:  '#F59E0B',
-  text:   '#111827',
-  sub:    '#6B7280',
-  muted:  '#9CA3AF',
-  border: '#E5E7EB',
-  light:  '#F3F4F6',
+  text:   '#212121',
+  sub:    '#757575',
+  muted:  '#9E9E9E',
+  border: '#E0E0E0',
+  light:  '#F2F2F2',
 } as const;
 
-const shadow = {
-  shadowColor: '#1F2937',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.06,
-  shadowRadius: 10,
-  elevation: 3,
-} as const;
+const shadow = layout.cardShadow;
 
 // ─── Category Icon helper ─────────────────────────────────────────────────────
 
@@ -287,6 +285,103 @@ const ic2 = StyleSheet.create({
   body:     { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.sub, lineHeight: 19 },
 });
 
+// ─── ¿Qué podrías hacer con este ahorro? (Fase 2) ─────────────────────────────
+
+const DEST_META: Record<Exclude<SavingsDestinationType, 'deuda'>, { emoji: string; label: string; route: string }> = {
+  objetivo:         { emoji: '🎯', label: 'Destinarlo a una meta',           route: '/(app)/savings-goal' },
+  fondo_emergencia: { emoji: '🛟', label: 'Construir tu fondo de emergencia', route: '/(app)/savings' },
+  liquidez:         { emoji: '💧', label: 'Dejarlo disponible',              route: '/(app)/savings' },
+  inversion:        { emoji: '📈', label: 'Ver alternativas de inversión',    route: '/(app)/investment-alternatives' },
+};
+
+function SavingsDestinationCard({ monthlySaving, origin, result, goalCoverage }: {
+  monthlySaving: number;
+  origin: SavingsOrigin | null;
+  result: SavingsDestinationResult;
+  goalCoverage: GoalCoverage | null;
+}) {
+  const annual   = projectAnnualSaving(monthlySaving);
+  const debtNote = result.destinations.find(d => d.type === 'deuda');
+  const buttons  = result.destinations.filter(d => d.type !== 'deuda').slice(0, 3);
+
+  return (
+    <View style={sd.card}>
+      <View style={sd.header}>
+        <Text style={{ fontSize: 18 }}>💰</Text>
+        <Text style={sd.title}>¿Qué podrías hacer con este ahorro?</Text>
+      </View>
+
+      <Text style={sd.amount}>Podrías liberar {formatCurrency(monthlySaving)}</Text>
+
+      {origin && (
+        <Text style={sd.originText}>
+          {origin.isRealized
+            ? `Ya estás gastando ~${formatCurrency(origin.amount)} menos de lo habitual en ${origin.categoryName.toLowerCase()} este mes.`
+            : `Volviendo a tu ritmo habitual en ${origin.categoryName.toLowerCase()}${origin.approxPct != null ? ` (~${origin.approxPct}% menos)` : ''}, podrías liberar ~${formatCurrency(origin.amount)}.`}
+        </Text>
+      )}
+
+      <Text style={sd.annualText}>
+        Manteniéndolo 12 meses, serían aproximadamente {formatCurrency(annual)}.
+        {goalCoverage ? ` Eso cubriría ~${goalCoverage.coveragePct}% de tu meta "${goalCoverage.title}".` : ''}
+      </Text>
+
+      {!result.hasSufficientData ? (
+        <Text style={sd.missingText}>
+          Para recomendarte qué hacer con este dinero necesito conocer un poco más sobre tu situación
+          {result.missingInfo.length > 0 ? ` (${result.missingInfo.join(', ')})` : ''}.
+        </Text>
+      ) : (
+        <>
+          {debtNote && (
+            <View style={sd.debtNote}>
+              <Text style={{ fontSize: 13 }}>💳</Text>
+              <Text style={sd.debtNoteText}>{debtNote.rationale}</Text>
+            </View>
+          )}
+          {buttons.length > 0 && (
+            <>
+              <Text style={sd.helpText}>Este dinero podría ayudarte a:</Text>
+              <View style={{ gap: spacing[2] }}>
+                {buttons.map(d => {
+                  const meta = DEST_META[d.type as Exclude<SavingsDestinationType, 'deuda'>];
+                  return (
+                    <TouchableOpacity
+                      key={d.type}
+                      style={sd.destBtn}
+                      activeOpacity={0.8}
+                      onPress={() => router.push(meta.route as any)}
+                    >
+                      <Text style={{ fontSize: 16 }}>{meta.emoji}</Text>
+                      <Text style={sd.destBtnText}>{meta.label}</Text>
+                      <Ionicons name="chevron-forward" size={14} color={C.violet} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
+        </>
+      )}
+    </View>
+  );
+}
+
+const sd = StyleSheet.create({
+  card:        { backgroundColor: C.card, borderRadius: 16, padding: spacing[4], gap: spacing[2], ...shadow },
+  header:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  title:       { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.text, flex: 1 },
+  amount:      { fontFamily: 'Montserrat_800ExtraBold', fontSize: 18, color: C.violet, marginTop: spacing[1] },
+  originText:  { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.sub, lineHeight: 17 },
+  annualText:  { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.muted, lineHeight: 17 },
+  missingText: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.sub, lineHeight: 17, fontStyle: 'italic', marginTop: spacing[1] },
+  debtNote:    { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2], backgroundColor: C.amber + '12', borderRadius: 10, padding: spacing[2], marginTop: spacing[1] },
+  debtNoteText:{ flex: 1, fontFamily: 'Montserrat_400Regular', fontSize: 11, color: C.sub, lineHeight: 15 },
+  helpText:    { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: C.text, marginTop: spacing[2] },
+  destBtn:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2], borderWidth: 1.5, borderColor: C.violet + '30', backgroundColor: C.violet + '0A', borderRadius: 12, padding: spacing[3] },
+  destBtnText: { flex: 1, fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: C.text },
+});
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 /** BudgetPlan cuyas categorías ya pasaron por el ajuste de recurrencia. */
@@ -298,6 +393,9 @@ export default function SavingsPlanScreen() {
   const [loading,      setLoading]     = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showAll,      setShowAll]     = useState(false);
+  const [savingsResult,   setSavingsResult]   = useState<SavingsDestinationResult | null>(null);
+  const [savingsOrigin,   setSavingsOrigin]   = useState<SavingsOrigin | null>(null);
+  const [goalCoverage,    setGoalCoverage]    = useState<GoalCoverage | null>(null);
 
   const load = useCallback(async () => {
     if (!user?.id) return;
@@ -310,15 +408,43 @@ export default function SavingsPlanScreen() {
     // reemplaza el motor de ritmo — lo alimenta con el remanente correcto.
     const evaluations = await fetchRecurringEvaluations(user.id);
     const categories  = applyRecurringContext(data, evaluations);
-    const adjusted: PlanWithRecurring = {
-      ...data,
-      categories,
-      potentialSavings: computePotentialSavings(categories),
-    };
+    const potentialSavings = computePotentialSavings(categories);
+    const adjusted: PlanWithRecurring = { ...data, categories, potentialSavings };
 
     setPlan(adjusted);
     setLoading(false);
     checkAndNotifyBudgetLimits(adjusted);
+
+    // Fase 2 — "¿qué podrías hacer con este ahorro?". El monto nunca se
+    // recalcula acá: siempre es `potentialSavings`, el mismo número que ya
+    // muestra el resto de la pantalla (única fuente de verdad).
+    if (potentialSavings > 500) {
+      const origin = describeSavingsOrigin(categories.map(c => ({
+        categoryName: c.name,
+        amount:       buildCategoryInsight(c, adjusted).amount,
+        level:        c.alertLevel,
+        base:         c.avgMonthly,
+      })));
+      setSavingsOrigin(origin);
+
+      const { estimatedIncome } = useExpensesStore.getState();
+      const ctx = await fetchUserFinancialContext(user.id, {
+        monthlyPotentialSaving: potentialSavings,
+        estimatedIncome,
+        avgMonthlySpend: adjusted.totalAvg,
+      });
+      const result = determineSavingsDestinations(ctx);
+      setSavingsResult(result);
+
+      const hasObjetivo = result.destinations.some(d => d.type === 'objetivo');
+      const activeGoals = ctx.goals.filter(g => g.currentAmount < g.targetAmount);
+      const featured     = hasObjetivo ? pickFeaturedGoal(activeGoals) : null;
+      setGoalCoverage(featured ? computeGoalCoverage(featured, potentialSavings) : null);
+    } else {
+      setSavingsResult(null);
+      setSavingsOrigin(null);
+      setGoalCoverage(null);
+    }
   }, [user?.id]);
 
   useEffect(() => { load(); }, [load]);
@@ -340,24 +466,9 @@ export default function SavingsPlanScreen() {
     ? (plan?.categories ?? [])
     : (plan?.categories ?? []).slice(0, 6);
 
-  const { totalDisposable, estimatedIncome } = useExpensesStore();
-
   const insights = plan
     ? (selectRelevantInsights(plan).length > 0 ? selectRelevantInsights(plan) : [buildAllGoodInsight()])
     : [];
-
-  const ahorroSugerencias = plan
-    ? (() => {
-        const rows: CategoryRow[] = plan.categories
-          .filter(c => c.currentSpend > 0)
-          .map(c => ({ id: c.categoryId, name: c.name, color: c.color ?? '#888888', amount: c.currentSpend, pct: 0 }))
-          .sort((a, b) => b.amount - a.amount)
-          .map(r => ({ ...r, pct: plan.totalCurrentSpend > 0 ? r.amount / plan.totalCurrentSpend : 0 }));
-        return buildAhorroSugerencias({ rows, disposable: totalDisposable, total: plan.totalCurrentSpend, estimatedIncome });
-      })()
-    : [];
-
-  const now = new Date();
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
@@ -428,9 +539,14 @@ export default function SavingsPlanScreen() {
           </View>
           <InsightsSection insights={insights} />
 
-          {/* Potencial de inversión (antes en Gastos → Análisis) */}
-          {ahorroSugerencias.length > 0 && (
-            <DineroRecuperableCard sugerencias={ahorroSugerencias} month={now.getMonth() + 1} year={now.getFullYear()} />
+          {/* Fase 2 — ¿qué podrías hacer con este ahorro? */}
+          {plan.potentialSavings > 500 && savingsResult && (
+            <SavingsDestinationCard
+              monthlySaving={plan.potentialSavings}
+              origin={savingsOrigin}
+              result={savingsResult}
+              goalCoverage={goalCoverage}
+            />
           )}
 
           <Text style={st.footnote}>

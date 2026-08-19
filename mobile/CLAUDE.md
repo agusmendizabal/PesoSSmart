@@ -82,7 +82,7 @@ Two non-obvious behaviors:
 | `ai-advisor` | Financial chatbot. Fetches user context from DB + macro data (BCRA/inflation API), validates message limits, calls Groq. Supports `generate_welcome: true` for auto-generated opening message. |
 | `process-screenshot` | Two-stage OCR: `llama-3.2-11b-vision-preview` extracts text, then `llama-3.3-70b-versatile` parses into structured expenses. |
 
-All edge functions do their own JWT validation via `GET /auth/v1/user`. **"Verify JWT with legacy secret" must be OFF** in Supabase → Edge Functions → Settings.
+User-facing functions (`ai-advisor`, `investment-advisor`, `gmail-poll`, `mp-poll`, `transcribe`) are deployed with Gateway JWT verification **ON** (`verify_jwt=true`), so Supabase rejects invalid/missing JWTs before the function code runs. Server-to-server functions with no end-user session (cron jobs, `mp-webhook`, `send-push`/`advisor-sunday`) are deployed with `--no-verify-jwt` and instead check a shared secret in `Authorization` — see root `CLAUDE.md` for the full list. `create-payment` additionally does its own JWT validation in code via `GET /auth/v1/user`.
 
 #### AI Advisor — key patterns
 

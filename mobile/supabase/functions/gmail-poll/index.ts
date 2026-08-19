@@ -206,7 +206,7 @@ Si no hay monto saliente claro, respondé: { "es_movimiento": false }`;
 
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content ?? '';
-    console.log('[gmail-poll] Groq raw response:', content);
+    console.log('[gmail-poll] Groq raw response length:', content.length);
 
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
@@ -215,7 +215,7 @@ Si no hay monto saliente claro, respondé: { "es_movimiento": false }`;
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
-    console.log('[gmail-poll] Groq parsed:', JSON.stringify(parsed));
+    console.log('[gmail-poll] Groq devolvió JSON válido');
     return parsed;
   } catch (err) {
     console.error('[gmail-poll] classifyWithGroq exception:', err);
@@ -397,13 +397,13 @@ serve(async (req) => {
       const subject = headers.find((h: any) => h.name === 'Subject')?.value ?? '';
       const from = headers.find((h: any) => h.name === 'From')?.value ?? '';
 
-      console.log('[gmail-poll] Procesando email | from:', from, '| subject:', subject);
+      console.log('[gmail-poll] Procesando email, id:', msg.id);
 
       // ── Sender domain whitelist ───────────────────────────────────────────
       const fromLower = from.toLowerCase();
       const isKnownSender = ALL_SENDER_DOMAINS.some(d => fromLower.includes(d));
       if (!isKnownSender) {
-        console.log('[gmail-poll] Remitente ignorado:', from);
+        console.log('[gmail-poll] Remitente ignorado (no está en whitelist)');
         continue;
       }
 
@@ -411,17 +411,17 @@ serve(async (req) => {
       const subjectLower = subject.toLowerCase();
       const isRelevant = SUBJECT_KEYWORDS.some(k => subjectLower.includes(k));
       if (!isRelevant) {
-        console.log('[gmail-poll] Subject no relevante:', subject);
+        console.log('[gmail-poll] Subject no relevante');
         continue;
       }
 
       const body = extractTextFromEmail(emailData.payload);
       if (!body.trim()) {
-        console.log('[gmail-poll] Body vacío para:', subject);
+        console.log('[gmail-poll] Body vacío');
         continue;
       }
 
-      console.log('[gmail-poll] Body extraído (primeros 200 chars):', body.slice(0, 200));
+      console.log('[gmail-poll] Body extraído, longitud:', body.length);
 
       // ── Pre-parse with bank detectors ─────────────────────────────────────
       const detection = detectBank(from, subject, body);
@@ -534,13 +534,13 @@ serve(async (req) => {
     // ── Push notification si hay nuevos gastos ─────────────────────────────
     if (newPending > 0) {
       const supabaseServiceUrl = Deno.env.get('SUPABASE_URL')!;
-      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const internalFnSecret = Deno.env.get('INTERNAL_FN_SECRET');
       const plural = newPending > 1 ? `${newPending} gastos nuevos` : `1 gasto nuevo`;
       await fetch(`${supabaseServiceUrl}/functions/v1/send-push`, {
         method: 'POST',
         headers: {
           'Content-Type':  'application/json',
-          'Authorization': `Bearer ${serviceKey}`,
+          'Authorization': `Bearer ${internalFnSecret}`,
         },
         body: JSON.stringify({
           userId,

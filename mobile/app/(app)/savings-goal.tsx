@@ -7,15 +7,13 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, layout } from '@/theme';
 import { Text } from '@/components/ui/Text';
+import { FormSheetModal, FormSheetButton } from '@/components/ui/FormSheetModal';
 import { useAuthStore } from '@/store/authStore';
 import { useGoalsStore } from '@/store/goalsStore';
 import { fetchBudgetPlan, type BudgetPlan } from '@/lib/budgetPlan';
@@ -24,27 +22,21 @@ import { formatCurrency } from '@/utils/format';
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:     '#F7F9FC',
+  bg:     '#F6F7F9',
   card:   '#FFFFFF',
-  blue:   '#2563EB',
-  green:  '#16A34A',
-  violet: '#8B5CF6',
+  blue:   '#1976D2',
+  green:  '#2E7D32',
+  violet: '#7B61FF',
   red:    '#EF4444',
   amber:  '#F59E0B',
-  text:   '#111827',
-  sub:    '#6B7280',
-  muted:  '#9CA3AF',
-  border: '#E5E7EB',
-  light:  '#F3F4F6',
+  text:   '#212121',
+  sub:    '#757575',
+  muted:  '#9E9E9E',
+  border: '#E0E0E0',
+  light:  '#F2F2F2',
 } as const;
 
-const shadow = {
-  shadowColor: '#1F2937',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.06,
-  shadowRadius: 10,
-  elevation: 3,
-} as const;
+const shadow = layout.cardShadow;
 
 // ─── Hero Card ────────────────────────────────────────────────────────────────
 
@@ -132,60 +124,38 @@ function CustomAmountModal({ visible, suggested, onClose, onSave }: {
   const [amount, setAmount] = useState(suggested.toString());
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <SafeAreaView style={cam.sheet}>
-          <View style={cam.handle} />
-          <View style={cam.header}>
-            <Text style={cam.title}>Elegir otro monto</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={22} color={C.sub} />
-            </TouchableOpacity>
-          </View>
-          <View style={cam.body}>
-            <Text style={cam.label}>MONTO DE LA META (ARS)</Text>
-            <View style={cam.amountBox}>
-              <Text style={cam.prefix}>$</Text>
-              <TextInput
-                style={cam.input}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="decimal-pad"
-                placeholder="0"
-                placeholderTextColor={C.muted}
-                autoFocus
-              />
-            </View>
-            <TouchableOpacity
-              style={cam.btn}
-              onPress={() => {
-                const amt = parseFloat(amount.replace(',', '.'));
-                if (isNaN(amt) || amt <= 0) { Alert.alert('', 'Ingresá un monto válido.'); return; }
-                onSave(amt);
-              }}
-              activeOpacity={0.85}
-            >
-              <Text style={cam.btnText}>Crear meta con este monto</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </Modal>
+    <FormSheetModal visible={visible} title="Elegir otro monto" onClose={onClose} presentationStyle="formSheet" scrollable={false}>
+      <Text style={cam.label}>MONTO DE LA META (ARS)</Text>
+      <View style={cam.amountBox}>
+        <Text style={cam.prefix}>$</Text>
+        <TextInput
+          style={cam.input}
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="decimal-pad"
+          placeholder="0"
+          placeholderTextColor={C.muted}
+          autoFocus
+        />
+      </View>
+      <FormSheetButton
+        label="Crear meta con este monto"
+        color={C.blue}
+        onPress={() => {
+          const amt = parseFloat(amount.replace(',', '.'));
+          if (isNaN(amt) || amt <= 0) { Alert.alert('', 'Ingresá un monto válido.'); return; }
+          onSave(amt);
+        }}
+      />
+    </FormSheetModal>
   );
 }
 
 const cam = StyleSheet.create({
-  sheet:    { flex: 1, backgroundColor: C.card },
-  handle:   { width: 36, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginTop: spacing[3] },
-  header:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing[5], paddingTop: spacing[3] },
-  title:    { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: C.text },
-  body:     { padding: spacing[5], gap: spacing[4] },
   label:    { fontFamily: 'Montserrat_600SemiBold', fontSize: 11, color: C.muted, letterSpacing: 0.6 },
   amountBox:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], backgroundColor: C.light, borderRadius: 16, padding: spacing[5], borderWidth: 1.5, borderColor: C.border },
   prefix:   { fontFamily: 'Montserrat_700Bold', fontSize: 32, color: C.muted },
   input:    { fontFamily: 'Montserrat_700Bold', fontSize: 40, color: C.text, minWidth: 100, textAlign: 'center' },
-  btn:      { backgroundColor: C.blue, borderRadius: 14, height: 54, alignItems: 'center', justifyContent: 'center' },
-  btnText:  { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#FFF' },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
