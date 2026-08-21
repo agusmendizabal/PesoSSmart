@@ -119,28 +119,28 @@ const BOTS: Record<BotId, {
 const BOT_IDS: BotId[] = ['general', 'ahorro', 'gastos'];
 
 const QUICK_GOALS = [
-  { id: 'ahorrar',  label: 'Ahorrar más',     icon: '🐷', color: '#7C3AED', msg: '¿Cómo puedo ahorrar más este mes?' },
-  { id: 'gastar',   label: 'Gastar mejor',    icon: '💸', color: '#16A34A', msg: '¿En qué estoy gastando de más?' },
-  { id: 'deudas',   label: 'Salir de deudas', icon: '🔓', color: '#EA580C', msg: '¿Cómo salgo de mis deudas?' },
-  { id: 'invertir', label: 'Invertir',         icon: '📈', color: '#2563EB', msg: '¿Cómo empiezo a invertir?' },
+  { id: 'ahorrar',  label: 'Ahorrar más',     icon: '🐷', color: '#27AE60', msg: '¿Cómo puedo ahorrar más este mes?' },
+  { id: 'gastar',   label: 'Gastar mejor',    icon: '💸', color: '#27AE60', msg: '¿En qué estoy gastando de más?' },
+  { id: 'deudas',   label: 'Salir de deudas', icon: '🔓', color: '#F59E0B', msg: '¿Cómo salgo de mis deudas?' },
+  { id: 'invertir', label: 'Invertir',         icon: '📈', color: '#27AE60', msg: '¿Cómo empiezo a invertir?' },
 ] as const;
 
 // Colores premium para la vista bots (light theme propio)
 const B = {
-  bg:       '#F6F7F9',
+  bg:       '#FAFAF7',
   card:     '#FFFFFF',
-  violet:   '#7C3AED',
-  violetLt: '#EDE9FE',
-  text:     '#0F172A',
-  sub:      '#64748B',
-  muted:    '#94A3B8',
-  border:   '#E8EAF0',
-  yellow:   '#D97706',
-  yellowLt: '#FEF3C7',
-  pink:     '#DB2777',
-  pinkLt:   '#FCE7F3',
-  green:    '#16A34A',
-  greenLt:  '#DCFCE7',
+  violet:   '#27AE60',
+  violetLt: '#D1F7E3',
+  text:     '#1C1C1C',
+  sub:      '#6D6A63',
+  muted:    '#9B9790',
+  border:   '#E8E2D9',
+  yellow:   '#F59E0B',
+  yellowLt: '#D1F7E3',
+  pink:     '#EF4444',
+  pinkLt:   '#FEE2E2',
+  green:    '#27AE60',
+  greenLt:  '#D1F7E3',
 } as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -800,7 +800,7 @@ export default function AdvisorScreen() {
 
           {/* ── Insight card ── */}
           <View style={bs.insightCard}>
-            <View style={[bs.insightIcon, { backgroundColor: '#BBF7D0' }]}>
+            <View style={[bs.insightIcon, { backgroundColor: '#A8D5C2' }]}>
               <Ionicons name="trending-up" size={22} color={B.green} />
             </View>
             <View style={{ flex: 1, gap: 3 }}>
@@ -1344,10 +1344,10 @@ const bs = StyleSheet.create({
   // Insight card
   insightCard: {
     marginHorizontal: layout.screenPadding,
-    backgroundColor: '#F0FDF4', borderRadius: 22,
+    backgroundColor: '#D1F7E3', borderRadius: 22,
     padding: spacing[5], flexDirection: 'row',
     alignItems: 'center', gap: spacing[4],
-    borderWidth: 1, borderColor: '#BBF7D0',
+    borderWidth: 1, borderColor: '#A8D5C2',
     overflow: 'hidden',
   },
   insightIcon: {
@@ -1411,7 +1411,7 @@ const ts = StyleSheet.create({
   actionBtn: {
     width: 32, height: 32, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#F1F3F6',
+    backgroundColor: '#F5F1E9',
   },
   arrowBox: {
     width: 32, height: 32, borderRadius: 10,

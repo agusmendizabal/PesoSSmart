@@ -253,7 +253,7 @@ function OptionCard({ suggestion, isPrimary, whenText }: OptionCardProps) {
 
       {/* Indicadores */}
       <View style={optStyles.indicators}>
-        <IndicatorBar icon="💧" label="Liquidez"   value={instrument.liquidityLevel}       color="#82b1ff" />
+        <IndicatorBar icon="💧" label="Liquidez"   value={instrument.liquidityLevel}       color="#27AE60" />
         <IndicatorBar icon="🛡️" label="Vs. inflac."  value={instrument.inflationProtection}  color="#a5d6a7" />
         <IndicatorBar icon="📈" label="Crecimiento" value={instrument.growthPotential}       color={colors.neon} />
       </View>

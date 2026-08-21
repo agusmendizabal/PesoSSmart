@@ -7,7 +7,10 @@ import {
   TextInput,
   Alert,
   RefreshControl,
+  Platform,
+  Modal,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,17 +32,17 @@ import { FirstVisitSheet } from '@/components/FirstVisitSheet';
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:      '#F6F7F9',
+  bg:      '#FAFAF7',
   card:    '#FFFFFF',
   blue:    '#1976D2',
-  green:   '#2E7D32',
-  violet:  '#7B61FF',
+  green:   '#27AE60',
+  violet:  '#27AE60',
   red:     '#EF4444',
-  text:    '#212121',
-  sub:     '#757575',
-  muted:   '#9E9E9E',
-  border:  '#E0E0E0',
-  light:   '#F2F2F2',
+  text:    '#1C1C1C',
+  sub:     '#6D6A63',
+  muted:   '#9B9790',
+  border:  '#E8E2D9',
+  light:   '#F5F1E9',
 } as const;
 
 const shadow = layout.cardShadow;
@@ -326,6 +329,12 @@ function AddInvestmentModal({ visible, initial, onClose, onSave }: {
 
 // ─── Add Goal Modal ───────────────────────────────────────────────────────────
 
+function formatAmountDisplay(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  return parseInt(digits, 10).toLocaleString('es-AR').replace(/,/g, '.');
+}
+
 function AddGoalModal({ visible, initial, onClose, onSave }: {
   visible: boolean; initial: Partial<SavingsGoal> | null;
   onClose: () => void; onSave: (data: Omit<SavingsGoal, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
@@ -333,29 +342,47 @@ function AddGoalModal({ visible, initial, onClose, onSave }: {
   const [title, setTitle]               = useState('');
   const [emoji, setEmoji]               = useState('🎯');
   const [targetAmount, setTargetAmount] = useState('');
-  const [deadline, setDeadline]         = useState('');
+  const [deadlineDate, setDeadlineDate] = useState<Date | null>(null);
+  const [showPicker, setShowPicker]     = useState(false);
   const [saving, setSaving]             = useState(false);
 
   useEffect(() => {
     if (visible) {
       setTitle(initial?.title ?? '');
       setEmoji(initial?.emoji ?? '🎯');
-      setTargetAmount(initial?.target_amount?.toString() ?? '');
-      setDeadline(initial?.deadline ?? '');
+      const amt = initial?.target_amount;
+      setTargetAmount(amt ? amt.toString() : '');
+      const dl = initial?.deadline;
+      setDeadlineDate(dl ? new Date(dl + 'T12:00:00') : null);
     }
   }, [visible, initial]);
 
+  const handleAmountChange = (text: string) => {
+    const digits = text.replace(/\D/g, '');
+    setTargetAmount(digits);
+  };
+
+  const deadlineISO = deadlineDate
+    ? deadlineDate.toISOString().slice(0, 10)
+    : null;
+
+  const deadlineDisplay = deadlineDate
+    ? `${String(deadlineDate.getDate()).padStart(2, '0')}-${String(deadlineDate.getMonth() + 1).padStart(2, '0')}-${deadlineDate.getFullYear()}`
+    : '';
+
   const handleSave = async () => {
-    const amt = parseFloat(targetAmount.replace(',', '.'));
+    const amt = parseFloat(targetAmount);
     if (!title.trim()) { Alert.alert('', 'Ingresá un nombre para la meta.'); return; }
     if (isNaN(amt) || amt <= 0) { Alert.alert('', 'Ingresá un monto objetivo.'); return; }
     setSaving(true);
     try {
-      await onSave({ title: title.trim(), emoji, target_amount: amt, current_amount: initial?.current_amount ?? 0, deadline: deadline || null });
+      await onSave({ title: title.trim(), emoji, target_amount: amt, current_amount: initial?.current_amount ?? 0, deadline: deadlineISO });
       onClose();
     } catch { Alert.alert('Error', 'No se pudo guardar. Intentá de nuevo.'); }
     finally { setSaving(false); }
   };
+
+  const pickerDate = deadlineDate ?? new Date();
 
   return (
     <FormSheetModal visible={visible} title={initial?.id ? 'Editar meta' : 'Nueva meta'} onClose={onClose}>
@@ -370,9 +397,68 @@ function AddGoalModal({ visible, initial, onClose, onSave }: {
       <Text style={m.label}>NOMBRE</Text>
       <TextInput style={m.input} value={title} onChangeText={setTitle} placeholder="Vacaciones, Auto, Emergencias..." placeholderTextColor={C.muted} autoCapitalize="sentences" maxLength={60} />
       <Text style={m.label}>MONTO OBJETIVO (ARS)</Text>
-      <TextInput style={m.input} value={targetAmount} onChangeText={setTargetAmount} placeholder="1000000" placeholderTextColor={C.muted} keyboardType="decimal-pad" />
-      <Text style={m.label}>FECHA LÍMITE (YYYY-MM-DD, opcional)</Text>
-      <TextInput style={m.input} value={deadline} onChangeText={setDeadline} placeholder="2025-12-31" placeholderTextColor={C.muted} />
+      <TextInput
+        style={m.input}
+        value={targetAmount ? formatAmountDisplay(targetAmount) : ''}
+        onChangeText={handleAmountChange}
+        placeholder="1.000.000"
+        placeholderTextColor={C.muted}
+        keyboardType="numeric"
+      />
+      <Text style={m.label}>FECHA LÍMITE (opcional)</Text>
+      <TouchableOpacity style={[m.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]} onPress={() => setShowPicker(true)} activeOpacity={0.7}>
+        <Text style={{ color: deadlineDisplay ? C.text : C.muted, fontSize: 15 }}>
+          {deadlineDisplay || 'DD-MM-AAAA'}
+        </Text>
+        {deadlineDate && (
+          <TouchableOpacity onPress={() => setDeadlineDate(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close-circle" size={18} color={C.muted} />
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+
+      {/* Android: muestra el picker directo */}
+      {showPicker && Platform.OS === 'android' && (
+        <DateTimePicker
+          value={pickerDate}
+          mode="date"
+          display="calendar"
+          minimumDate={new Date()}
+          onChange={(_, date) => {
+            setShowPicker(false);
+            if (date) setDeadlineDate(date);
+          }}
+        />
+      )}
+
+      {/* iOS: modal con picker inline */}
+      {Platform.OS === 'ios' && (
+        <Modal visible={showPicker} transparent animationType="slide">
+          <View style={m.pickerOverlay}>
+            <View style={m.pickerSheet}>
+              <View style={m.pickerHeader}>
+                <TouchableOpacity onPress={() => { setDeadlineDate(null); setShowPicker(false); }}>
+                  <Text style={{ color: C.muted, fontSize: 15 }}>Borrar</Text>
+                </TouchableOpacity>
+                <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 15 }}>Fecha límite</Text>
+                <TouchableOpacity onPress={() => setShowPicker(false)}>
+                  <Text style={{ color: C.blue, fontSize: 15, fontFamily: 'Montserrat_600SemiBold' }}>Listo</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={pickerDate}
+                mode="date"
+                display="spinner"
+                minimumDate={new Date()}
+                locale="es-AR"
+                onChange={(_, date) => { if (date) setDeadlineDate(date); }}
+                style={{ width: '100%' }}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+
       <FormSheetButton label="Guardar meta" color={C.blue} loading={saving} onPress={handleSave} />
     </FormSheetModal>
   );
@@ -483,8 +569,11 @@ const m = StyleSheet.create({
   amountBox:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], backgroundColor: C.light, borderRadius: 16, padding: spacing[5], borderWidth: 1.5, borderColor: C.border },
   prefix:        { fontFamily: 'Montserrat_700Bold', fontSize: 32, color: C.muted },
   amountInput:   { fontFamily: 'Montserrat_700Bold', fontSize: 40, color: C.text, minWidth: 80, textAlign: 'center' },
-  emojiBtn:      { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.border, backgroundColor: C.light },
-  emojiBtnActive:{ borderColor: C.blue, backgroundColor: C.blue + '12' },
+  emojiBtn:       { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.border, backgroundColor: C.light },
+  emojiBtnActive: { borderColor: C.blue, backgroundColor: C.blue + '12' },
+  pickerOverlay:  { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
+  pickerSheet:    { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32 },
+  pickerHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -588,8 +677,9 @@ export default function SavingsScreen() {
         {/* ── Tus metas ──────────────────────────────────────────────────── */}
         <View style={s.sectionRow}>
           <Text style={s.sectionTitle}>Tus metas</Text>
-          <TouchableOpacity onPress={openAddGoal}>
-            <Text style={s.seeAll}>Ver todas</Text>
+          <TouchableOpacity onPress={openAddGoal} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="add-circle-outline" size={16} color={C.blue} />
+            <Text style={s.seeAll}>Nueva meta</Text>
           </TouchableOpacity>
         </View>
 
@@ -605,7 +695,7 @@ export default function SavingsScreen() {
             <Ionicons name="chevron-forward" size={16} color={C.muted} />
           </TouchableOpacity>
         ) : (
-          goals.slice(0, 3).map(g => (
+          goals.map(g => (
             <GoalCard
               key={g.id} goal={g}
               onEdit={openEditGoal}
@@ -652,34 +742,6 @@ export default function SavingsScreen() {
           ))
         )}
 
-        {/* ── Inversiones ────────────────────────────────────────────────── */}
-        <View style={s.sectionRow}>
-          <Text style={s.sectionTitle}>Inversiones</Text>
-          <TouchableOpacity onPress={openAddInvestment}>
-            <Text style={s.seeAll}>Ver todas</Text>
-          </TouchableOpacity>
-        </View>
-
-        {investments.length === 0 ? (
-          <TouchableOpacity style={s.emptyCard} onPress={openAddInvestment} activeOpacity={0.8}>
-            <View style={[s.emptyIcon, { backgroundColor: C.violet + '14' }]}>
-              <Ionicons name="trending-up-outline" size={20} color={C.violet} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.emptyTitle}>Registrar una inversión</Text>
-              <Text style={s.emptySub}>FCI, Cedears, plazo fijo, cripto...</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={C.muted} />
-          </TouchableOpacity>
-        ) : (
-          investments.map(inv => (
-            <InvestmentItem
-              key={inv.id} investment={inv}
-              onEdit={openEditInvestment}
-              onDelete={confirmDeleteInvestment}
-            />
-          ))
-        )}
 
         {/* ── Advisor CTA ────────────────────────────────────────────────── */}
         {ADVISOR_ENABLED && (

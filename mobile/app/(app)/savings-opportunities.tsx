@@ -20,18 +20,18 @@ import { formatCurrency } from '@/utils/format';
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:     '#F6F7F9',
+  bg:     '#FAFAF7',
   card:   '#FFFFFF',
   blue:   '#1976D2',
-  green:  '#2E7D32',
-  violet: '#7B61FF',
+  green:  '#27AE60',
+  violet: '#27AE60',
   red:    '#EF4444',
   amber:  '#F59E0B',
-  text:   '#212121',
-  sub:    '#757575',
-  muted:  '#9E9E9E',
-  border: '#E0E0E0',
-  light:  '#F2F2F2',
+  text:   '#1C1C1C',
+  sub:    '#6D6A63',
+  muted:  '#9B9790',
+  border: '#E8E2D9',
+  light:  '#F5F1E9',
 } as const;
 
 const shadow = layout.cardShadow;
@@ -66,9 +66,9 @@ function HeroCard({ total }: { total: number }) {
 const hc = StyleSheet.create({
   card:   { backgroundColor: C.green, borderRadius: 24, padding: spacing[6], flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   left:   { flex: 1, gap: spacing[1] },
-  eyebrow:{ fontFamily: 'Montserrat_500Medium', fontSize: 12, color: '#BBF7D0' },
+  eyebrow:{ fontFamily: 'Montserrat_500Medium', fontSize: 12, color: '#A8D5C2' },
   amount: { fontFamily: 'Montserrat_800ExtraBold', fontSize: 34, color: '#FFFFFF', lineHeight: 42 },
-  sub:    { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#D1FAE5' },
+  sub:    { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#6D6A63' },
   emoji:  { fontSize: 52 },
 });
 
@@ -323,7 +323,7 @@ const st = StyleSheet.create({
   goalCta:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.blue, borderRadius: 18, padding: spacing[5], gap: spacing[3] },
   goalCtaLeft:  { flex: 1, gap: 3 },
   goalCtaTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#FFF' },
-  goalCtaSub:   { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#BFDBFE' },
+  goalCtaSub:   { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63' },
   goalCtaArrow: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF25', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   allCatsBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], borderWidth: 1, borderColor: C.blue + '35', borderRadius: 14, padding: spacing[4] },
   allCatsText:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: C.blue },

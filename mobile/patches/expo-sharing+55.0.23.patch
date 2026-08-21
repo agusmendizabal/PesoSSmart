@@ -1,0 +1,13 @@
+diff --git a/node_modules/expo-sharing/ios/SharingModule.swift b/node_modules/expo-sharing/ios/SharingModule.swift
+index 71c61a1..1aca7f1 100644
+--- a/node_modules/expo-sharing/ios/SharingModule.swift
++++ b/node_modules/expo-sharing/ios/SharingModule.swift
+@@ -14,7 +14,7 @@ public final class SharingModule: Module {
+     Name("ExpoSharing")
+ 
+     AsyncFunction("shareAsync") { (url: URL, options: SharingOptions, promise: Promise) in
+-      guard FileSystemUtilities.isReadableFile(appContext, url) else {
++      guard FileManager.default.isReadableFile(atPath: url.path) else {
+         throw FilePermissionException()
+       }
+ 

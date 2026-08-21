@@ -137,7 +137,7 @@ serve(async (req) => {
         console.error('[gmail-auth] Token CSRF no encontrado:', csrfToken);
         return new Response(null, {
           status: 302,
-          headers: { Location: `pesossmart://gmail-connected?error=${encodeURIComponent('Token inválido o expirado')}` },
+          headers: { Location: `nomi://gmail-connected?error=${encodeURIComponent('Token inválido o expirado')}` },
         });
       }
 
@@ -146,7 +146,7 @@ serve(async (req) => {
         console.error('[gmail-auth] Token CSRF expirado');
         return new Response(null, {
           status: 302,
-          headers: { Location: `pesossmart://gmail-connected?error=${encodeURIComponent('Tiempo de conexión expirado. Intentá de nuevo.')}` },
+          headers: { Location: `nomi://gmail-connected?error=${encodeURIComponent('Tiempo de conexión expirado. Intentá de nuevo.')}` },
         });
       }
 
@@ -201,13 +201,13 @@ serve(async (req) => {
       console.log('[gmail-auth] Conexión Gmail guardada (encriptada) para user:', userId);
       return new Response(null, {
         status: 302,
-        headers: { Location: `pesossmart://gmail-connected?email=${encodeURIComponent(userInfo.email)}` },
+        headers: { Location: `nomi://gmail-connected?email=${encodeURIComponent(userInfo.email)}` },
       });
     } catch (err) {
       console.error('[gmail-auth] Error en callback:', err);
       return new Response(null, {
         status: 302,
-        headers: { Location: `pesossmart://gmail-connected?error=${encodeURIComponent(String(err))}` },
+        headers: { Location: `nomi://gmail-connected?error=${encodeURIComponent(String(err))}` },
       });
     }
   }

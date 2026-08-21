@@ -78,7 +78,7 @@ export default function GmailConnectAppScreen() {
         return;
       }
 
-      const result = await WebBrowser.openAuthSessionAsync(json.url, 'pesossmart://gmail-connected');
+      const result = await WebBrowser.openAuthSessionAsync(json.url, 'nomi://gmail-connected');
 
       if (result.type === 'success' && result.url) {
         const match    = result.url.match(/email=([^&]+)/);
@@ -191,20 +191,20 @@ const styles = StyleSheet.create({
 
   iconWrap: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: '#FEEFEE',
+    backgroundColor: '#FEE2E2',
     alignItems: 'center', justifyContent: 'center',
   },
 
   title: {
     fontFamily: 'Montserrat_700Bold',
     fontSize:   22,
-    color:      '#212121',
+    color:      '#1C1C1C',
     textAlign:  'center',
   },
   subtitle: {
     fontFamily: 'Montserrat_400Regular',
     fontSize:   14,
-    color:      '#757575',
+    color:      '#6D6A63',
     textAlign:  'center',
     lineHeight: 22,
   },
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     gap:            spacing[2],
     width:          '100%',
     height:         48,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#27AE60',
     borderRadius:   12,
   },
   connectBtnText: {
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
 
   privacyCard: {
     width:           '100%',
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#D1F7E3',
     borderRadius:    12,
     padding:         spacing[4],
     gap:             spacing[2],
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   privacyTitle: {
     fontFamily: 'Montserrat_600SemiBold',
     fontSize:   13,
-    color:      '#1565C0',
+    color:      '#27AE60',
   },
   privacyRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   privacyItem: {
     fontFamily: 'Montserrat_400Regular',
     fontSize:   13,
-    color:      '#1565C0',
+    color:      '#27AE60',
     flex:       1,
   },
 });

@@ -132,7 +132,7 @@ function PlanCard({
         <View style={cardStyles.highlights}>
           {plan.highlights.map((h, i) => (
             <View key={i} style={cardStyles.highlightRow}>
-              <Ionicons name="checkmark-circle-outline" size={14} color={plan.color !== '#6B7280' ? plan.color : colors.primary} />
+              <Ionicons name="checkmark-circle-outline" size={14} color={plan.color !== '#6D6A63' ? plan.color : colors.primary} />
               <Text variant="caption" color={colors.text.secondary} style={{ flex: 1, lineHeight: 17 }}>{h}</Text>
             </View>
           ))}
@@ -234,7 +234,7 @@ export default function PlansScreen() {
       // Abrir checkout de MercadoPago en browser embebido
       const result = await WebBrowser.openAuthSessionAsync(
         data.init_point,
-        'pesossmart://payment-success',
+        'nomi://payment-success',
       );
 
       if (result.type === 'success') {

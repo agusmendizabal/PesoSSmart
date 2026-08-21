@@ -26,8 +26,8 @@ export default function WelcomeScreen() {
       <View style={styles.container}>
         {/* Logo */}
         <View style={styles.logoSection}>
-          <Text variant="h1" color={colors.neon}>
-            PESOS{'\n'}$MART
+          <Text variant="h1" style={{ color: '#006B5A' }}>
+            NO<Text variant="h1" style={{ color: '#A8D5C2' }}>MI</Text>
           </Text>
         </View>
 

@@ -69,10 +69,10 @@ export default function LoginScreen() {
                 FINANZAS PERSONALES
               </Text>
             </View>
-            <Text variant="h1" color={colors.text.primary} style={styles.brandTitle}>
-              SMART
-              <Text variant="h1" color={colors.neon}>
-                PESOS
+            <Text variant="h1" style={[styles.brandTitle, { color: '#006B5A' }]}>
+              NO
+              <Text variant="h1" style={{ color: '#A8D5C2' }}>
+                MI
               </Text>
             </Text>
             <View style={styles.brandDivider} />

@@ -21,18 +21,18 @@ import { formatCurrency } from '@/utils/format';
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:     '#F6F7F9',
+  bg:     '#FAFAF7',
   card:   '#FFFFFF',
   blue:   '#1976D2',
-  green:  '#2E7D32',
-  violet: '#7B61FF',
+  green:  '#27AE60',
+  violet: '#27AE60',
   red:    '#EF4444',
   amber:  '#F59E0B',
-  text:   '#212121',
-  sub:    '#757575',
-  muted:  '#9E9E9E',
-  border: '#E0E0E0',
-  light:  '#F2F2F2',
+  text:   '#1C1C1C',
+  sub:    '#6D6A63',
+  muted:  '#9B9790',
+  border: '#E8E2D9',
+  light:  '#F5F1E9',
 } as const;
 
 const shadow = layout.cardShadow;

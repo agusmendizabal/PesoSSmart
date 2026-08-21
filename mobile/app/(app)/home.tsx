@@ -259,7 +259,7 @@ function buildHomeHighlights({
       title: `${formatCurrency(totalInvestable)} disponibles`,
       subtitle: `Invertido en FCI Money Market podrías ganar ~${formatCurrency(fciMonthly)}/mes sin hacer nada más.`,
       icon: 'trending-up-outline', iconColor: '#A78BFA',
-      cta: { label: 'Ver simulador', route: '/(app)/simulator' },
+      cta: { label: 'Hablar con asesor', route: '/(app)/advisor' },
     });
   }
 
@@ -313,7 +313,7 @@ function buildHomeHighlights({
   return items.slice(0, 5);
 }
 
-const QS_KEY = '@smartpesos/quickstart_dismissed';
+const QS_KEY = '@nomi/quickstart_dismissed';
 
 function QuickStartCard({
   hasExpenses,
@@ -816,7 +816,7 @@ export default function HomeScreen() {
     const catMap: Record<string, { name: string; amount: number; color: string }> = {};
     expenses.forEach(e => {
       const name  = (e as any).category?.name_es ?? 'Sin clasificar';
-      const color = (e as any).category?.color   ?? '#7C3AED';
+      const color = (e as any).category?.color   ?? '#27AE60';
       if (!catMap[name]) catMap[name] = { name, amount: 0, color };
       catMap[name].amount += e.amount;
     });
@@ -862,7 +862,7 @@ export default function HomeScreen() {
     const catMap: Record<string, { name: string; amount: number; color: string }> = {};
     expenses.forEach(e => {
       const name  = (e as any).category?.name_es ?? 'Sin clasificar';
-      const color = (e as any).category?.color   ?? '#7C3AED';
+      const color = (e as any).category?.color   ?? '#27AE60';
       if (!catMap[name]) catMap[name] = { name, amount: 0, color };
       catMap[name].amount += e.amount;
     });
@@ -900,7 +900,7 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={isLoading}
             onRefresh={() => user?.id && fetchExpenses(user.id)}
-            tintColor="#22C55E"
+            tintColor="#27AE60"
           />
         }
       >
@@ -921,7 +921,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/(app)/advisor' as any)}
                 activeOpacity={0.75}
               >
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#1A1A1A" />
+                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#1C1C1C" />
               </TouchableOpacity>
             </View>
           )}
@@ -938,27 +938,27 @@ export default function HomeScreen() {
           {/* Ahorro posible */}
           <TouchableOpacity style={nStyles.summaryBlock} onPress={() => router.push((ADVISOR_ENABLED ? '/(app)/advisor' : ADVISOR_FALLBACK_CTA.route) as any)} activeOpacity={0.8}>
             <View style={[nStyles.summaryIcon, { backgroundColor: '#DCFCE7' }]}>
-              <Ionicons name="wallet-outline" size={16} color="#22C55E" />
+              <Ionicons name="wallet-outline" size={16} color="#27AE60" />
             </View>
             <Text style={nStyles.summaryLabel}>Ahorro posible</Text>
-            <Text style={[nStyles.summaryValue, { color: '#22C55E' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            <Text style={[nStyles.summaryValue, { color: '#27AE60' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
               {formatCurrency(savingsPotential)}
             </Text>
-            <Text style={[nStyles.summaryCta, { color: '#22C55E' }]}>Ver cómo lograrlo →</Text>
+            <Text style={[nStyles.summaryCta, { color: '#27AE60' }]}>Ver cómo lograrlo →</Text>
           </TouchableOpacity>
 
           <View style={nStyles.summaryDivider} />
 
           {/* Gastado */}
           <TouchableOpacity style={nStyles.summaryBlock} onPress={() => router.push('/(app)/expenses' as any)} activeOpacity={0.8}>
-            <View style={[nStyles.summaryIcon, { backgroundColor: '#F3F4F6' }]}>
-              <Ionicons name="trending-up-outline" size={16} color="#374151" />
+            <View style={[nStyles.summaryIcon, { backgroundColor: '#E8E2D9' }]}>
+              <Ionicons name="trending-up-outline" size={16} color="#1C1C1C" />
             </View>
             <Text style={nStyles.summaryLabel}>Gastado</Text>
-            <Text style={[nStyles.summaryValue, { color: '#1A1A1A' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            <Text style={[nStyles.summaryValue, { color: '#1C1C1C' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
               {formatCurrency(totalThisMonth)}
             </Text>
-            <Text style={[nStyles.summaryCta, { color: '#6B7280' }]}>Ver análisis →</Text>
+            <Text style={[nStyles.summaryCta, { color: '#6D6A63' }]}>Ver análisis →</Text>
           </TouchableOpacity>
 
           <View style={nStyles.summaryDivider} />
@@ -979,14 +979,14 @@ export default function HomeScreen() {
 
           {/* Meta principal */}
           <TouchableOpacity style={nStyles.summaryBlock} onPress={() => router.push('/(app)/savings' as any)} activeOpacity={0.8}>
-            <View style={[nStyles.summaryIcon, { backgroundColor: '#EDE9FE' }]}>
-              <Ionicons name="flag-outline" size={16} color="#7C3AED" />
+            <View style={[nStyles.summaryIcon, { backgroundColor: '#F2E8D5' }]}>
+              <Ionicons name="flag-outline" size={16} color="#27AE60" />
             </View>
             <Text style={nStyles.summaryLabel}>Meta principal</Text>
-            <Text style={[nStyles.summaryValue, { color: '#7C3AED' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            <Text style={[nStyles.summaryValue, { color: '#27AE60' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
               {goalPct !== null ? `${goalPct}%` : '--'}
             </Text>
-            <Text style={[nStyles.summaryCta, { color: '#7C3AED' }]} numberOfLines={1}>
+            <Text style={[nStyles.summaryCta, { color: '#27AE60' }]} numberOfLines={1}>
               {activeGoal ? `${activeGoal.title} →` : 'Crear meta →'}
             </Text>
           </TouchableOpacity>
@@ -1018,7 +1018,7 @@ export default function HomeScreen() {
                 {/* Progress arc */}
                 <SvgPath
                   d={`M 40 40 m -32 0 a 32 32 0 1 1 64 0 a 32 32 0 1 1 -64 0`}
-                  stroke="#7C3AED"
+                  stroke="#27AE60"
                   strokeWidth={9}
                   fill="none"
                   strokeDasharray={`${(topCatData.pct / 100) * 201} 201`}
@@ -1044,7 +1044,7 @@ export default function HomeScreen() {
             <Svg width={80} height={80}>
               <SvgPath
                 d={`M 40 40 m -32 0 a 32 32 0 1 1 64 0 a 32 32 0 1 1 -64 0`}
-                stroke="#E5E7EB"
+                stroke="#E8E2D9"
                 strokeWidth={8}
                 fill="none"
               />
@@ -1092,12 +1092,12 @@ export default function HomeScreen() {
             <View style={{ alignItems: 'flex-end', justifyContent: 'flex-end', gap: 4 }}>
               <MiniLineChart
                 data={[prevMonthTotal, totalThisMonth]}
-                color={totalThisMonth <= prevMonthTotal ? '#22C55E' : '#EF4444'}
+                color={totalThisMonth <= prevMonthTotal ? '#27AE60' : '#EF4444'}
               />
-              <Text style={[nStyles.healthTrendText, { color: totalThisMonth <= prevMonthTotal ? '#22C55E' : '#EF4444' }]}>
+              <Text style={[nStyles.healthTrendText, { color: totalThisMonth <= prevMonthTotal ? '#27AE60' : '#EF4444' }]}>
                 {prevPct !== null ? `${prevPct > 0 ? '+' : ''}${prevPct}%` : ''}
               </Text>
-              <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 9, color: '#9CA3AF' }}>vs. mes pasado</Text>
+              <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 9, color: '#6D6A63' }}>vs. mes pasado</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -1124,10 +1124,10 @@ export default function HomeScreen() {
           ) : (
             expenses.slice(0, 2).map((exp, idx) => {
               const catName  = (exp as any).category?.name_es ?? 'Sin categoría';
-              const catColor = (exp as any).category?.color ?? '#9CA3AF';
+              const catColor = (exp as any).category?.color ?? '#6D6A63';
               const isDisp   = exp.classification === 'disposable';
               const isNecess = exp.classification === 'necessary';
-              const tagColor = isDisp ? '#EF4444' : isNecess ? '#3B82F6' : '#9CA3AF';
+              const tagColor = isDisp ? '#EF4444' : isNecess ? '#27AE60' : '#6D6A63';
               const tagLabel = isDisp ? 'Prescindible' : isNecess ? 'Necesario' : 'Sin clasificar';
               const merchant = exp.merchant || catName;
               return (
@@ -1156,52 +1156,6 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* ── OPORTUNIDAD PARA VOS ─────────────────────────────────────────────── */}
-        {totalDisposable > 0 && (
-          <TouchableOpacity
-            style={nStyles.oppCard}
-            onPress={() => router.push('/(app)/simulator' as any)}
-            activeOpacity={0.88}
-          >
-            {/* Header */}
-            <View style={nStyles.oppHeader}>
-              <View style={nStyles.oppIconCircle}>
-                <Text style={{ fontSize: 22 }}>💡</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={nStyles.oppLabel}>OPORTUNIDAD</Text>
-                <Text style={nStyles.oppTitle2}>Oportunidad para vos</Text>
-              </View>
-            </View>
-
-            {/* Body */}
-            <Text style={nStyles.oppBody2}>
-              Si invertís tus gastos prescindibles de este mes, podrías generar{' '}
-              <Text style={nStyles.oppHighlight}>{formatCurrency(investedIn12m)}</Text>
-              {' '}en 12 meses.
-            </Text>
-
-            {/* Mini growth bar */}
-            <View style={nStyles.oppGrowthWrap}>
-              <View style={nStyles.oppGrowthTrack}>
-                <View style={[nStyles.oppGrowthFill, { width: '72%' }]} />
-              </View>
-              <View style={nStyles.oppGrowthLabels}>
-                <Text style={nStyles.oppGrowthStart}>{formatCurrency(totalDisposable)}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="trending-up" size={12} color="#16A34A" />
-                  <Text style={nStyles.oppGrowthEnd}>{formatCurrency(investedIn12m)}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* CTA */}
-            <View style={nStyles.oppCta}>
-              <Text style={nStyles.oppCtaText}>Ver simulación</Text>
-              <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
-            </View>
-          </TouchableOpacity>
-        )}
 
         {/* ── QUICKSTART ──────────────────────────────────────────────────────── */}
         {showQuickStart && expenses.length === 0 && (
@@ -1223,11 +1177,11 @@ export default function HomeScreen() {
         visible={isFirstVisit}
         screenTitle="Tu dashboard financiero"
         screenIcon="home-outline"
-        iconColor="#22C55E"
+        iconColor="#27AE60"
         features={[
-          { icon: 'cash-outline', color: '#22C55E', title: 'Tu oportunidad del mes', body: 'Ves cuánto podrías recuperar ajustando tus gastos prescindibles y cómo invertirlo hoy.' },
-          { icon: 'thermometer-outline', color: '#F59E0B', title: 'Tu inflación real', body: 'Comparamos tu inflación personal contra el INDEC para que sepas si estás ganando o perdiendo poder adquisitivo.' },
-          { icon: 'mail-outline', color: '#3B82F6', title: 'Gmail detecta tus gastos', body: 'Si conectás Gmail, detectamos automáticamente las compras de tus resúmenes bancarios y billeteras.' },
+          { icon: 'cash-outline', color: '#27AE60', title: 'Tu oportunidad del mes', body: 'Ves cuánto podrías recuperar ajustando tus gastos prescindibles y cómo invertirlo hoy.' },
+          { icon: 'thermometer-outline', color: '#27AE60', title: 'Tu inflación real', body: 'Comparamos tu inflación personal contra el INDEC para que sepas si estás ganando o perdiendo poder adquisitivo.' },
+          { icon: 'mail-outline', color: '#27AE60', title: 'Gmail detecta tus gastos', body: 'Si conectás Gmail, detectamos automáticamente las compras de tus resúmenes bancarios y billeteras.' },
         ]}
         onDismiss={markVisited}
       />
@@ -1245,10 +1199,10 @@ export default function HomeScreen() {
             <View style={nStyles.incomeSheetHeader}>
               <Text variant="subtitle">¿Cuánto ganás por mes?</Text>
               <TouchableOpacity onPress={() => setShowIncomeModal(false)}>
-                <Ionicons name="close" size={22} color="#6B7280" />
+                <Ionicons name="close" size={22} color="#6D6A63" />
               </TouchableOpacity>
             </View>
-            <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#9CA3AF', marginBottom: 16 }}>
+            <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#6D6A63', marginBottom: 16 }}>
               Ingreso neto mensual aproximado. Se usa para calcular tu salud financiera.
             </Text>
             <View style={{ gap: 8 }}>
@@ -1258,11 +1212,11 @@ export default function HomeScreen() {
                   style={[nStyles.incomeOption, selectedRange === opt.value && nStyles.incomeOptionActive]}
                   onPress={() => setSelectedRange(opt.value)}
                 >
-                  <Text style={[nStyles.incomeOptionText, selectedRange === opt.value && { color: '#3B82F6', fontFamily: 'Montserrat_700Bold' }]}>
+                  <Text style={[nStyles.incomeOptionText, selectedRange === opt.value && { color: '#27AE60', fontFamily: 'Montserrat_700Bold' }]}>
                     {opt.label}
                   </Text>
                   {selectedRange === opt.value && (
-                    <Ionicons name="checkmark-circle" size={18} color="#3B82F6" />
+                    <Ionicons name="checkmark-circle" size={18} color="#27AE60" />
                   )}
                 </TouchableOpacity>
               ))}
@@ -1349,7 +1303,7 @@ function PremiumBannerCarousel({ highlights }: { highlights: HomeHighlight[] }) 
             </View>
             {/* Right robot */}
             <View style={bannerS.robotWrap}>
-              <Text style={{ fontSize: 56 }}>🤖</Text>
+              <Text style={{ fontSize: 44, lineHeight: 52 }}>🤖</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -1369,11 +1323,11 @@ function PremiumBannerCarousel({ highlights }: { highlights: HomeHighlight[] }) 
 
 const bannerS = StyleSheet.create({
   slide: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#1C1C1C',
     borderRadius: 24, padding: 24,
     flexDirection: 'row', alignItems: 'center', gap: 12,
     minHeight: 180,
-    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 6 },
+    shadowColor: '#1C1C1C', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
   },
   tag:     { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
@@ -1384,34 +1338,34 @@ const bannerS = StyleSheet.create({
   ctaText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#FFFFFF' },
   robotWrap: { width: 64, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   dots:    { flexDirection: 'row', justifyContent: 'center', gap: 6 },
-  dot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#D1D5DB' },
-  dotActive:{ width: 20, height: 6, borderRadius: 3, backgroundColor: '#22C55E' },
+  dot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: '#C5BEB5' },
+  dotActive:{ width: 20, height: 6, borderRadius: 3, backgroundColor: '#27AE60' },
 });
 
 // ─── Estilos nuevos (light theme) ─────────────────────────────────────────────
 
 const nStyles = StyleSheet.create({
-  safe:  { flex: 1, backgroundColor: '#F6F6F8' },
+  safe:  { flex: 1, backgroundColor: '#FAFAF7' },
   scroll: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 18,
     paddingBottom: 100,
     gap: 14,
-    backgroundColor: '#F6F6F8',
+    backgroundColor: '#FAFAF7',
   },
 
   // Header
   header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 4 },
-  greetingName: { fontFamily: 'Montserrat_700Bold', fontSize: 24, color: '#1A1A1A', letterSpacing: -0.4 },
-  greetingSub:  { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#9CA3AF', marginLeft: 30 },
+  greetingName: { fontFamily: 'Montserrat_700Bold', fontSize: 24, lineHeight: 30, color: '#1C1C1C', letterSpacing: -0.4 },
+  greetingSub:  { fontFamily: 'Montserrat_400Regular', fontSize: 13, lineHeight: 18, color: '#6D6A63', marginLeft: 30 },
   headerIconBtn: {
     width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
   robotAvatar: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: '#EDE9FE',
+    width: 44, height: 44, borderRadius: 22, backgroundColor: '#F2E8D5',
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -1422,25 +1376,25 @@ const nStyles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
   },
   summaryBlock:   { flex: 1, alignItems: 'center', gap: 6 },
-  summaryDivider: { width: 1, height: 60, backgroundColor: '#F3F4F6', alignSelf: 'center' },
+  summaryDivider: { width: 1, height: 60, backgroundColor: '#E8E2D9', alignSelf: 'center' },
   summaryIcon:    { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  summaryLabel:   { fontFamily: 'Montserrat_500Medium', fontSize: 10, color: '#6B7280', textAlign: 'center' },
+  summaryLabel:   { fontFamily: 'Montserrat_500Medium', fontSize: 10, color: '#6D6A63', textAlign: 'center' },
   summaryValue:   { fontFamily: 'Montserrat_700Bold', fontSize: 13, textAlign: 'center', letterSpacing: -0.3 },
   summaryCta:     { fontFamily: 'Montserrat_500Medium', fontSize: 9, textAlign: 'center', lineHeight: 12 },
 
   // Top category card
   topCatCard: {
-    backgroundColor: '#F5F3FF', borderRadius: 20, padding: 20,
+    backgroundColor: '#F2E8D5', borderRadius: 20, padding: 20,
     flexDirection: 'row', alignItems: 'center', gap: 16,
-    shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
+    shadowColor: '#27AE60', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
   },
-  topCatMeta:  { fontFamily: 'Montserrat_500Medium', fontSize: 11, color: '#8B5CF6', letterSpacing: 0.3 },
-  topCatName:  { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#1A1A1A', lineHeight: 22, letterSpacing: -0.3 },
-  topCatSub:   { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6B7280' },
-  topCatCta:   { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#7C3AED' },
+  topCatMeta:  { fontFamily: 'Montserrat_500Medium', fontSize: 11, color: '#27AE60', letterSpacing: 0.3 },
+  topCatName:  { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#1C1C1C', lineHeight: 22, letterSpacing: -0.3 },
+  topCatSub:   { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63' },
+  topCatCta:   { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#27AE60' },
   donutWrap:   { width: 80, height: 80, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   donutLabel:  { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  donutPct:    { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#7C3AED' },
+  donutPct:    { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#27AE60' },
 
   // Health card
   healthCard: {
@@ -1451,13 +1405,13 @@ const nStyles = StyleSheet.create({
   healthScoreWrap:  { width: 80, height: 80, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   healthScoreLabel: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   healthScoreNum:   { fontFamily: 'Montserrat_700Bold', fontSize: 18, lineHeight: 22, letterSpacing: -0.5 },
-  healthScoreTotal: { fontFamily: 'Montserrat_400Regular', fontSize: 9, color: '#9CA3AF', lineHeight: 12 },
-  healthTitle:      { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#1A1A1A', letterSpacing: -0.2 },
+  healthScoreTotal: { fontFamily: 'Montserrat_400Regular', fontSize: 9, color: '#6D6A63', lineHeight: 12 },
+  healthTitle:      { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#1C1C1C', letterSpacing: -0.2 },
   healthBadge:      { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   healthDot:        { width: 7, height: 7, borderRadius: 4 },
   healthBadgeText:  { fontFamily: 'Montserrat_700Bold', fontSize: 11 },
-  healthBody:       { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6B7280', lineHeight: 17 },
-  healthSub:        { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9CA3AF', lineHeight: 16 },
+  healthBody:       { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63', lineHeight: 17 },
+  healthSub:        { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6D6A63', lineHeight: 16 },
   healthTrendText:  { fontFamily: 'Montserrat_700Bold', fontSize: 14 },
 
   // Actividad reciente (full-width)
@@ -1466,104 +1420,104 @@ const nStyles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
   },
   recentHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  recentTitle:    { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#1A1A1A' },
-  recentLink:     { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#22C55E' },
-  recentEmpty:    { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#9CA3AF', textAlign: 'center', paddingVertical: 12 },
-  recentDivider:  { height: 1, backgroundColor: '#F3F4F6', marginVertical: 12 },
+  recentTitle:    { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#1C1C1C' },
+  recentLink:     { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#27AE60' },
+  recentEmpty:    { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#6D6A63', textAlign: 'center', paddingVertical: 12 },
+  recentDivider:  { height: 1, backgroundColor: '#E8E2D9', marginVertical: 12 },
   recentRow:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
   recentIcon:     { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  recentMerchant: { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: '#1A1A1A' },
+  recentMerchant: { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: '#1C1C1C' },
   recentTagDot:   { width: 6, height: 6, borderRadius: 3 },
   recentTag:      { fontFamily: 'Montserrat_600SemiBold', fontSize: 11 },
-  recentCat:      { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9CA3AF', flex: 1 },
-  recentAmount:   { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#1A1A1A' },
-  recentDate:     { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9CA3AF' },
+  recentCat:      { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6D6A63', flex: 1 },
+  recentAmount:   { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#1C1C1C' },
+  recentDate:     { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6D6A63' },
 
   // Oportunidad para vos (full-width premium)
   oppCard: {
-    backgroundColor: '#FFFBEB', borderRadius: 24, padding: 24,
-    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 4,
-    borderWidth: 1, borderColor: '#FDE68A',
+    backgroundColor: '#F5F1E9', borderRadius: 24, padding: 24,
+    shadowColor: '#27AE60', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 4,
+    borderWidth: 1, borderColor: '#E8E2D9',
   },
   oppHeader:      { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
-  oppIconCircle:  { width: 52, height: 52, borderRadius: 26, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  oppLabel:       { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: '#D97706', letterSpacing: 0.8, marginBottom: 2 },
-  oppTitle2:      { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: '#1A1A1A', letterSpacing: -0.3 },
-  oppBody2:       { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#374151', lineHeight: 21, marginBottom: 20 },
-  oppHighlight:   { fontFamily: 'Montserrat_700Bold', color: '#16A34A' },
+  oppIconCircle:  { width: 52, height: 52, borderRadius: 26, backgroundColor: '#F2E8D5', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  oppLabel:       { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: '#6D6A63', letterSpacing: 0.8, marginBottom: 2 },
+  oppTitle2:      { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: '#1C1C1C', letterSpacing: -0.3 },
+  oppBody2:       { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#1C1C1C', lineHeight: 21, marginBottom: 20 },
+  oppHighlight:   { fontFamily: 'Montserrat_700Bold', color: '#27AE60' },
   oppGrowthWrap:  { marginBottom: 20, gap: 8 },
-  oppGrowthTrack: { height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, overflow: 'hidden' },
-  oppGrowthFill:  { height: 8, backgroundColor: '#22C55E', borderRadius: 4 },
+  oppGrowthTrack: { height: 8, backgroundColor: '#E8E2D9', borderRadius: 4, overflow: 'hidden' },
+  oppGrowthFill:  { height: 8, backgroundColor: '#27AE60', borderRadius: 4 },
   oppGrowthLabels:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  oppGrowthStart: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9CA3AF' },
-  oppGrowthEnd:   { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: '#16A34A' },
+  oppGrowthStart: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6D6A63' },
+  oppGrowthEnd:   { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: '#27AE60' },
   oppCta: {
-    backgroundColor: '#1A1A1A', borderRadius: 14, paddingVertical: 14,
+    backgroundColor: '#1C1C1C', borderRadius: 14, paddingVertical: 14,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
   oppCtaText:     { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#FFFFFF' },
 
   // legacy (keep for any remaining refs)
   bottomCard:      { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 16 },
-  bottomCardTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#1A1A1A' },
-  bottomCardLink:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#22C55E' },
+  bottomCardTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#1C1C1C' },
+  bottomCardLink:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#27AE60' },
   activityRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  activityDivider: { height: 1, backgroundColor: '#F3F4F6' },
+  activityDivider: { height: 1, backgroundColor: '#E8E2D9' },
   activityIcon:    { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  activityMerchant:{ fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#1A1A1A' },
-  activityCat:     { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#9CA3AF' },
+  activityMerchant:{ fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#1C1C1C' },
+  activityCat:     { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#6D6A63' },
   activityTag:     { fontFamily: 'Montserrat_600SemiBold', fontSize: 10 },
-  activityAmount:  { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: '#1A1A1A' },
-  activityDate:    { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#9CA3AF' },
-  oppIconWrap:     { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center' },
-  oppTitle:        { fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#1A1A1A' },
-  oppBody:         { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6B7280', lineHeight: 16 },
-  oppBtn:          { backgroundColor: '#F59E0B', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start' },
+  activityAmount:  { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: '#1C1C1C' },
+  activityDate:    { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#6D6A63' },
+  oppIconWrap:     { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F2E8D5', alignItems: 'center', justifyContent: 'center' },
+  oppTitle:        { fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#1C1C1C' },
+  oppBody:         { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6D6A63', lineHeight: 16 },
+  oppBtn:          { backgroundColor: '#27AE60', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start' },
   oppBtnText:      { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: '#FFFFFF' },
 
   // Income modal
   incomeOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   incomeSheet:       { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, gap: 12 },
-  incomeSheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', alignSelf: 'center', marginBottom: 8 },
+  incomeSheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E8E2D9', alignSelf: 'center', marginBottom: 8 },
   incomeSheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  incomeOption:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
-  incomeOptionActive:{ borderColor: '#3B82F6', backgroundColor: '#EFF6FF' },
-  incomeOptionText:  { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#1A1A1A' },
-  incomeSaveBtn:     { marginTop: 8, backgroundColor: '#3B82F6', borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },
+  incomeOption:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E8E2D9', backgroundColor: '#F5F1E9' },
+  incomeOptionActive:{ borderColor: '#27AE60', backgroundColor: '#D1F7E3' },
+  incomeOptionText:  { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#1C1C1C' },
+  incomeSaveBtn:     { marginTop: 8, backgroundColor: '#27AE60', borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },
 
   // legacy kept
-  styles_safe:   { flex: 1, backgroundColor: '#F6F6F8' },
+  styles_safe:   { flex: 1, backgroundColor: '#FAFAF7' },
 });
 
 // keep old styles ref alive for income modal (unused keys are fine)
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F6F6F8' },
+  safe: { flex: 1, backgroundColor: '#FAFAF7' },
   scroll: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 100, gap: 14 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  greetingName: { fontFamily: 'Montserrat_700Bold', fontSize: 24, color: '#1A1A1A' },
-  eyeLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: '#7C3AED' },
+  greetingName: { fontFamily: 'Montserrat_700Bold', fontSize: 24, color: '#1C1C1C' },
+  eyeLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: '#27AE60' },
   eyeSub: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#9E9E9E' },
   bellBtn: { padding: 8 },
   syncBtn: { padding: 8 },
-  syncMsg: { fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#22C55E' },
+  syncMsg: { fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#27AE60' },
   insightBtn: { padding: 4 },
-  insightBadge: { position: 'absolute', top: 0, right: 0, width: 14, height: 14, borderRadius: 7, backgroundColor: '#22C55E', alignItems: 'center', justifyContent: 'center' },
+  insightBadge: { position: 'absolute', top: 0, right: 0, width: 14, height: 14, borderRadius: 7, backgroundColor: '#27AE60', alignItems: 'center', justifyContent: 'center' },
   insightBadgeText: { fontFamily: 'Montserrat_700Bold', fontSize: 8, color: '#FFF' },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   expenseList: { backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden' },
-  expenseItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  expenseItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E8E2D9' },
   expenseLeft: { flex: 1, marginRight: 16, gap: 4 },
   expenseMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   seeAllRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14 },
   emptyCard: { padding: 24, alignItems: 'center', gap: 16 },
   incomeOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   incomeSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, gap: 12 },
-  incomeSheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', alignSelf: 'center', marginBottom: 8 },
+  incomeSheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E8E2D9', alignSelf: 'center', marginBottom: 8 },
   incomeSheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   incomeOptions: { gap: 8 },
-  incomeOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB' },
-  incomeOptionActive: { borderColor: '#3B82F6', backgroundColor: '#EFF6FF' },
-  incomeSaveBtn: { marginTop: 8, backgroundColor: '#3B82F6', borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },
+  incomeOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E8E2D9', backgroundColor: '#F5F1E9' },
+  incomeOptionActive: { borderColor: '#27AE60', backgroundColor: '#D1F7E3' },
+  incomeSaveBtn: { marginTop: 8, backgroundColor: '#27AE60', borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center' },
 });

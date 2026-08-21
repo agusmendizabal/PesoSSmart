@@ -11,14 +11,14 @@ import QRCode from 'react-native-qrcode-svg';
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
 const C = {
-  bg:       '#F6F7F9',
+  bg:       '#FAFAF7',
   white:    '#FFFFFF',
-  purple:   '#7B61FF',
-  purpleLt: '#F3EEFF',
-  text:     '#212121',
-  text2:    '#757575',
-  muted:    '#9E9E9E',
-  border:   '#E0E0E0',
+  purple:   '#27AE60',
+  purpleLt: '#D1F7E3',
+  text:     '#1C1C1C',
+  text2:    '#6D6A63',
+  muted:    '#9B9790',
+  border:   '#E8E2D9',
 } as const;
 
 const sp = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32 } as const;

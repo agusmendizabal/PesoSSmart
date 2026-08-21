@@ -29,7 +29,7 @@ import { matchDebt } from '@/lib/debtMatcher';
 import type { ExpenseCategory, ExpenseClassification } from '@/types';
 
 // Design tokens
-const G  = '#1F9D47';
+const G  = '#27AE60';
 const CR = 20; // card border radius
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -121,7 +121,7 @@ function SourceBadge({ source }: { source: string | null }) {
     : source;
   const color = source === 'mercadopago' ? '#009EE3'
     : source === 'gmail' ? '#EA4335'
-    : '#78909C';
+    : '#9B9790';
   return (
     <View style={[sbS.pill, { backgroundColor: color + '1A' }]}>
       <View style={[sbS.dot, { backgroundColor: color }]} />
@@ -229,9 +229,9 @@ function CategorizarSheet({
             <Text style={sh.sectionTitle}>Tipo de gasto</Text>
             <View style={sh.typeRow}>
               {([
-                { key: 'necessary',  label: 'Necesario',    icon: 'shield-checkmark-outline', color: '#16A34A', bg: '#F0FDF4', border: '#22C55E' },
+                { key: 'necessary',  label: 'Necesario',    icon: 'shield-checkmark-outline', color: '#27AE60', bg: '#D1F7E3', border: '#27AE60' },
                 { key: 'disposable', label: 'Prescindible', icon: 'cart-outline',              color: '#DC2626', bg: '#FEF2F2', border: '#EF4444' },
-                { key: 'investable', label: 'Invertible',   icon: 'trending-up-outline',       color: '#2563EB', bg: '#EFF6FF', border: '#3B82F6' },
+                { key: 'investable', label: 'Invertible',   icon: 'trending-up-outline',       color: '#27AE60', bg: '#D1F7E3', border: '#27AE60' },
               ] as const).map(opt => {
                 const active = selectedClass === opt.key;
                 return (
@@ -241,8 +241,8 @@ function CategorizarSheet({
                     onPress={() => { setSelectedClass(opt.key); hapticLight(); }}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name={opt.icon} size={20} color={active ? opt.color : '#C4C9D4'} />
-                    <Text style={[sh.typeBtnLabel, { color: active ? opt.color : '#9CA3AF' }]}>{opt.label}</Text>
+                    <Ionicons name={opt.icon} size={20} color={active ? opt.color : '#9B9790'} />
+                    <Text style={[sh.typeBtnLabel, { color: active ? opt.color : '#9B9790' }]}>{opt.label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -293,10 +293,10 @@ function CategorizarSheet({
                     onPress={() => { setSelectedCat(prev => prev === cat.id ? null : cat.id); hapticLight(); }}
                     activeOpacity={0.75}
                   >
-                    <View style={[sh.catIconWrap, { backgroundColor: (cat.color ?? '#6366F1') + '20' }]}>
+                    <View style={[sh.catIconWrap, { backgroundColor: (cat.color ?? '#27AE60') + '20' }]}>
                       <CategoryIcon categoryName={cat.name_es} size={26} />
                     </View>
-                    <Text style={[sh.catName, isActive && { color: '#111827', fontFamily: 'Montserrat_600SemiBold' }]} numberOfLines={1}>
+                    <Text style={[sh.catName, isActive && { color: '#1C1C1C', fontFamily: 'Montserrat_600SemiBold' }]} numberOfLines={1}>
                       {cat.name_es}
                     </Text>
                     {isActive
@@ -338,42 +338,42 @@ function CategorizarSheet({
 const sh = StyleSheet.create({
   outerWrap:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet:        { backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '92%' },
-  dragBar:      { width: 36, height: 4, borderRadius: 2, backgroundColor: '#E5E7EB', alignSelf: 'center', marginTop: 12, marginBottom: 4 },
+  dragBar:      { width: 36, height: 4, borderRadius: 2, backgroundColor: '#E8E2D9', alignSelf: 'center', marginTop: 12, marginBottom: 4 },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
-  headerTitle:  { fontFamily: 'Montserrat_700Bold', fontSize: 20, color: '#111827' },
-  closeBtn:     { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  headerTitle:  { fontFamily: 'Montserrat_700Bold', fontSize: 20, color: '#1C1C1C' },
+  closeBtn:     { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F5F1E9', alignItems: 'center', justifyContent: 'center' },
   scroll:       { paddingHorizontal: 20, paddingBottom: 12, gap: 20 },
   aiBanner:     { gap: 8 },
-  aiBadge:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF2FF', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, alignSelf: 'flex-start' },
-  aiBadgeText:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#4F46E5' },
-  aiSubtitle:   { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#6B7280', lineHeight: 19 },
-  expenseCard:     { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 22, paddingVertical: 16, paddingHorizontal: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 14, elevation: 4, borderWidth: 1, borderColor: '#F3F4F6' },
-  expenseIconWrap: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
-  expenseName:     { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#6366F1' },
-  expenseMeta:     { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#9CA3AF' },
-  expenseAmount:   { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#111827', flexShrink: 0 },
-  descInput:    { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#111827' },
-  sectionTitle: { fontFamily: 'Montserrat_600SemiBold', fontSize: 15, color: '#111827' },
+  aiBadge:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D1F7E3', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, alignSelf: 'flex-start' },
+  aiBadgeText:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#27AE60' },
+  aiSubtitle:   { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#6D6A63', lineHeight: 19 },
+  expenseCard:     { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 22, paddingVertical: 16, paddingHorizontal: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 14, elevation: 4, borderWidth: 1, borderColor: '#F5F1E9' },
+  expenseIconWrap: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#FAFAF7', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
+  expenseName:     { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#27AE60' },
+  expenseMeta:     { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#9B9790' },
+  expenseAmount:   { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#1C1C1C', flexShrink: 0 },
+  descInput:    { backgroundColor: '#FAFAF7', borderWidth: 1, borderColor: '#E8E2D9', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#1C1C1C' },
+  sectionTitle: { fontFamily: 'Montserrat_600SemiBold', fontSize: 15, color: '#1C1C1C' },
   typeRow:      { flexDirection: 'row', gap: 8 },
   typeBtn:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5 },
-  typeBtnOff:   { backgroundColor: '#FFFFFF', borderColor: '#E5E7EB' },
+  typeBtnOff:   { backgroundColor: '#FFFFFF', borderColor: '#E8E2D9' },
   typeBtnLabel: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12 },
-  matchCard:      { backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F3F4F6' },
+  matchCard:      { backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F5F1E9' },
   matchRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16 },
-  matchRowActive: { backgroundColor: '#F0FDF4' },
-  matchRank:      { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#C4C9D4', width: 16 },
-  matchName:      { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 14, color: '#374151' },
-  matchPct:       { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#6366F1' },
-  searchRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  searchInput:  { flex: 1, fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#111827', paddingVertical: 0 },
-  catList:      { backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F3F4F6' },
+  matchRowActive: { backgroundColor: '#D1F7E3' },
+  matchRank:      { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#9B9790', width: 16 },
+  matchName:      { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 14, color: '#1C1C1C' },
+  matchPct:       { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#27AE60' },
+  searchRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F5F1E9', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  searchInput:  { flex: 1, fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#1C1C1C', paddingVertical: 0 },
+  catList:      { backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F5F1E9' },
   catRow:       { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 13, paddingHorizontal: 16 },
-  catRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
-  catRowActive: { backgroundColor: '#F0FDF4' },
+  catRowBorder: { borderBottomWidth: 1, borderBottomColor: '#FAFAF7' },
+  catRowActive: { backgroundColor: '#D1F7E3' },
   catIconWrap:  { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
-  catName:      { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 14, color: '#374151' },
-  bottomBar:    { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F3F4F6' },
-  ctaBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#15803D', borderRadius: 16, paddingVertical: 17, shadowColor: '#15803D', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 12, elevation: 5 },
+  catName:      { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 14, color: '#1C1C1C' },
+  bottomBar:    { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F5F1E9' },
+  ctaBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#27AE60', borderRadius: 16, paddingVertical: 17, shadowColor: '#27AE60', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 12, elevation: 5 },
   ctaBtnText:   { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: '#FFFFFF', letterSpacing: 0.2 },
 });
 
@@ -804,8 +804,8 @@ const st = StyleSheet.create({
 
   emptyState: { alignItems: 'center', gap: spacing[3], paddingVertical: spacing[10] },
   emptyIcon:  { width: 72, height: 72, borderRadius: 36, backgroundColor: G + '14', alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#111827' },
-  emptySub:   { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#9CA3AF', textAlign: 'center' },
+  emptyTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#1C1C1C' },
+  emptySub:   { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#9B9790', textAlign: 'center' },
 
   // Bulk action card — premium AI module
   bulkCard:       { borderRadius: CR, overflow: 'hidden', backgroundColor: G + '0A', borderWidth: 1, borderColor: G + '28', shadowColor: G, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.10, shadowRadius: 18, elevation: 4 },
@@ -813,15 +813,15 @@ const st = StyleSheet.create({
   bulkIconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', flexShrink: 0, shadowColor: G, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.18, shadowRadius: 10, elevation: 4 },
   bulkAiBadge:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', borderWidth: 1, borderColor: G + '28' },
   bulkAiBadgeText:{ fontFamily: 'Montserrat_600SemiBold', fontSize: 10, color: G, letterSpacing: 0.2 },
-  bulkTitle:      { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#111827', lineHeight: 20 },
-  bulkSub:        { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6B7280', lineHeight: 17 },
+  bulkTitle:      { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1C1C1C', lineHeight: 20 },
+  bulkSub:        { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63', lineHeight: 17 },
   bulkArrow:      { width: 38, height: 38, borderRadius: 19, backgroundColor: G, alignItems: 'center', justifyContent: 'center', flexShrink: 0, shadowColor: G, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   sparkleA:       { position: 'absolute', top: 10, right: 52, fontSize: 12, color: G, opacity: 0.45 },
   sparkleB:       { position: 'absolute', top: 4,  right: 26, fontSize: 8,  color: G, opacity: 0.28 },
   sparkleC:       { position: 'absolute', bottom: 12, right: 40, fontSize: 7, color: G, opacity: 0.22 },
 
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle:  { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#111827' },
+  sectionTitle:  { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#1C1C1C' },
   ordenarBtn:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
   ordenarText:   { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: G },
 
@@ -830,33 +830,33 @@ const st = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: CR,
     overflow: 'hidden',
-    shadowColor: '#1F2937',
+    shadowColor: '#1C1C1C',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.07,
     shadowRadius: 16,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#EDEEF0',
+    borderColor: '#E8E2D9',
   },
   cardBody:     { padding: 14, gap: 10 },
   cardMain:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconCircle:   { width: 54, height: 54, borderRadius: 27, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
+  iconCircle:   { width: 54, height: 54, borderRadius: 27, backgroundColor: '#F5F1E9', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
   cardInfo:     { flex: 1, gap: 3 },
-  merchantName: { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#111827', letterSpacing: -0.2 },
+  merchantName: { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1C1C1C', letterSpacing: -0.2 },
   metaRow:      { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  dateLabel:    { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9CA3AF' },
+  dateLabel:    { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9B9790' },
   suggestPill:  { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: G + '14', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, alignSelf: 'flex-start' },
-  suggestText:  { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#374151' },
-  suggestBold:  { fontFamily: 'Montserrat_700Bold', color: '#0F5C2E' },
+  suggestText:  { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#1C1C1C' },
+  suggestBold:  { fontFamily: 'Montserrat_700Bold', color: '#1F8C4F' },
   cardRight:    { alignItems: 'flex-end', gap: 3, flexShrink: 0 },
-  amount:       { fontFamily: 'Montserrat_800ExtraBold', fontSize: 16, color: '#111827', letterSpacing: -0.4 },
+  amount:       { fontFamily: 'Montserrat_800ExtraBold', fontSize: 16, color: '#1C1C1C', letterSpacing: -0.4 },
 
-  clasificarRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#F0FDF4', borderWidth: 1.5, borderColor: '#22C55E', borderRadius: 12 },
+  clasificarRow:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#D1F7E3', borderWidth: 1.5, borderColor: '#27AE60', borderRadius: 12 },
   clasificarText:    { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: G },
   clasificarSparkle: { fontSize: 11, color: G, opacity: 0.55 },
 
-  dupeBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF3E0', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: '#FFE0B2' },
-  dupeText:   { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 11, color: '#E65100' },
+  dupeBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFBEB', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: '#E8E2D9' },
+  dupeText:   { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 11, color: '#F59E0B' },
 
   showMoreBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 12 },
   showMoreText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: G },

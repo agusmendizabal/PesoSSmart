@@ -71,7 +71,7 @@ serve(async (req) => {
     }
 
     const csrfToken   = crypto.randomUUID() + '-' + crypto.randomUUID();
-    const redirectUrl = url.searchParams.get('redirect_url') ?? 'pesossmart://mp-connected';
+    const redirectUrl = url.searchParams.get('redirect_url') ?? 'nomi://mp-connected';
     const { error: stateErr } = await supabase.from('mp_oauth_states').insert({
       token: csrfToken,
       user_id: userId,
@@ -114,7 +114,7 @@ serve(async (req) => {
         .eq('token', csrfToken)
         .single();
 
-      const appRedirect = stateRow?.redirect_url ?? 'pesossmart://mp-connected';
+      const appRedirect = stateRow?.redirect_url ?? 'nomi://mp-connected';
 
       if (stateErr || !stateRow) {
         console.error('[mp-auth] Token CSRF no encontrado:', csrfToken);

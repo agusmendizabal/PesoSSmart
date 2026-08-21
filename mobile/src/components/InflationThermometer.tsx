@@ -17,14 +17,14 @@ import {
 
 // ─── State tokens ─────────────────────────────────────────────────────────────
 
-const C_GREEN  = '#2E7D32';
+const C_GREEN  = '#27AE60';
 const C_YELLOW = '#F9AB25';
 const C_RED    = '#EF4444';
 
 type GaugeState = 'green' | 'yellow' | 'red';
 
 const STATE_CFG: Record<GaugeState, { bg: string; color: string; msg: string }> = {
-  green:  { bg: '#E8F5E9', color: C_GREEN,  msg: 'Le ganaste a la inflación por' },
+  green:  { bg: '#D1F7E3', color: C_GREEN,  msg: 'Le ganaste a la inflación por' },
   yellow: { bg: '#FFF8E1', color: C_YELLOW, msg: 'Estuviste alineado con la inflación' },
   red:    { bg: '#FFEBEE', color: C_RED,    msg: 'Tu inflación está por encima del promedio por' },
 };
@@ -80,7 +80,7 @@ function InflationGauge({ personal, official }: { personal: number; official: nu
   return (
     <Svg width={GW} height={GH} viewBox={`0 0 ${GW} ${GH}`}>
       {/* Background track */}
-      <Path d={arcD(0, 180)} stroke="#E0E0E0" strokeWidth={STROKE} fill="none" strokeLinecap="round" />
+      <Path d={arcD(0, 180)} stroke="#E8E2D9" strokeWidth={STROKE} fill="none" strokeLinecap="round" />
 
       {/* Green zone — left 40% */}
       <Path d={arcD(0, GREEN_END)} stroke={C_GREEN} strokeWidth={STROKE} fill="none" strokeLinecap="round" />
@@ -104,9 +104,9 @@ function InflationGauge({ personal, official }: { personal: number; official: nu
       <G>
         <Path
           d={`M ${needleBase1.x} ${needleBase1.y} L ${needleTip.x} ${needleTip.y} L ${needleBase2.x} ${needleBase2.y} Z`}
-          fill="#212121"
+          fill="#1C1C1C"
         />
-        <Circle cx={CX} cy={CY} r={8} fill="#212121" />
+        <Circle cx={CX} cy={CY} r={8} fill="#1C1C1C" />
         <Circle cx={CX} cy={CY} r={4} fill="white" />
       </G>
     </Svg>
@@ -364,12 +364,12 @@ export function InflationThermometer({ userId, year, month }: InflationThermomet
         </Text>
 
         <View style={gcS.compRow}>
-          <Text variant="caption" color="#757575">{'Tu inflación: '}</Text>
-          <Text variant="caption" color="#212121" style={{ fontFamily: 'Montserrat_700Bold' }}>
+          <Text variant="caption" color="#6D6A63">{'Tu inflación: '}</Text>
+          <Text variant="caption" color="#1C1C1C" style={{ fontFamily: 'Montserrat_700Bold' }}>
             {result.personalInflation.toFixed(1).replace('.', ',')}%
           </Text>
-          <Text variant="caption" color="#757575">{'   |   INDEC: '}</Text>
-          <Text variant="caption" color="#212121" style={{ fontFamily: 'Montserrat_700Bold' }}>
+          <Text variant="caption" color="#6D6A63">{'   |   INDEC: '}</Text>
+          <Text variant="caption" color="#1C1C1C" style={{ fontFamily: 'Montserrat_700Bold' }}>
             {result.officialInflation.toFixed(1).replace('.', ',')}%
           </Text>
         </View>
@@ -394,7 +394,7 @@ const gcS = StyleSheet.create({
   title: {
     fontFamily: 'Montserrat_600SemiBold',
     fontSize: 14,
-    color: '#212121',
+    color: '#1C1C1C',
     alignSelf: 'flex-start',
     marginBottom: 8,
   },
@@ -411,10 +411,10 @@ const gcS = StyleSheet.create({
   mainValue: {
     fontFamily: 'Montserrat_700Bold',
     fontSize: 28,
+    lineHeight: 38,
     textAlign: 'center',
     marginTop: 4,
-    alignSelf: 'stretch',
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
   },
   compRow: {
     flexDirection: 'row',

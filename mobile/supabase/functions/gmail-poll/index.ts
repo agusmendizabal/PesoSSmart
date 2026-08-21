@@ -83,10 +83,21 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
 
 function cleanMerchant(raw: string): string {
   return raw
-    .replace(/@\S*/g, '')        // sushi@ → sushi, @alias → ''
-    .replace(/#\S*/g, '')        // #hashtag → ''
-    .replace(/[*|_\\]/g, ' ')   // separadores de descriptores de pago
+    .replace(/@\S*/g, '')
+    .replace(/#\S*/g, '')
+    .replace(/[*|_\\]/g, ' ')
     .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+function normalizeMerchant(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')          // quita tildes
+    .replace(/\b(s\.?a\.?l?|s\.?r\.?l\.?|s\.?a\.?s\.?)\b/gi, '') // quita S.A., S.R.L.
+    .replace(/[^a-z0-9\s]/g, '')              // solo alfanumérico
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -171,10 +182,10 @@ Formato exacto:
   "monto": 350000,
   "moneda": "ARS",
   "comercio": "Nombre limpio del comercio o destinatario (sin @, #, ni caracteres especiales)",
-  "categoria": "otros",
+  "categoria": "comida",
   "clasificacion": "disposable",
   "fecha": "2026-04-08",
-  "descripcion": "Nombre del comercio o descripción muy corta (máx 30 caracteres, sin frases largas)"
+  "descripcion": "McDonald's"
 }
 
 REGLAS PARA descripcion:
@@ -183,8 +194,20 @@ REGLAS PARA descripcion:
 - Sin frases largas como "Compraste en..." o "Pago realizado en..."
 - Sin palabras como "Producto de", "Compra en", "Pago a"
 
-Categorías válidas: comida, cafe, transporte, servicios, entretenimiento, salud, ropa, hogar, educacion, deporte, peluqueria, seguros, otros
-Usar "cafe" para cafeterías/Starbucks/café/té. Usar "peluqueria" para cortes/tintura/estética/spa. Usar "deporte" para gym/pilates/natación. Usar "seguros" para pólizas y coberturas.
+CATEGORÍAS — elegí siempre la más específica. Usá "otros" SOLO si ninguna encaja:
+- comida: supermercado, almacén, Carrefour, Día, Coto, Jumbo, Disco, Rappi (supermercado), PedidosYa, Glovo, McDonald's, Burger King, Mostaza, pizzería, rotisería, delivery de comida, cualquier restaurant o comida para llevar
+- cafe: Starbucks, cafetería, café, té, bar de café, panadería con consumición
+- transporte: Uber, Cabify, taxi, colectivo, SUBE, Trenes Argentinos, subte, combustible, YPF, Shell, Axion, estacionamiento, peaje, Autopistas, garaje
+- servicios: luz (Edesur/Edenor), gas (Metrogas/Naturgy), agua (AySA), internet (Fibertel/Telecentro/Claro/Personal), telefonía, Movistar, ARBA, AFIP, expensas, ABL, alquiler, seguro de hogar, tarjeta de crédito (resumen/pago)
+- entretenimiento: Netflix, Disney+, HBO Max, Spotify, Amazon Prime, Apple TV, cine, teatro, Ticketek, videojuegos, Steam, PlayStation, Xbox, bares, boliches, salidas nocturnas
+- salud: farmacia (Farmacity, Rappi Farma), OSDE, Swiss Medical, Galeno, obra social, médico, clínica, laboratorio, dentista, óptica, hospital
+- ropa: Zara, H&M, Nike, Adidas, Falabella, Garbarino (ropa), indumentaria, calzado, zapatillas, accesorios de moda
+- hogar: Fravega, Garbarino (electrodomésticos), Easy, Sodimac, mueblería, pinturería, ferretería, limpieza del hogar, artículos para el hogar
+- educacion: universidad, colegio, curso online, Udemy, Coursera, guardería, jardín de infantes, libros educativos, idiomas
+- deporte: gym, Megatlon, Smart Fit, pilates, crossfit, natación, yoga, equipamiento deportivo, Nike Run, Decathlon
+- peluqueria: peluquería, barbería, salón de belleza, spa, manicuría, tintura, corte de pelo, estética
+- seguros: seguro de auto (Sancor, La Caja, Zurich, Mapfre), ART, seguro de vida, seguro de moto
+- otros: SOLO si no encaja en ninguna categoría anterior
 Si no hay monto saliente claro, respondé: { "es_movimiento": false }`;
 
   try {
@@ -475,13 +498,13 @@ serve(async (req) => {
       const finalAmount = result.monto ?? preParsed.amount;
       const finalDate = result.fecha ?? preParsed.occurredAt ?? new Date().toISOString().split('T')[0];
       const finalMerchant = cleanMerchant(result.comercio ?? preParsed.recipientName ?? preParsed.senderName ?? 'Desconocido');
+      const merchantNorm  = normalizeMerchant(finalMerchant);
 
       const validClassifications = ['necessary', 'disposable', 'investable'];
-      const classification = validClassifications.includes(result.clasificacion)
+      const groqClassification = validClassifications.includes(result.clasificacion)
         ? result.clasificacion
         : 'disposable';
 
-      // Mapear categoría al name de DB
       const CATEGORY_NAME_MAP: Record<string, string> = {
         cafe:            'cafe',
         peluqueria:      'beauty_salon',
@@ -496,6 +519,45 @@ serve(async (req) => {
         entretenimiento: 'entertainment',
         otros:           'other',
       };
+      const groqCategory = CATEGORY_NAME_MAP[result.categoria] ?? 'other';
+
+      // ── Merchant hint: aprendizaje histórico ─────────────────────────────
+      const { data: hint } = await supabase
+        .from('merchant_category_hints')
+        .select('category, classification, count')
+        .eq('user_id', userId)
+        .eq('merchant_normalized', merchantNorm)
+        .maybeSingle();
+
+      let finalCategory       = groqCategory;
+      let finalClassification = groqClassification;
+
+      if (hint && hint.count >= 2) {
+        // Comercio conocido con 2+ apariciones → usar categoría aprendida
+        finalCategory       = hint.category;
+        finalClassification = hint.classification;
+        console.log(`[gmail-poll] Hint aplicado para "${finalMerchant}": ${finalCategory} (${hint.count}x)`);
+      }
+
+      // Upsert hint: crear si es nuevo, o incrementar count si ya existe
+      const today = new Date().toISOString().split('T')[0];
+      if (hint) {
+        await supabase
+          .from('merchant_category_hints')
+          .update({ count: hint.count + 1, last_seen: today })
+          .eq('user_id', userId)
+          .eq('merchant_normalized', merchantNorm);
+      } else {
+        await supabase.from('merchant_category_hints').insert({
+          user_id:             userId,
+          merchant_normalized: merchantNorm,
+          merchant_display:    finalMerchant,
+          category:            groqCategory,
+          classification:      groqClassification,
+          count:               1,
+          last_seen:           today,
+        });
+      }
 
       // Guardar como pendiente — el usuario confirma en la app
       const { error: insertError } = await supabase.from('pending_transactions').upsert({
@@ -504,8 +566,8 @@ serve(async (req) => {
         amount: finalAmount,
         currency: result.moneda ?? 'ARS',
         merchant: finalMerchant,
-        suggested_category: CATEGORY_NAME_MAP[result.categoria] ?? 'other',
-        suggested_classification: classification,
+        suggested_category: finalCategory,
+        suggested_classification: finalClassification,
         description: result.descripcion,
         transaction_date: finalDate,
         raw_subject: msg.id,

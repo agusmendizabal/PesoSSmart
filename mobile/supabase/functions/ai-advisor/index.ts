@@ -25,7 +25,7 @@ function fmt(n: number): string {
 
 const BASE_KNOWLEDGE = `
 === IDENTIDAD ===
-Sos SmartPesos, el asesor virtual de finanzas personales para Argentina dentro de una app de gestión de gastos. Tenés conocimiento experto en economía argentina, instrumentos financieros locales, historia económica del país y finanzas personales. Hablás con tono argentino, directo y humano — nunca genérico ni condescendiente.
+Sos Nomi, el asesor virtual de finanzas personales para Argentina dentro de una app de gestión de gastos. Tenés conocimiento experto en economía argentina, instrumentos financieros locales, historia económica del país y finanzas personales. Hablás con tono argentino, directo y humano — nunca genérico ni condescendiente.
 
 === REGLAS DE RESPUESTA ===
 - Siempre usá datos concretos del usuario cuando los tenés. Nunca des consejos genéricos si hay datos disponibles.
@@ -278,7 +278,7 @@ function buildWelcomeUserMessage(ctx: Record<string, any>, initialContext: strin
     const estado = ctx.month_status === 'good' ? 'positivo' : ctx.month_status === 'tight' ? 'ajustado' : 'en déficit';
     return `Mis finanzas este mes están ${estado}. Total gastado: ${fmt(ctx.total_spent)}${ctx.income ? `, ingreso estimado ${fmt(ctx.income)}` : ''}. Resumí mi situación en 2-3 frases y decime el punto más importante que debería atender hoy. Sin introducción.`;
   }
-  return `Presentate brevemente como SmartPesos y decime 2 maneras concretas en que podés ayudarme con mis finanzas en Argentina hoy. Máximo 2 frases.`;
+  return `Presentate brevemente como Nomi y decime 2 maneras concretas en que podés ayudarme con mis finanzas en Argentina hoy. Máximo 2 frases.`;
 }
 
 // ─── Servidor ────────────────────────────────────────────────────────────────
@@ -327,7 +327,7 @@ serve(async (req) => {
       const reportSystemPrompt = `${BASE_KNOWLEDGE}
 
 === MODO: GENERACIÓN DE REPORTE FINANCIERO ===
-Sos SmartPesos. Tu tarea es generar un análisis narrativo conciso del estado financiero del usuario basado en los datos calculados que te envían. Respondé ÚNICAMENTE con un JSON válido con esta estructura exacta:
+Sos Nomi. Tu tarea es generar un análisis narrativo conciso del estado financiero del usuario basado en los datos calculados que te envían. Respondé ÚNICAMENTE con un JSON válido con esta estructura exacta:
 {
   "narrative": "2-3 oraciones que resumen el estado financiero del mes de forma honesta, con datos concretos, en tono humano e inteligente. Sin moralizar.",
   "key_finding": "Una oración que identifica el hallazgo más relevante del mes, con dato concreto.",

@@ -1,5 +1,5 @@
 // ============================================================
-// Utilidades de formateo para Pesos$mart
+// Utilidades de formateo para Nomi
 // Contexto: Argentina, moneda ARS
 // ============================================================
 

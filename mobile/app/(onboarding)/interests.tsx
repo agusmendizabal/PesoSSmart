@@ -22,7 +22,7 @@ const interestOptions: InterestOption[] = [
     label: 'Autos',
     description: 'Fierros, marcas, lo último en el mercado automotor.',
     icon: 'car-sport-outline',
-    color: '#ef5350',
+    color: '#EF4444',
   },
   {
     key: 'sector_energia',
@@ -36,14 +36,14 @@ const interestOptions: InterestOption[] = [
     label: 'Departamentos',
     description: 'Real estate, propiedades, alquileres.',
     icon: 'business-outline',
-    color: '#a5d6a7',
+    color: '#A8D5C2',
   },
   {
     key: 'sector_tech',
     label: 'Tecnología',
     description: 'Celulares, gadgets, todo lo nuevo.',
     icon: 'phone-portrait-outline',
-    color: '#82b1ff',
+    color: '#27AE60',
   },
   {
     key: 'sector_moda',

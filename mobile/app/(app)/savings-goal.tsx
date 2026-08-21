@@ -22,18 +22,18 @@ import { formatCurrency } from '@/utils/format';
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:     '#F6F7F9',
+  bg:     '#FAFAF7',
   card:   '#FFFFFF',
   blue:   '#1976D2',
-  green:  '#2E7D32',
-  violet: '#7B61FF',
+  green:  '#27AE60',
+  violet: '#27AE60',
   red:    '#EF4444',
   amber:  '#F59E0B',
-  text:   '#212121',
-  sub:    '#757575',
-  muted:  '#9E9E9E',
-  border: '#E0E0E0',
-  light:  '#F2F2F2',
+  text:   '#1C1C1C',
+  sub:    '#6D6A63',
+  muted:  '#9B9790',
+  border: '#E8E2D9',
+  light:  '#F5F1E9',
 } as const;
 
 const shadow = layout.cardShadow;
@@ -59,9 +59,9 @@ const hc = StyleSheet.create({
   card:    { backgroundColor: C.violet, borderRadius: 24, padding: spacing[6], alignItems: 'flex-start', gap: spacing[2] },
   iconRow: { marginBottom: spacing[2] },
   iconBox: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFFFFF20', alignItems: 'center', justifyContent: 'center' },
-  eyebrow: { fontFamily: 'Montserrat_500Medium', fontSize: 13, color: '#DDD6FE' },
+  eyebrow: { fontFamily: 'Montserrat_500Medium', fontSize: 13, color: '#A8D5C2' },
   amount:  { fontFamily: 'Montserrat_800ExtraBold', fontSize: 38, color: '#FFFFFF', lineHeight: 46 },
-  sub:     { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#C4B5FD', lineHeight: 20 },
+  sub:     { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#A8D5C2', lineHeight: 20 },
 });
 
 // ─── Breakdown Card ───────────────────────────────────────────────────────────

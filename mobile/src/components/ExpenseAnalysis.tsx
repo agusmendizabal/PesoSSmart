@@ -17,9 +17,9 @@ import { InflationHistory } from './InflationHistory';
 import { OpportunityCost } from './OpportunityCost';
 
 const PALETTE = [
-  '#00C853', '#1978E5', '#E53935', '#FFB300',
-  '#7B61FF', '#FF6D00', '#00BCD4', '#E91E63',
-  '#4CAF50', '#795548',
+  '#27AE60', '#27AE60', '#E53935', '#FFB300',
+  '#27AE60', '#FF6D00', '#00BCD4', '#E91E63',
+  '#27AE60', '#795548',
 ];
 
 const MONTH_NAMES = [

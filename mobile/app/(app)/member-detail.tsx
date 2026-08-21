@@ -13,21 +13,21 @@ import { formatCurrency } from '@/utils/format';
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
 const C = {
-  bg:       '#F6F7F9',
+  bg:       '#FAFAF7',
   white:    '#FFFFFF',
-  green:    '#2E7D32',
-  greenLt:  '#EEF7EF',
-  purple:   '#7B61FF',
-  purpleLt: '#F5F0FF',
-  text:     '#212121',
-  text2:    '#757575',
-  muted:    '#9E9E9E',
-  border:   '#E0E0E0',
+  green:    '#27AE60',
+  greenLt:  '#D1F7E3',
+  purple:   '#27AE60',
+  purpleLt: '#D1F7E3',
+  text:     '#1C1C1C',
+  text2:    '#6D6A63',
+  muted:    '#9B9790',
+  border:   '#E8E2D9',
 } as const;
 
 const sp = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 } as const;
 
-const AVATAR_COLORS = ['#4361ee', '#e63946', '#2d6a4f', '#f4a261', '#7209b7', '#3a86ff'];
+const AVATAR_COLORS = ['#27AE60', '#e63946', '#2d6a4f', '#f4a261', '#F59E0B', '#10B981'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -65,18 +65,18 @@ function dateLabel(dateStr: string): string {
 function expenseIcon(desc: string): { icon: string; iconBg: string; iconColor: string } {
   const d = (desc ?? '').toLowerCase();
   if (d.includes('super') || d.includes('mercado') || d.includes('carrefour') || d.includes('coto'))
-    return { icon: 'cart-outline',        iconBg: '#DCFCE7', iconColor: '#16A34A' };
+    return { icon: 'cart-outline',        iconBg: '#D1F7E3', iconColor: '#27AE60' };
   if (d.includes('restau') || d.includes('cena') || d.includes('comida') || d.includes('pizza'))
     return { icon: 'restaurant-outline',  iconBg: '#FEF3C7', iconColor: '#D97706' };
   if (d.includes('internet') || d.includes('wifi'))
-    return { icon: 'wifi-outline',        iconBg: '#DBEAFE', iconColor: '#2563EB' };
+    return { icon: 'wifi-outline',        iconBg: '#D1F7E3', iconColor: '#27AE60' };
   if (d.includes('luz') || d.includes('electric'))
     return { icon: 'flash-outline',       iconBg: '#FEF9C3', iconColor: '#CA8A04' };
   if (d.includes('nafta') || d.includes('combustible'))
-    return { icon: 'car-outline',         iconBg: '#FCE7F3', iconColor: '#9D174D' };
+    return { icon: 'car-outline',         iconBg: '#FEE2E2', iconColor: '#EF4444' };
   if (d.includes('viaje') || d.includes('vuelo') || d.includes('hotel'))
-    return { icon: 'airplane-outline',    iconBg: '#E0F2FE', iconColor: '#0369A1' };
-  return { icon: 'cash-outline', iconBg: '#F3F4F6', iconColor: '#6B7280' };
+    return { icon: 'airplane-outline',    iconBg: '#D1F7E3', iconColor: '#27AE60' };
+  return { icon: 'cash-outline', iconBg: '#F5F1E9', iconColor: '#6D6A63' };
 }
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────

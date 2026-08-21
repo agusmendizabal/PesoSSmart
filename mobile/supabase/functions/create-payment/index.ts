@@ -11,8 +11,8 @@ const SUPABASE_URL    = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SECRET = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const PLAN_CONFIG: Record<string, { title: string; price: number }> = {
-  pro:     { title: 'PesoSSmart Pro',     price: 3990 },
-  premium: { title: 'PesoSSmart Premium', price: 7990 },
+  pro:     { title: 'Nomi Pro',     price: 3990 },
+  premium: { title: 'Nomi Premium', price: 7990 },
 };
 
 serve(async (req) => {
@@ -51,13 +51,13 @@ serve(async (req) => {
       }],
       payer: { email: profile?.email ?? user.email },
       back_urls: {
-        success: 'pesossmart://payment-success',
-        failure: 'pesossmart://payment-failure',
-        pending: 'pesossmart://payment-pending',
+        success: 'nomi://payment-success',
+        failure: 'nomi://payment-failure',
+        pending: 'nomi://payment-pending',
       },
       auto_return:        'approved',
       external_reference: user.id,           // para lookup en el webhook
-      statement_descriptor: 'PESOSSMART',
+      statement_descriptor: 'NOMI',
       metadata: { plan_id, user_id: user.id },
     };
 

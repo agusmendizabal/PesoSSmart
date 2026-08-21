@@ -73,7 +73,7 @@ export default function GmailConnectScreen() {
         return;
       }
 
-      const result = await WebBrowser.openAuthSessionAsync(json.url, 'pesossmart://gmail-connected');
+      const result = await WebBrowser.openAuthSessionAsync(json.url, 'nomi://gmail-connected');
 
       if (result.type === 'success' && result.url) {
         const match    = result.url.match(/email=([^&]+)/);

@@ -248,6 +248,32 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
       set((s) => ({
         expenses: s.expenses.map((e) => (e.id === id ? (updated as Expense) : e)),
       }));
+
+      // Aprendizaje: si el usuario cambió la categoría, reforzar el hint
+      if (data.category_id) {
+        const expense = get().expenses.find(e => e.id === id);
+        const category = get().categories.find(c => c.id === data.category_id);
+        const description = expense?.description?.trim();
+        if (description && category && expense?.user_id) {
+          const norm = description
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-z0-9\s]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+          const classification = (updated as Expense).classification ?? 'disposable';
+          await supabase.from('merchant_category_hints').upsert({
+            user_id:             expense.user_id,
+            merchant_normalized: norm,
+            merchant_display:    description,
+            category:            category.name,
+            classification,
+            count:               10,
+            last_seen:           new Date().toISOString().split('T')[0],
+          }, { onConflict: 'user_id,merchant_normalized' });
+        }
+      }
     } catch (err) {
       set({ error: handleSupabaseError(err) });
       throw err;

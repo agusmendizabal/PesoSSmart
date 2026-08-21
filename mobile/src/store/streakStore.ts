@@ -1,5 +1,5 @@
 /**
- * streakStore — Gamificación mínima de SmartPesos
+ * streakStore — Gamificación mínima de Nomi
  *
  * Rastrea:
  *  - weekStreak:          semanas consecutivas dentro del presupuesto

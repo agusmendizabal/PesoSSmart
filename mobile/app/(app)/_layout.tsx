@@ -1,7 +1,8 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing } from '@/theme';
 
 type TabIconProps = {
@@ -23,14 +24,18 @@ function TabIcon({ name, focused, color }: TabIconProps) {
 }
 
 export default function AppLayout() {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = 60 + insets.bottom;
+  const tabBarPaddingBottom = insets.bottom > 0 ? insets.bottom + 4 : 12;
+
   return (
     <Tabs
       backBehavior="history"
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: '#2E7D32',
-        tabBarInactiveTintColor: '#757575',
+        tabBarStyle: [styles.tabBar, { height: tabBarHeight, paddingBottom: tabBarPaddingBottom }],
+        tabBarActiveTintColor: '#27AE60',
+        tabBarInactiveTintColor: '#6D6A63',
         tabBarLabelStyle: styles.tabLabel,
         tabBarShowLabel: true,
       }}
@@ -86,7 +91,6 @@ export default function AppLayout() {
       <Tabs.Screen name="group-code"     options={{ href: null }} />
       <Tabs.Screen name="member-detail"  options={{ href: null }} />
       <Tabs.Screen name="plans"          options={{ href: null }} />
-      <Tabs.Screen name="simulator"      options={{ href: null }} />
       <Tabs.Screen name="gmail-connect"  options={{ href: null }} />
       <Tabs.Screen name="savings-plan"    options={{ href: null }} />
       <Tabs.Screen name="category-detail"        options={{ href: null }} />
@@ -102,10 +106,8 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    height: 64,
+    borderTopColor: '#E8E2D9',
     paddingTop: spacing[2],
-    paddingBottom: Platform.OS === 'ios' ? spacing[5] : spacing[2],
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -1 },
     shadowOpacity: 0.06,

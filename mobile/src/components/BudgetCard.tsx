@@ -66,7 +66,7 @@ function getCategoryEmoji(nameEs: string): string {
 function getBarColor(pct: number): string {
   if (pct > 0.9) return '#EF4444';
   if (pct > 0.7) return '#F59E0B';
-  return '#2E7D32';
+  return '#27AE60';
 }
 
 // ─── Data hooks ───────────────────────────────────────────────────────────────
@@ -280,27 +280,27 @@ function SetBudgetModal({
 
 const ms = StyleSheet.create({
   backdrop:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  sheet:         { backgroundColor: '#FAFAFA', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing[5], gap: spacing[4], paddingBottom: spacing[10] },
+  sheet:         { backgroundColor: '#FAFAF7', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: spacing[5], gap: spacing[4], paddingBottom: spacing[10] },
   dragBar:       { width: 36, height: 4, borderRadius: 2, backgroundColor: '#DDD', alignSelf: 'center', marginBottom: spacing[1] },
   header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title:         { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#212121', letterSpacing: -0.3 },
-  sectionLabel:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 10, color: '#9E9E9E', letterSpacing: 0.5 },
+  title:         { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#1C1C1C', letterSpacing: -0.3 },
+  sectionLabel:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 10, color: '#9B9790', letterSpacing: 0.5 },
   catChip:       { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: 20, borderWidth: 1.5, borderColor: colors.border.default, backgroundColor: colors.bg.card },
   catChipEmoji:  { fontSize: 15 },
   catChipText:   { fontFamily: 'Montserrat_500Medium', fontSize: 12, color: colors.text.secondary },
-  editingCat:    { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: '#F5F5F5', borderRadius: 14, padding: spacing[3] },
+  editingCat:    { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: '#F5F1E9', borderRadius: 14, padding: spacing[3] },
   editCatEmojiBox:{ width: 48, height: 48, borderRadius: 14, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
   editCatEmoji:  { fontSize: 24 },
-  editCatName:   { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: '#212121' },
+  editCatName:   { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: '#1C1C1C' },
   inputRow:      { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.border.default, borderRadius: 14, backgroundColor: '#FFF', paddingHorizontal: spacing[4], gap: spacing[2] },
-  inputPrefix:   { fontFamily: 'Montserrat_700Bold', fontSize: 22, color: '#212121' },
-  input:         { flex: 1, fontFamily: 'Montserrat_600SemiBold', fontSize: 22, color: '#212121', paddingVertical: spacing[4] },
-  inputSuffix:   { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#9E9E9E' },
+  inputPrefix:   { fontFamily: 'Montserrat_700Bold', fontSize: 22, color: '#1C1C1C' },
+  input:         { flex: 1, fontFamily: 'Montserrat_600SemiBold', fontSize: 22, color: '#1C1C1C', paddingVertical: spacing[4] },
+  inputSuffix:   { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#9B9790' },
   saveBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], backgroundColor: colors.primary, borderRadius: 14, paddingVertical: spacing[4], shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
   saveBtnText:   { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: colors.white },
   deleteBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], paddingVertical: spacing[3], borderRadius: 12, borderWidth: 1, borderColor: colors.red + '40', backgroundColor: colors.red + '08' },
   deleteBtnText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: colors.red },
-  microcopy:     { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9E9E9E', textAlign: 'center' },
+  microcopy:     { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9B9790', textAlign: 'center' },
 });
 
 // ─── BudgetCategoryRow ────────────────────────────────────────────────────────
@@ -325,7 +325,7 @@ function BudgetCategoryRow({ row, onEdit }: { row: BudgetRow; onEdit: (row: Budg
         </View>
         <Text style={bs.amounts} numberOfLines={1}>
           <Text style={{ color: barColor, fontFamily: 'Montserrat_600SemiBold' }}>{formatCurrency(row.spent)}</Text>
-          <Text style={{ color: '#BDBDBD' }}>{' / '}{formatCurrency(row.budget.monthly_limit)}</Text>
+          <Text style={{ color: '#9B9790' }}>{' / '}{formatCurrency(row.budget.monthly_limit)}</Text>
         </Text>
       </View>
     </TouchableOpacity>
@@ -375,7 +375,7 @@ function BudgetFullSheet({
           <View style={bs.header}>
             <Text style={bs.title}>Presupuestos de {monthName}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={22} color="#9E9E9E" />
+              <Ionicons name="close" size={22} color="#9B9790" />
             </TouchableOpacity>
           </View>
 
@@ -400,7 +400,7 @@ function BudgetFullSheet({
               <View style={bs.totalBarTrack}>
                 <View style={[bs.totalBarFill, { width: `${totalPctInt}%` as any, backgroundColor: totalBarColor }]} />
               </View>
-              <Text style={[bs.availableText, { color: available >= 0 ? '#2E7D32' : '#EF4444' }]}>
+              <Text style={[bs.availableText, { color: available >= 0 ? '#27AE60' : '#EF4444' }]}>
                 {available >= 0
                   ? `Disponible: ${formatCurrency(available)}`
                   : `Excedido por ${formatCurrency(-available)}`}
@@ -455,40 +455,40 @@ function BudgetFullSheet({
 const bs = StyleSheet.create({
   backdrop:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   backdropTouch: { flex: 1 },
-  sheet:         { backgroundColor: '#FAFAFA', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 36, gap: 16 },
-  dragBar:       { width: 36, height: 4, borderRadius: 2, backgroundColor: '#E0E0E0', alignSelf: 'center', marginBottom: 6 },
+  sheet:         { backgroundColor: '#FAFAF7', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 36, gap: 16 },
+  dragBar:       { width: 36, height: 4, borderRadius: 2, backgroundColor: '#E8E2D9', alignSelf: 'center', marginBottom: 6 },
   header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title:         { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#212121', letterSpacing: -0.3 },
+  title:         { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#1C1C1C', letterSpacing: -0.3 },
   // Total card
-  totalCard:     { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, gap: 10, borderWidth: 1, borderColor: '#F0F0F0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  totalCard:     { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, gap: 10, borderWidth: 1, borderColor: '#E8E2D9', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
   totalTopRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  totalLabel:    { fontFamily: 'Montserrat_500Medium', fontSize: 11, color: '#9E9E9E', marginBottom: 4 },
+  totalLabel:    { fontFamily: 'Montserrat_500Medium', fontSize: 11, color: '#9B9790', marginBottom: 4 },
   totalSpent:    { fontFamily: 'Montserrat_700Bold', fontSize: 22, letterSpacing: -0.5 },
-  totalSep:      { fontFamily: 'Montserrat_400Regular', fontSize: 16, color: '#BDBDBD' },
-  totalLimit:    { fontFamily: 'Montserrat_400Regular', fontSize: 16, color: '#BDBDBD' },
+  totalSep:      { fontFamily: 'Montserrat_400Regular', fontSize: 16, color: '#9B9790' },
+  totalLimit:    { fontFamily: 'Montserrat_400Regular', fontSize: 16, color: '#9B9790' },
   totalPct:      { fontFamily: 'Montserrat_700Bold', fontSize: 28, letterSpacing: -1, flexShrink: 0 },
-  totalBarTrack: { height: 8, backgroundColor: '#EBEBEB', borderRadius: 999, overflow: 'hidden' },
+  totalBarTrack: { height: 8, backgroundColor: '#E8E2D9', borderRadius: 999, overflow: 'hidden' },
   totalBarFill:  { height: '100%', borderRadius: 999 },
   availableText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13 },
   // Category row
   catRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 2 },
-  emojiBox:    { width: 46, height: 46, borderRadius: 14, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  emojiBox:    { width: 46, height: 46, borderRadius: 14, backgroundColor: '#F5F1E9', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   emoji:       { fontSize: 22 },
   catRowHeader:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  catName:     { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: '#1A1A1A', flex: 1, marginRight: 8 },
+  catName:     { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: '#1C1C1C', flex: 1, marginRight: 8 },
   pctLabel:    { fontFamily: 'Montserrat_700Bold', fontSize: 13, flexShrink: 0 },
-  barTrack:    { height: 7, backgroundColor: '#EBEBEB', borderRadius: 999, overflow: 'hidden' },
+  barTrack:    { height: 7, backgroundColor: '#E8E2D9', borderRadius: 999, overflow: 'hidden' },
   barFill:     { height: '100%', borderRadius: 999 },
   amounts:     { fontFamily: 'Montserrat_400Regular', fontSize: 12 },
-  divider:     { height: 1, backgroundColor: '#F0F0F0', marginHorizontal: 2 },
+  divider:     { height: 1, backgroundColor: '#E8E2D9', marginHorizontal: 2 },
   // Add button
   addBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.primary + '40', backgroundColor: colors.primary + '08' },
   addBtnText:  { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: colors.primary },
   // Empty
   emptyWrap:   { alignItems: 'center', paddingVertical: 28, gap: 8 },
   emptyEmoji:  { fontSize: 36 },
-  emptyTitle:  { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: '#424242' },
-  emptyText:   { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#9E9E9E', textAlign: 'center' },
+  emptyTitle:  { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: '#1C1C1C' },
+  emptyText:   { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#9B9790', textAlign: 'center' },
 });
 
 // ─── BudgetRingIndicator ──────────────────────────────────────────────────────
@@ -613,7 +613,7 @@ const rs = StyleSheet.create({
   pctText:   { fontFamily: 'Montserrat_700Bold', fontSize: 9.5, lineHeight: 12 },
   emptyRing: {
     width: RING_SIZE, height: RING_SIZE, borderRadius: RING_SIZE / 2,
-    borderWidth: 2, borderColor: '#E0E0E0', borderStyle: 'dashed',
+    borderWidth: 2, borderColor: '#E8E2D9', borderStyle: 'dashed',
     alignItems: 'center', justifyContent: 'center',
   },
 });
@@ -683,8 +683,8 @@ export function BudgetHomeWidget({ expenses, budgets, onPress }: BudgetHomeWidge
     ? `Superaste el límite por ${formatCurrency(Math.round(worstRow.spent - worstRow.budget.monthly_limit))}.`
     : `Ya usaste el ${pctInt}% del presupuesto.`;
 
-  const bg     = isOver2 ? '#FEEBEE' : '#FFF8E1';
-  const border = isOver2 ? '#FFCDD2' : '#FFE082';
+  const bg     = isOver2 ? '#FEE2E2' : '#FFFBEB';
+  const border = isOver2 ? '#FEE2E2' : '#E8E2D9';
 
   return (
     <TouchableOpacity style={[hw.card, { backgroundColor: bg, borderColor: border }]} onPress={onPress} activeOpacity={0.85}>
@@ -708,9 +708,9 @@ const hw = StyleSheet.create({
   card:    { flexDirection: 'row', alignItems: 'center', gap: spacing[3], borderRadius: 14, padding: 14, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
   emojiBox:{ width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   emoji:   { fontSize: 20 },
-  label:   { fontFamily: 'Montserrat_700Bold', fontSize: 9, color: '#9E9E9E', letterSpacing: 0.8 },
-  title:   { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1A1A1A', letterSpacing: -0.2 },
-  subtitle:{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#616161', lineHeight: 17 },
+  label:   { fontFamily: 'Montserrat_700Bold', fontSize: 9, color: '#9B9790', letterSpacing: 0.8 },
+  title:   { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1C1C1C', letterSpacing: -0.2 },
+  subtitle:{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63', lineHeight: 17 },
   cta:     { flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 0 },
   ctaText: { fontFamily: 'Montserrat_700Bold', fontSize: 12 },
 });

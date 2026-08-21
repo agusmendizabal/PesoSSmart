@@ -19,7 +19,7 @@ function SkeletonBox({ width, height = 16, borderRadius = 8, style }: {
   return (
     <Animated.View
       style={[
-        { width, height, borderRadius, backgroundColor: '#E0E0E0', opacity },
+        { width, height, borderRadius, backgroundColor: '#E8E2D9', opacity },
         style,
       ]}
     />

@@ -28,18 +28,18 @@ import { checkAndNotifyBudgetLimits } from '@/lib/budgetNotifications';
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:     '#F6F7F9',
+  bg:     '#FAFAF7',
   card:   '#FFFFFF',
   blue:   '#1976D2',
-  green:  '#2E7D32',
-  violet: '#7B61FF',
+  green:  '#27AE60',
+  violet: '#27AE60',
   red:    '#EF4444',
   amber:  '#F59E0B',
-  text:   '#212121',
-  sub:    '#757575',
-  muted:  '#9E9E9E',
-  border: '#E0E0E0',
-  light:  '#F2F2F2',
+  text:   '#1C1C1C',
+  sub:    '#6D6A63',
+  muted:  '#9B9790',
+  border: '#E8E2D9',
+  light:  '#F5F1E9',
 } as const;
 
 const shadow = layout.cardShadow;
@@ -97,7 +97,7 @@ function HeroCard({ plan }: { plan: BudgetPlan }) {
         <View style={hc.dividerV} />
         <View style={{ gap: 3, alignItems: 'center', flex: 1 }}>
           <Text style={hc.colLabel}>Disponible{'\n'}restante</Text>
-          <Text style={[hc.colValue, { color: isOver ? '#FCA5A5' : '#BBF7D0' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+          <Text style={[hc.colValue, { color: isOver ? '#FCA5A5' : '#A8D5C2' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
             {isOver ? '-' : ''}{formatCurrency(Math.abs(available))}
           </Text>
         </View>
@@ -127,16 +127,16 @@ const hc = StyleSheet.create({
   glow2:        { position: 'absolute', bottom: -40, left: -40, width: 130, height: 130, borderRadius: 65, backgroundColor: '#60A5FA18' },
   illustration: { position: 'absolute', top: -4, right: 12, fontSize: 70, opacity: 0.25 },
   topRow:       { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  eyebrow:      { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#EDE9FE', flex: 1 },
-  subtitle:     { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#A78BFA', marginTop: -spacing[1] },
+  eyebrow:      { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#D1F7E3', flex: 1 },
+  subtitle:     { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6D6A63', marginTop: -spacing[1] },
   threeCol:     { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF18', borderRadius: 14, padding: spacing[4] },
   dividerV:     { width: 1, height: 36, backgroundColor: '#FFFFFF30', marginHorizontal: spacing[2] },
-  colLabel:     { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#C4B5FD', textAlign: 'center', lineHeight: 14 },
+  colLabel:     { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#9B9790', textAlign: 'center', lineHeight: 14 },
   colValue:     { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#FFFFFF', textAlign: 'center' },
   track:        { height: 6, backgroundColor: '#FFFFFF22', borderRadius: 3, overflow: 'visible', position: 'relative' },
   fill:         { height: '100%', borderRadius: 3 },
   dayMark:      { position: 'absolute', top: -3, width: 2, height: 12, backgroundColor: '#FFFFFF80', borderRadius: 1 },
-  trackLabel:   { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#A78BFA' },
+  trackLabel:   { fontFamily: 'Montserrat_400Regular', fontSize: 10, color: '#6D6A63' },
 });
 
 // ─── IA Insight card ──────────────────────────────────────────────────────────

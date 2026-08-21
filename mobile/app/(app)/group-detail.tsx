@@ -20,28 +20,27 @@ const { width: SW } = Dimensions.get('window');
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
 const C = {
-  bg:       '#F6F7F9',
+  bg:       '#FAFAF7',
+  surface:  '#F5F1E9',
+  cream:    '#F2E8D5',
   white:    '#FFFFFF',
-  purple:   '#7B61FF',
-  purpleLt: '#EDE9FE',
-  purpleMd: '#7B61FF',
-  green:    '#2E7D32',
-  greenLt:  '#ECFDF3',
-  text:     '#212121',
-  text2:    '#757575',
-  muted:    '#9E9E9E',
-  border:   '#E0E0E0',
+  green:    '#27AE60',
+  accent:   '#D1F7E3',
+  text:     '#1C1C1C',
+  text2:    '#6D6A63',
+  muted:    '#9B9790',
+  border:   '#E8E2D9',
   red:      '#EF4444',
-  redLt:    '#FEF3F2',
+  redLt:    '#FEE2E2',
   orange:   '#F59E0B',
-  orangeLt: '#FFFAEB',
+  orangeLt: '#FFFBEB',
   card:     '#FFFFFF',
 } as const;
 
 const sp = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 } as const;
 
-const GROUP_COLORS  = ['#7C3AED', '#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#EC4899'];
-const AVATAR_COLORS = ['#4361ee', '#e63946', '#2d6a4f', '#f4a261', '#7209b7', '#3a86ff'];
+const GROUP_COLORS  = ['#27AE60', '#F59E0B', '#10B981', '#2E7D32', '#EF4444', '#EC4899'];
+const AVATAR_COLORS = ['#27AE60', '#e63946', '#2d6a4f', '#f4a261', '#F59E0B', '#10B981'];
 
 function hashIdx(str: string, len: number): number {
   let h = 0;
@@ -192,7 +191,7 @@ function daysAgoLabel(days: number): string {
 function expenseIcon(desc: string): { icon: string; iconBg: string; iconColor: string } {
   const d = (desc ?? '').toLowerCase();
   if (d.includes('super') || d.includes('mercado') || d.includes('carrefour') || d.includes('coto'))
-    return { icon: 'cart-outline',       iconBg: '#DCFCE7', iconColor: '#16A34A' };
+    return { icon: 'cart-outline',       iconBg: '#D1F7E3', iconColor: '#16A34A' };
   if (d.includes('restau') || d.includes('cena') || d.includes('comida') || d.includes('pizza') || d.includes('sushi'))
     return { icon: 'restaurant-outline', iconBg: '#FEF3C7', iconColor: '#D97706' };
   if (d.includes('internet') || d.includes('wifi'))
@@ -636,10 +635,10 @@ type BadgeVariant = 'pending' | 'paid' | 'overdue' | 'owes';
 
 function StatusBadge({ variant, label }: { variant: BadgeVariant; label?: string }) {
   const config: Record<BadgeVariant, { bg: string; color: string; text: string }> = {
-    paid:    { bg: '#ECFDF3', color: '#027A48', text: 'Pagado'    },
+    paid:    { bg: '#D1F7E3', color: '#027A48', text: 'Pagado'    },
     pending: { bg: '#FFFAEB', color: '#B54708', text: 'Pendiente' },
     overdue: { bg: '#FEF3F2', color: '#B42318', text: 'Atrasado'  },
-    owes:    { bg: '#F0F2F5', color: '#344054', text: 'Debe'      },
+    owes:    { bg: '#F0F2F5', color: '#1C1C1C', text: 'Debe'      },
   };
   const c = config[variant];
   return (
@@ -718,14 +717,14 @@ function MemberEditModal({
         ]).map(({ role, desc }) => (
           <TouchableOpacity
             key={role}
-            style={[s.radioRow, selectedRole === role && { borderColor: C.purple + '80', backgroundColor: C.purpleLt }]}
+            style={[s.radioRow, selectedRole === role && { borderColor: C.green + '80', backgroundColor: C.accent }]}
             onPress={() => setSelectedRole(role)} activeOpacity={0.8}
           >
-            <View style={[s.radioCircle, selectedRole === role && { borderColor: C.purple }]}>
-              {selectedRole === role && <View style={[s.radioDot, { backgroundColor: C.purple }]} />}
+            <View style={[s.radioCircle, selectedRole === role && { borderColor: C.green }]}>
+              {selectedRole === role && <View style={[s.radioDot, { backgroundColor: C.green }]} />}
             </View>
             <View style={{ flex: 1, gap: 3 }}>
-              <Text style={[s.radioTitle, selectedRole === role && { color: C.purple }]}>{role}</Text>
+              <Text style={[s.radioTitle, selectedRole === role && { color: C.green }]}>{role}</Text>
               <Text style={s.radioDesc}>{desc}</Text>
             </View>
           </TouchableOpacity>
@@ -738,7 +737,7 @@ function MemberEditModal({
             <View key={p.key}>
               {i > 0 && <View style={s.divider} />}
               <TouchableOpacity style={s.checkRow} onPress={() => setPerms(prev => ({ ...prev, [p.key]: !prev[p.key] }))} activeOpacity={0.8}>
-                <View style={[s.checkbox, perms[p.key] && { backgroundColor: C.purple, borderColor: C.purple }]}>
+                <View style={[s.checkbox, perms[p.key] && { backgroundColor: C.green, borderColor: C.green }]}>
                   {perms[p.key] && <Ionicons name="checkmark" size={13} color={C.white} />}
                 </View>
                 <Text style={s.checkLabel}>{p.label}</Text>
@@ -747,7 +746,7 @@ function MemberEditModal({
           ))}
         </View>
       </View>
-      <FormSheetButton label="Guardar cambios" color={C.purple} loading={saving} onPress={handleSave} />
+      <FormSheetButton label="Guardar cambios" color={C.green} loading={saving} onPress={handleSave} />
     </FormSheetModal>
   );
 }
@@ -929,17 +928,17 @@ function AddExpenseModal({
                 { val: 'manual'   as const, title: 'Crear gasto manual',   sub: 'Ingresá un gasto nuevo para compartir.',                  icon: 'create-outline'  },
               ]).map(opt => (
                 <TouchableOpacity key={opt.val}
-                  style={[s.sourceCard, source === opt.val && { borderColor: C.purple, backgroundColor: C.purpleLt }]}
+                  style={[s.sourceCard, source === opt.val && { borderColor: C.green, backgroundColor: C.accent }]}
                   onPress={() => setSource(opt.val)} activeOpacity={0.8}>
-                  <View style={[s.sourceIcon, { backgroundColor: source === opt.val ? C.purple + '18' : C.bg }]}>
-                    <Ionicons name={opt.icon as any} size={22} color={source === opt.val ? C.purple : C.muted} />
+                  <View style={[s.sourceIcon, { backgroundColor: source === opt.val ? C.green + '18' : C.bg }]}>
+                    <Ionicons name={opt.icon as any} size={22} color={source === opt.val ? C.green : C.muted} />
                   </View>
                   <View style={{ flex: 1, gap: 3 }}>
-                    <Text style={[s.radioTitle, source === opt.val && { color: C.purple }]}>{opt.title}</Text>
+                    <Text style={[s.radioTitle, source === opt.val && { color: C.green }]}>{opt.title}</Text>
                     <Text style={s.radioDesc}>{opt.sub}</Text>
                   </View>
-                  <View style={[s.radioCircle, source === opt.val && { borderColor: C.purple }]}>
-                    {source === opt.val && <View style={[s.radioDot, { backgroundColor: C.purple }]} />}
+                  <View style={[s.radioCircle, source === opt.val && { borderColor: C.green }]}>
+                    {source === opt.val && <View style={[s.radioDot, { backgroundColor: C.green }]} />}
                   </View>
                 </TouchableOpacity>
               ))}
@@ -964,7 +963,7 @@ function AddExpenseModal({
                 </View>
               </View>
               {loadingExp ? (
-                <View style={s.centered}><ActivityIndicator color={C.purple} /></View>
+                <View style={s.centered}><ActivityIndicator color={C.green} /></View>
               ) : (
                 <ScrollView contentContainerStyle={{ paddingHorizontal: sp.xl, paddingBottom: 120, gap: sp.sm }} keyboardShouldPersistTaps="handled">
                   {filteredExpenses.length === 0 ? (
@@ -977,7 +976,7 @@ function AddExpenseModal({
                     const ic = expenseIcon(exp.description);
                     return (
                       <TouchableOpacity key={exp.id}
-                        style={[s.pickExpRow, isSelected && { borderColor: C.purple, backgroundColor: C.purpleLt }]}
+                        style={[s.pickExpRow, isSelected && { borderColor: C.green, backgroundColor: C.accent }]}
                         onPress={() => handleSelectExpense(exp)} activeOpacity={0.8}>
                         <View style={[s.expIconSm, { backgroundColor: exp.categoryColor ? exp.categoryColor + '20' : ic.iconBg }]}>
                           <Ionicons name={(exp.categoryIcon ?? ic.icon) as any} size={18} color={exp.categoryColor ?? ic.iconColor} />
@@ -986,18 +985,18 @@ function AddExpenseModal({
                           <Text style={s.expName} numberOfLines={1}>{exp.description}</Text>
                           <Text style={s.expMeta}>{dateLabel(exp.date)} · {exp.categoryName}</Text>
                         </View>
-                        <Text style={[s.expAmt, isSelected && { color: C.purple }]}>{formatCurrency(exp.amount)}</Text>
-                        <View style={[s.radioCircle, { marginLeft: sp.sm }, isSelected && { borderColor: C.purple }]}>
-                          {isSelected && <View style={[s.radioDot, { backgroundColor: C.purple }]} />}
+                        <Text style={[s.expAmt, isSelected && { color: C.green }]}>{formatCurrency(exp.amount)}</Text>
+                        <View style={[s.radioCircle, { marginLeft: sp.sm }, isSelected && { borderColor: C.green }]}>
+                          {isSelected && <View style={[s.radioDot, { backgroundColor: C.green }]} />}
                         </View>
                       </TouchableOpacity>
                     );
                   })}
                   <TouchableOpacity style={s.createManualRow}
                     onPress={() => { setSource('manual'); setStep('form'); }} activeOpacity={0.8}>
-                    <Ionicons name="create-outline" size={17} color={C.purple} />
-                    <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.purple, flex: 1 }}>Crear gasto manual</Text>
-                    <Ionicons name="chevron-forward" size={15} color={C.purple} />
+                    <Ionicons name="create-outline" size={17} color={C.green} />
+                    <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.green, flex: 1 }}>Crear gasto manual</Text>
+                    <Ionicons name="chevron-forward" size={15} color={C.green} />
                   </TouchableOpacity>
                 </ScrollView>
               )}
@@ -1050,7 +1049,7 @@ function AddExpenseModal({
                       <TouchableOpacity style={s.payerRow} onPress={() => setPaidById(m.userId)} activeOpacity={0.8}>
                         <Avatar name={m.name} color={m.color} size={36} />
                         <Text style={s.payerName}>{m.isMe ? `${m.name} (vos)` : m.name}</Text>
-                        {paidById === m.userId && <Ionicons name="checkmark-circle" size={22} color={C.purple} />}
+                        {paidById === m.userId && <Ionicons name="checkmark-circle" size={22} color={C.green} />}
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -1072,11 +1071,11 @@ function AddExpenseModal({
                         <View style={[
                           s.avatarBase,
                           { width: 52, height: 52, borderRadius: 26, backgroundColor: m.color + '22' },
-                          isIn && { borderWidth: 2.5, borderColor: C.purple },
+                          isIn && { borderWidth: 2.5, borderColor: C.green },
                           !isIn && { opacity: 0.35 },
                         ]}>
                           {isIn && (
-                            <View style={{ position: 'absolute', bottom: -3, right: -3, backgroundColor: C.purple, borderRadius: 9, width: 18, height: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.white }}>
+                            <View style={{ position: 'absolute', bottom: -3, right: -3, backgroundColor: C.green, borderRadius: 9, width: 18, height: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: C.white }}>
                               <Ionicons name="checkmark" size={11} color={C.white} />
                             </View>
                           )}
@@ -1097,13 +1096,13 @@ function AddExpenseModal({
                   { val: 'custom' as SplitMode, label: 'Personalizado', desc: 'Definir montos diferentes por persona' },
                 ]).map(opt => (
                   <TouchableOpacity key={opt.val}
-                    style={[s.radioRow, splitMode === opt.val && { borderColor: C.purple + '80', backgroundColor: C.purpleLt }]}
+                    style={[s.radioRow, splitMode === opt.val && { borderColor: C.green + '80', backgroundColor: C.accent }]}
                     onPress={() => setSplitMode(opt.val)} activeOpacity={0.8}>
-                    <View style={[s.radioCircle, splitMode === opt.val && { borderColor: C.purple }]}>
-                      {splitMode === opt.val && <View style={[s.radioDot, { backgroundColor: C.purple }]} />}
+                    <View style={[s.radioCircle, splitMode === opt.val && { borderColor: C.green }]}>
+                      {splitMode === opt.val && <View style={[s.radioDot, { backgroundColor: C.green }]} />}
                     </View>
                     <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={[s.radioTitle, splitMode === opt.val && { color: C.purple }]}>{opt.label}</Text>
+                      <Text style={[s.radioTitle, splitMode === opt.val && { color: C.green }]}>{opt.label}</Text>
                       <Text style={s.radioDesc}>{opt.desc}</Text>
                     </View>
                   </TouchableOpacity>
@@ -1151,7 +1150,7 @@ function AddExpenseModal({
                 <View style={{ padding: sp.lg, gap: sp.md }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={[s.expName, { flex: 1 }]} numberOfLines={1}>{savedExpense.description}</Text>
-                    <Text style={[s.expAmt, { color: C.purple }]}>{formatCurrency(savedExpense.amount)}</Text>
+                    <Text style={[s.expAmt, { color: C.green }]}>{formatCurrency(savedExpense.amount)}</Text>
                   </View>
                   <View style={s.divider} />
                   {[
@@ -1450,7 +1449,7 @@ function MemberProfileSheet({
 
   const badgeLabel = hasDebt ? 'Te debe' : iOwe ? 'Le debés' : 'Al día';
   const badgeColor = hasDebt ? C.green : iOwe ? C.red : C.muted;
-  const badgeBg    = hasDebt ? C.greenLt : iOwe ? C.redLt : C.bg;
+  const badgeBg    = hasDebt ? C.accent : iOwe ? C.redLt : C.bg;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
@@ -1505,7 +1504,7 @@ function MemberProfileSheet({
                 <View style={{ flexDirection: 'row', padding: sp.lg, gap: sp.md }}>
                   {[
                     { label: 'Gastos juntos', value: formatCurrency(gastosJuntos), color: C.text },
-                    { label: 'Pagó', value: formatCurrency(memberPaid), color: C.purple },
+                    { label: 'Pagó', value: formatCurrency(memberPaid), color: C.green },
                     { label: 'Debe', value: formatCurrency(debtAmt), color: debtAmt > 0 ? C.red : C.muted },
                   ].map((col, i) => (
                     <View key={col.label} style={{ flex: 1, alignItems: i === 1 ? 'center' : i === 2 ? 'flex-end' : 'flex-start', gap: 3 }}>
@@ -1552,12 +1551,12 @@ function MemberProfileSheet({
               style={s.remindBtn}
               onPress={() => { hapticMedium(); onRemind(member); }}
               activeOpacity={0.85}>
-              <Ionicons name="logo-whatsapp" size={18} color={C.purple} />
+              <Ionicons name="logo-whatsapp" size={18} color={C.green} />
               <Text style={s.remindBtnText}>Recordar a {member.name.split(' ')[0]}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={{ alignItems: 'center', paddingVertical: sp.md }} activeOpacity={0.7}>
-              <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.purple }}>
+              <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.green }}>
                 Ver historial completo →
               </Text>
             </TouchableOpacity>
@@ -1635,10 +1634,10 @@ function RecordarModal({
             {TONE_CONFIG.map(t => (
               <TouchableOpacity
                 key={t.val}
-                style={[s.toneCard, tone === t.val && { borderColor: C.purple, backgroundColor: C.purpleLt }]}
+                style={[s.toneCard, tone === t.val && { borderColor: C.green, backgroundColor: C.accent }]}
                 onPress={() => { setTone(t.val); hapticLight(); }} activeOpacity={0.8}>
                 <Text style={{ fontSize: 26 }}>{t.emoji}</Text>
-                <Text style={[s.toneName, tone === t.val && { color: C.purple }]}>{t.label}</Text>
+                <Text style={[s.toneName, tone === t.val && { color: C.green }]}>{t.label}</Text>
                 <Text style={s.toneDesc}>{t.desc}</Text>
               </TouchableOpacity>
             ))}
@@ -1663,7 +1662,7 @@ function RecordarModal({
           </View>
           <FormSheetButton
             label="Enviar por WhatsApp"
-            color={C.purple}
+            color={C.green}
             icon="logo-whatsapp"
             loading={sending}
             onPress={handleSend}
@@ -1708,7 +1707,7 @@ function DebtMatchBanner({
     <View style={dmb.wrap}>
       <View style={dmb.row}>
         <View style={dmb.iconWrap}>
-          <Ionicons name="cash-outline" size={18} color="#15803D" />
+          <Ionicons name="cash-outline" size={18} color="#27AE60" />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={dmb.title}>Pago detectado</Text>
@@ -1765,7 +1764,7 @@ function AmbiguousDebtMatchBanner({
     <View style={dmb.wrap}>
       <View style={dmb.row}>
         <View style={dmb.iconWrap}>
-          <Ionicons name="cash-outline" size={18} color="#15803D" />
+          <Ionicons name="cash-outline" size={18} color="#27AE60" />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={dmb.title}>Pago detectado</Text>
@@ -1795,7 +1794,7 @@ function AmbiguousDebtMatchBanner({
                 {isSelected && <View style={dmb.radioDot} />}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[dmb.radioLabel, isSelected && { color: '#14532D' }]} numberOfLines={1}>
+                <Text style={[dmb.radioLabel, isSelected && { color: '#1C1C1C' }]} numberOfLines={1}>
                   {name}
                 </Text>
                 <Text style={dmb.radioSub}>{amt}</Text>
@@ -1812,7 +1811,7 @@ function AmbiguousDebtMatchBanner({
           <View style={[dmb.radioCircle, selectedId === 'none' && dmb.radioCircleActive]}>
             {selectedId === 'none' && <View style={dmb.radioDot} />}
           </View>
-          <Text style={[dmb.radioLabel, selectedId === 'none' && { color: '#14532D' }]}>
+          <Text style={[dmb.radioLabel, selectedId === 'none' && { color: '#1C1C1C' }]}>
             Ninguna de estas
           </Text>
         </TouchableOpacity>
@@ -1980,18 +1979,18 @@ function FriendsMainTab({
       {/* Summary card */}
       <View style={s.summaryCard}>
         <Text style={s.scMonthLabel}>Este mes</Text>
-        <Text style={s.scTotal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatCurrency(detail.totalMonth)}</Text>
+        <Text style={s.scTotal} numberOfLines={1}>{formatCurrency(detail.totalMonth)}</Text>
         <Text style={s.scTotalLabel}>Total compartido</Text>
         <View style={s.scDivider} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <View style={{ flex: 1, gap: 4, marginRight: 8 }}>
             <Text style={s.summaryLabel}>Te deben</Text>
-            <Text style={[s.scBalAmt, { color: C.green }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatCurrency(owedAmt)}</Text>
+            <Text style={[s.scBalAmt, { color: C.green }]} numberOfLines={1}>{formatCurrency(owedAmt)}</Text>
           </View>
           <View style={{ width: 1, backgroundColor: C.border }} />
           <View style={{ flex: 1, gap: 4, alignItems: 'flex-end', marginLeft: 8 }}>
             <Text style={s.summaryLabel}>Debés</Text>
-            <Text style={[s.scBalAmt, { color: C.red }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatCurrency(iOweAmt)}</Text>
+            <Text style={[s.scBalAmt, { color: C.red }]} numberOfLines={1}>{formatCurrency(iOweAmt)}</Text>
           </View>
         </View>
       </View>
@@ -2107,7 +2106,7 @@ function FriendsMainTab({
       {/* Recordar a todos */}
       {detail.debts.some(d => d.toUserId === myUserId) && (
         <TouchableOpacity style={s.remindAllBtn} onPress={() => { hapticMedium(); onRemindAll(); }} activeOpacity={0.85}>
-          <Ionicons name="paper-plane-outline" size={18} color={C.purple} />
+          <Ionicons name="paper-plane-outline" size={18} color={C.green} />
           <Text style={s.remindAllText}>Recordar a todos</Text>
         </TouchableOpacity>
       )}
@@ -2142,7 +2141,7 @@ function FriendsGastosTab({
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={s.sectionTitle}>{monthLabel()}</Text>
           <TouchableOpacity style={s.addSmallBtn} onPress={onAddExpense} activeOpacity={0.8}>
-            <Ionicons name="add" size={14} color={C.purple} />
+            <Ionicons name="add" size={14} color={C.green} />
             <Text style={s.addSmallText}>Agregar</Text>
           </TouchableOpacity>
         </View>
@@ -2270,17 +2269,17 @@ function RankingTab({ detail }: { detail: FetchResult }) {
         {ranking.map((entry, i) => (
           <View key={entry.member.userId}>
             {i > 0 && <View style={s.divider} />}
-            <View style={[s.rankRow, entry.member.isMe && { backgroundColor: C.purpleLt }]}>
+            <View style={[s.rankRow, entry.member.isMe && { backgroundColor: C.accent }]}>
               <Text style={s.rankNumber}>{medals[i] ?? `${i + 1}`}</Text>
               <Avatar name={entry.member.name} color={entry.member.color} size={40} />
               <View style={{ flex: 1, gap: 3 }}>
-                <Text style={[s.memberName, entry.member.isMe && { color: C.purple }]}>
+                <Text style={[s.memberName, entry.member.isMe && { color: C.green }]}>
                   {entry.member.isMe ? 'Vos' : entry.member.name.split(' ')[0]}
                 </Text>
                 <Text style={s.memberMeta}>{entry.settledCount} {entry.settledCount === 1 ? 'pago' : 'pagos'} a tiempo</Text>
               </View>
-              <View style={[s.badge, { backgroundColor: entry.points > 0 ? C.purpleLt : C.bg }]}>
-                <Text style={[s.badgeText, { color: entry.points > 0 ? C.purple : C.muted }]}>+{entry.points} pts</Text>
+              <View style={[s.badge, { backgroundColor: entry.points > 0 ? C.accent : C.bg }]}>
+                <Text style={[s.badgeText, { color: entry.points > 0 ? C.green : C.muted }]}>+{entry.points} pts</Text>
               </View>
             </View>
           </View>
@@ -2359,9 +2358,9 @@ function FamilyResumenTab({ detail, isAdmin, onInvite, groupId }: {
           ))}
         </View>
       )}
-      <View style={{ flexDirection: 'row', gap: sp.md, backgroundColor: '#ECFDF3', borderRadius: 14, padding: sp.lg }}>
+      <View style={{ flexDirection: 'row', gap: sp.md, backgroundColor: '#D1F7E3', borderRadius: 14, padding: sp.lg }}>
         <Ionicons name="information-circle-outline" size={18} color={C.green} style={{ marginTop: 1 }} />
-        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#344054', flex: 1, lineHeight: 20 }}>
+        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#1C1C1C', flex: 1, lineHeight: 20 }}>
           Los miembros no cargan nada manualmente. Sus gastos se asocian automáticamente.
         </Text>
       </View>
@@ -2436,8 +2435,8 @@ function MiembrosTab({ detail, isAdmin, isFriends, onEdit, onInvite }: {
                   {m.email ? <Text style={s.memberMeta} numberOfLines={1}>{m.email}</Text> : null}
                 </View>
                 {!isFriends && (
-                  <View style={[s.badge, { backgroundColor: m.role === 'Admin' ? '#DCFCE7' : C.purpleLt }]}>
-                    <Text style={[s.badgeText, { color: m.role === 'Admin' ? C.green : C.purple }]}>{m.role}</Text>
+                  <View style={[s.badge, { backgroundColor: C.accent }]}>
+                    <Text style={[s.badgeText, { color: C.green }]}>{m.role}</Text>
                   </View>
                 )}
                 {canEdit && (
@@ -2451,7 +2450,7 @@ function MiembrosTab({ detail, isAdmin, isFriends, onEdit, onInvite }: {
         })}
       </View>
       <TouchableOpacity style={s.remindAllBtn} onPress={onInvite} activeOpacity={0.85}>
-        <Ionicons name="enter-outline" size={18} color={C.purple} />
+        <Ionicons name="enter-outline" size={18} color={C.green} />
         <Text style={s.remindAllText}>Invitar con código</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -2665,12 +2664,12 @@ export default function GroupDetailScreen() {
       </View>
 
       {loading ? (
-        <View style={s.centered}><ActivityIndicator color={C.purple} size="large" /></View>
+        <View style={s.centered}><ActivityIndicator color={C.green} size="large" /></View>
       ) : !detail ? (
         <View style={s.centered}>
           <Text style={s.emptyTitle}>No se pudo cargar el grupo.</Text>
           <TouchableOpacity onPress={load} style={{ marginTop: sp.md }}>
-            <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.purple }}>Reintentar</Text>
+            <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.green }}>Reintentar</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -2733,8 +2732,8 @@ export default function GroupDetailScreen() {
                         {m.email ? <Text style={s.memberMeta} numberOfLines={1}>{m.email}</Text> : null}
                       </View>
                       {!isFriends && (
-                        <View style={[s.badge, { backgroundColor: m.role === 'Admin' ? '#DCFCE7' : C.purpleLt }]}>
-                          <Text style={[s.badgeText, { color: m.role === 'Admin' ? C.green : C.purple }]}>{m.role}</Text>
+                        <View style={[s.badge, { backgroundColor: C.accent }]}>
+                          <Text style={[s.badgeText, { color: C.green }]}>{m.role}</Text>
                         </View>
                       )}
                       {canEdit && (
@@ -2748,7 +2747,7 @@ export default function GroupDetailScreen() {
               })}
             </View>
             <TouchableOpacity style={s.remindAllBtn} onPress={() => { setShowMembers(false); handleInvite(); }} activeOpacity={0.85}>
-              <Ionicons name="enter-outline" size={18} color={C.purple} />
+              <Ionicons name="enter-outline" size={18} color={C.green} />
               <Text style={s.remindAllText}>Invitar con código</Text>
             </TouchableOpacity>
           </FormSheetModal>
@@ -2795,9 +2794,9 @@ const s = StyleSheet.create({
 
   tabBar: { flexDirection: 'row', backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.border },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 13, borderBottomWidth: 2.5, borderBottomColor: 'transparent' },
-  tabItemActive: { borderBottomColor: C.purple },
+  tabItemActive: { borderBottomColor: C.green },
   tabLabel:      { fontFamily: 'Montserrat_500Medium', fontSize: 12, color: C.muted },
-  tabLabelActive:{ fontFamily: 'Montserrat_700Bold', fontSize: 12, color: C.purple },
+  tabLabelActive:{ fontFamily: 'Montserrat_700Bold', fontSize: 12, color: C.green },
 
   tabContent: { paddingHorizontal: sp.xl, paddingTop: sp.xl, paddingBottom: 100, gap: sp.lg },
 
@@ -2815,7 +2814,7 @@ const s = StyleSheet.create({
   },
   scMonthLabel: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: C.muted, marginBottom: sp.xs },
   scTotalLabel: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.muted, marginTop: sp.xs },
-  scTotal:      { fontFamily: 'Montserrat_700Bold', fontSize: 30, color: C.text, letterSpacing: -1, lineHeight: 38 },
+  scTotal:      { fontFamily: 'Montserrat_700Bold', fontSize: 26, color: C.text, letterSpacing: -0.5, lineHeight: 34 },
   scDivider:    { height: 1, backgroundColor: C.border, marginVertical: sp.lg },
   scBalAmt:     { fontFamily: 'Montserrat_700Bold', fontSize: 22, letterSpacing: -0.5, lineHeight: 30 },
 
@@ -2823,7 +2822,7 @@ const s = StyleSheet.create({
   summaryAmt:   { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: C.text },
 
   insightCard: {
-    backgroundColor: C.purpleLt, borderRadius: 16,
+    backgroundColor: C.accent, borderRadius: 16,
     flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg,
   },
   insightTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.text },
@@ -2848,9 +2847,9 @@ const s = StyleSheet.create({
   expAmt:    { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.text, flexShrink: 0 },
   expIconSm: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
-  expEmojiBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#F5F0FF', alignItems: 'center', justifyContent: 'center' },
+  expEmojiBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#D1F7E3', alignItems: 'center', justifyContent: 'center' },
   detailTitle:  { fontFamily: 'Montserrat_700Bold', fontSize: 20, color: C.text, textAlign: 'center', lineHeight: 26 },
-  detailAmount: { fontFamily: 'Montserrat_700Bold', fontSize: 32, color: C.purple, letterSpacing: -1, lineHeight: 40 },
+  detailAmount: { fontFamily: 'Montserrat_700Bold', fontSize: 32, color: C.green, letterSpacing: -1, lineHeight: 40 },
   detailDate:   { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.muted },
 
   rankRow:    { flexDirection: 'row', alignItems: 'center', gap: sp.md, paddingHorizontal: sp.lg, paddingVertical: sp.md },
@@ -2862,10 +2861,10 @@ const s = StyleSheet.create({
   catBarFill: { height: '100%', backgroundColor: C.green, borderRadius: 3 },
 
   purpleBtn: {
-    backgroundColor: C.purple, borderRadius: 16,
+    backgroundColor: C.green, borderRadius: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.sm,
     paddingVertical: 16,
-    shadowColor: C.purple, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4,
+    shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4,
   },
   purpleBtnText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: C.white },
 
@@ -2877,27 +2876,27 @@ const s = StyleSheet.create({
   outlineBtnText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.text2 },
 
   remindAllBtn: {
-    borderRadius: 16, borderWidth: 1.5, borderColor: C.purple,
+    borderRadius: 16, borderWidth: 1.5, borderColor: C.green,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.sm,
     paddingVertical: 14, backgroundColor: C.white,
   },
-  remindAllText: { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.purple },
+  remindAllText: { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.green },
 
   remindBtn: {
-    borderRadius: 16, borderWidth: 1.5, borderColor: C.purple,
+    borderRadius: 16, borderWidth: 1.5, borderColor: C.green,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.sm,
     paddingVertical: 14, backgroundColor: C.white,
   },
-  remindBtnText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.purple },
+  remindBtnText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.green },
 
   addSmallBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
-    borderRadius: 10, borderWidth: 1, borderColor: C.purple + '60',
-    paddingHorizontal: sp.sm, paddingVertical: sp.xs, backgroundColor: C.purpleLt,
+    borderRadius: 10, borderWidth: 1, borderColor: C.green + '60',
+    paddingHorizontal: sp.sm, paddingVertical: sp.xs, backgroundColor: C.accent,
   },
-  addSmallText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: C.purple },
+  addSmallText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: C.green },
 
-  linkText:   { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: C.purple },
+  linkText:   { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: C.green },
   mutedSmall: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: C.muted },
 
   emptyBox:   { alignItems: 'center', gap: sp.md, paddingVertical: sp.xxl },
@@ -2960,8 +2959,8 @@ const s = StyleSheet.create({
   },
   createManualRow: {
     flexDirection: 'row', alignItems: 'center', gap: sp.md,
-    borderRadius: 12, borderWidth: 1, borderColor: C.purple + '30',
-    backgroundColor: C.purpleLt, padding: sp.md, marginTop: sp.sm,
+    borderRadius: 12, borderWidth: 1, borderColor: C.green + '30',
+    backgroundColor: C.accent, padding: sp.md, marginTop: sp.sm,
   },
 
   miniExpCard: {
@@ -2988,48 +2987,48 @@ const s = StyleSheet.create({
 
 const dmb = StyleSheet.create({
   wrap: {
-    backgroundColor: '#F0FDF4', borderRadius: 18,
-    borderWidth: 1.5, borderColor: '#BBF7D0',
+    backgroundColor: '#D1F7E3', borderRadius: 18,
+    borderWidth: 1.5, borderColor: '#A8D5C2',
     padding: sp.lg, gap: sp.sm,
-    shadowColor: '#15803D', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2,
+    shadowColor: '#27AE60', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 2,
   },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: sp.md },
   iconWrap: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: '#DCFCE7', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    backgroundColor: '#D1F7E3', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  title:    { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#14532D' },
-  sub:      { fontFamily: 'Montserrat_500Medium', fontSize: 12, color: '#166534', lineHeight: 17 },
-  note:     { fontFamily: 'Montserrat_500Medium', fontSize: 12, color: '#15803D', marginTop: 2 },
-  question: { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#344054' },
+  title:    { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1C1C1C' },
+  sub:      { fontFamily: 'Montserrat_500Medium', fontSize: 12, color: '#6D6A63', lineHeight: 17 },
+  note:     { fontFamily: 'Montserrat_500Medium', fontSize: 12, color: '#27AE60', marginTop: 2 },
+  question: { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#1C1C1C' },
   actions:  { flexDirection: 'row', gap: sp.sm, marginTop: sp.xs },
   confirmBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
-    backgroundColor: '#15803D', borderRadius: 12, paddingVertical: 11,
+    backgroundColor: '#27AE60', borderRadius: 12, paddingVertical: 11,
   },
   confirmText: { fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#FFF' },
   dismissBtn: {
     paddingHorizontal: sp.lg, paddingVertical: 11,
-    borderRadius: 12, borderWidth: 1.5, borderColor: '#BBF7D0',
+    borderRadius: 12, borderWidth: 1.5, borderColor: '#A8D5C2',
     alignItems: 'center', justifyContent: 'center',
   },
-  dismissText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#15803D' },
+  dismissText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#27AE60' },
 
   radioRow: {
     flexDirection: 'row', alignItems: 'center', gap: sp.md,
-    borderRadius: 12, borderWidth: 1.5, borderColor: '#BBF7D0',
-    backgroundColor: '#F0FDF4', padding: sp.md,
+    borderRadius: 12, borderWidth: 1.5, borderColor: '#A8D5C2',
+    backgroundColor: '#D1F7E3', padding: sp.md,
   },
   radioRowActive: {
-    borderColor: '#15803D', backgroundColor: '#DCFCE7',
+    borderColor: '#27AE60', backgroundColor: '#D1F7E3',
   },
   radioCircle: {
     width: 20, height: 20, borderRadius: 10,
     borderWidth: 2, borderColor: '#86EFAC',
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  radioCircleActive: { borderColor: '#15803D' },
-  radioDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: '#15803D' },
-  radioLabel:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#14532D' },
-  radioSub:    { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#166534', marginTop: 1 },
+  radioCircleActive: { borderColor: '#27AE60' },
+  radioDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: '#27AE60' },
+  radioLabel:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#1C1C1C' },
+  radioSub:    { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6D6A63', marginTop: 1 },
 });

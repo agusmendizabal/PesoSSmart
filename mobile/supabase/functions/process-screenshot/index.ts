@@ -1,5 +1,5 @@
 // ============================================================
-// SmartPesos — Edge Function: process-screenshot
+// Nomi — Edge Function: process-screenshot
 // Paso 1: Vision extrae texto crudo
 // Paso 2: Texto clasifica y parsea los gastos
 // ============================================================
@@ -107,7 +107,17 @@ Reglas:
 - amount: número positivo sin puntos ni comas ($14.000 → 14000, $32.097 → 32097, $10.215,64 → 10215)
 - date: formato YYYY-MM-DD ("28 de marzo" → ${currentYear}-03-28, "28/mar" → ${currentYear}-03-28, "hoy" → ${today}, "ayer" → ${yesterday})
 - classification: "necessary" (super, farmacia, transporte, servicios) o "disposable" (restaurant, ropa, entretenimiento) o "investable" (ahorro)
-- category: groceries, food_dining, transport, health, entertainment, clothing, home, technology, subscriptions, o other
+- category: elegí la más específica según el comercio/descripción:
+  groceries=supermercado/almacén/Carrefour/Coto/Jumbo/Día
+  food_dining=restaurant/McDonald's/Rappi comida/PedidosYa/delivery/pizzería/café/Starbucks
+  transport=Uber/Cabify/SUBE/combustible/YPF/Shell/peaje/estacionamiento
+  health=farmacia/Farmacity/OSDE/médico/obra social/laboratorio
+  entertainment=Netflix/Spotify/Disney+/cine/juegos/Steam
+  clothing=ropa/zapatillas/Zara/Nike/Adidas/indumentaria
+  home=Fravega/Garbarino/Easy/Sodimac/hogar/ferretería
+  technology=electrónica/computación/celular/Apple/Samsung
+  subscriptions=suscripción mensual/anual (Movistar/Claro/internet/streaming)
+  other=SOLO si ninguna otra categoría aplica
 
 Solo JSON, sin texto extra. Si no hay gastos: {"expenses":[]}`,
       }],

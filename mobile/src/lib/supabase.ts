@@ -84,7 +84,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   global: {
     fetch: fetchWithAuthRetry,
     headers: {
-      'x-app-name': 'pesossmart-mobile',
+      'x-app-name': 'nomi-mobile',
       'x-app-version': '1.0.0',
     },
   },

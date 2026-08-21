@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Svg, { Circle as SvgCircle } from 'react-native-svg';
+import Svg, { Circle as SvgCircle, Path as SvgPath } from 'react-native-svg';
 import { ExpensesSkeletonLoader, SmartLoadingState } from '@/components/ui/SkeletonLoader';
 import { useRouter } from 'expo-router';
 import {
@@ -45,6 +45,7 @@ import { useSavingsStore } from '@/store/savingsStore';
 import { InflationThermometer } from '@/components/InflationThermometer';
 import { DecisionHistorySection, buildOpportunities } from '@/components/DecisionHistory';
 import { fetchBudgetPlan, type BudgetPlan } from '@/lib/budgetPlan';
+import { computeFinancialDiagnosis } from '@/lib/financialDiagnosis';
 import {
   MONTH_NAMES, PALETTE, getCategoryColor, type CategoryRow, type MonthSummary,
   buildComparacion, buildAhorroSugerencias, buildPlanProximoMes, buildObjetivo,
@@ -59,7 +60,7 @@ function buildSegments(rows: CategoryRow[], total: number, maxCats = 8) {
   const rest = rows.slice(maxCats).reduce((s, r) => s + r.amount, 0);
   return [
     ...top,
-    ...(rest > 0 ? [{ id: 'otros', name: 'Otros', color: '#9CA3AF', amount: rest, pct: rest / total }] : []),
+    ...(rest > 0 ? [{ id: 'otros', name: 'Otros', color: '#9B9790', amount: rest, pct: rest / total }] : []),
   ] as CategoryRow[];
 }
 
@@ -538,7 +539,7 @@ function AnalysisTeaser({ recuperable, onPress }: { recuperable: number; onPress
   return (
     <TouchableOpacity style={teaserS.card} onPress={onPress} activeOpacity={0.85}>
       <View style={teaserS.iconWrap}>
-        <Ionicons name="analytics-outline" size={22} color="#2E7D32" />
+        <Ionicons name="analytics-outline" size={22} color="#27AE60" />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={teaserS.title}>Tu análisis ya está listo</Text>
@@ -546,22 +547,22 @@ function AnalysisTeaser({ recuperable, onPress }: { recuperable: number; onPress
           <Text style={teaserS.amount}>Encontramos {formatCurrency(recuperable)} para recuperar</Text>
         )}
       </View>
-      <Ionicons name="chevron-forward" size={18} color="#757575" />
+      <Ionicons name="chevron-forward" size={18} color="#6D6A63" />
     </TouchableOpacity>
   );
 }
 
 const teaserS = StyleSheet.create({
-  card:     { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#E8F5E9', borderRadius: 16, padding: 14, marginTop: 8, marginBottom: 8 },
-  iconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#C8E6C9', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  title:    { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: '#212121' },
-  amount:   { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#2E7D32' },
+  card:     { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#D1F7E3', borderRadius: 16, padding: 14, marginTop: 8, marginBottom: 8 },
+  iconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#A8D5C2', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  title:    { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: '#1C1C1C' },
+  amount:   { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#27AE60' },
 });
 
 // ─── ShareInGroupModal ────────────────────────────────────────────────────────
 
-const SHARE_PURPLE    = '#8B5CF6';
-const SHARE_PURPLE_LT = '#F5F3FF';
+const SHARE_PURPLE    = '#27AE60';
+const SHARE_PURPLE_LT = '#D1F7E3';
 
 function ShareInGroupModal({ visible, expense, userId, onClose }: {
   visible:  boolean;
@@ -572,7 +573,7 @@ function ShareInGroupModal({ visible, expense, userId, onClose }: {
   type ShareStep = 'group' | 'details' | 'confirm';
   interface FriendGroup { id: string; name: string; memberCount: number; members: { userId: string; name: string; color: string; initial: string; isMe: boolean }[] }
 
-  const AVATAR_COLORS = ['#4361ee', '#e63946', '#2d6a4f', '#f4a261', '#7209b7', '#3a86ff'];
+  const AVATAR_COLORS = ['#27AE60', '#e63946', '#2d6a4f', '#f4a261', '#F59E0B', '#10B981'];
   function hashIdx(str: string, len: number) {
     let h = 0;
     for (let i = 0; i < str.length; i++) { h = ((h << 5) - h) + str.charCodeAt(i); h |= 0; }
@@ -759,7 +760,7 @@ function ShareInGroupModal({ visible, expense, userId, onClose }: {
                         </View>
                         {selectedGrp?.id === grp.id
                           ? <Ionicons name="checkmark-circle" size={22} color={SHARE_PURPLE} />
-                          : <Ionicons name="chevron-forward" size={18} color="#9E9E9E" />
+                          : <Ionicons name="chevron-forward" size={18} color="#9B9790" />
                         }
                       </TouchableOpacity>
                     </View>
@@ -827,7 +828,7 @@ function ShareInGroupModal({ visible, expense, userId, onClose }: {
                       ]}>
                         <Text style={[shareStyles.avatarText, { color: m.color, fontSize: 18 }]}>{m.initial}</Text>
                       </View>
-                      <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 10, color: isIn ? '#111' : '#9E9E9E' }}>
+                      <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 10, color: isIn ? '#111' : '#9B9790' }}>
                         {m.isMe ? 'Vos' : m.name.split(' ')[0]}
                       </Text>
                     </TouchableOpacity>
@@ -875,7 +876,7 @@ function ShareInGroupModal({ visible, expense, userId, onClose }: {
               <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 22, color: '#111', textAlign: 'center', marginTop: 12 }}>
                 ¡Gasto compartido!
               </Text>
-              <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#9E9E9E', textAlign: 'center' }}>
+              <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#9B9790', textAlign: 'center' }}>
                 El gasto se agregó correctamente al grupo {selectedGrp?.name}.
               </Text>
               <TouchableOpacity
@@ -895,33 +896,33 @@ function ShareInGroupModal({ visible, expense, userId, onClose }: {
 
 const shareStyles = StyleSheet.create({
   modal:        { flex: 1, backgroundColor: '#FFFFFF' },
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#E8E2D9' },
   headerTitle:  { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: '#111' },
   body:         { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 60, gap: 16 },
-  sectionLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: '#9E9E9E', letterSpacing: 0.8 },
-  card:         { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16 },
-  divider:      { height: 1, backgroundColor: '#E5E7EB' },
+  sectionLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: '#9B9790', letterSpacing: 0.8 },
+  card:         { backgroundColor: '#FAFAF7', borderWidth: 1, borderColor: '#E8E2D9', borderRadius: 16 },
+  divider:      { height: 1, backgroundColor: '#E8E2D9' },
   emptyBox:     { alignItems: 'center', gap: 8, paddingVertical: 32 },
   emptyTitle:   { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: '#111' },
-  emptySub:     { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#9E9E9E', textAlign: 'center' },
-  expPreview:   { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F5F3FF', borderWidth: 1, borderColor: SHARE_PURPLE + '30', borderRadius: 14, padding: 14 },
+  emptySub:     { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#9B9790', textAlign: 'center' },
+  expPreview:   { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#D1F7E3', borderWidth: 1, borderColor: SHARE_PURPLE + '30', borderRadius: 14, padding: 14 },
   expPreviewName: { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: '#111' },
-  expPreviewMeta: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9E9E9E' },
+  expPreviewMeta: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9B9790' },
   expPreviewAmt:  { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: SHARE_PURPLE, flexShrink: 0 },
   groupRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
   groupIcon:    { width: 40, height: 40, borderRadius: 12, backgroundColor: SHARE_PURPLE + '18', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   groupName:    { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: '#111' },
-  groupMeta:    { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9E9E9E' },
+  groupMeta:    { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9B9790' },
   memberRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
   memberName:   { fontFamily: 'Montserrat_500Medium', fontSize: 14, color: '#111', flex: 1 },
   avatar:       { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   avatarText:   { fontFamily: 'Montserrat_700Bold', fontSize: 15 },
   avatarRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  radioRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1.5, borderColor: '#E5E7EB', padding: 14, backgroundColor: '#fff' },
-  radioCircle:  { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
+  radioRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1.5, borderColor: '#E8E2D9', padding: 14, backgroundColor: '#fff' },
+  radioCircle:  { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#E8E2D9', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
   radioDot:     { width: 10, height: 10, borderRadius: 5 },
   radioTitle:   { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: '#111' },
-  radioDesc:    { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#9E9E9E' },
+  radioDesc:    { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#9B9790' },
   btn:          { backgroundColor: SHARE_PURPLE, borderRadius: 14, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, shadowColor: SHARE_PURPLE, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 4 },
   btnText:      { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#fff' },
 });
@@ -943,7 +944,7 @@ function SinClasifInbox({ expenses, pendingTxs, categories, userId, onClassify, 
     return (
       <View style={scModalS.empty}>
         <View style={scModalS.emptyIconCircle}>
-          <Ionicons name="checkmark-circle" size={36} color="#1F9D47" />
+          <Ionicons name="checkmark-circle" size={36} color="#27AE60" />
         </View>
         <Text style={scModalS.emptyTitle}>¡Todo clasificado!</Text>
         <Text style={scModalS.emptySub}>Tus gastos están todos organizados.</Text>
@@ -1001,10 +1002,10 @@ function SinClasifInbox({ expenses, pendingTxs, categories, userId, onClassify, 
               </View>
             </View>
             <View style={scModalS.clasificarRow}>
-              <Ionicons name="pricetag-outline" size={14} color="#1F9D47" />
+              <Ionicons name="pricetag-outline" size={14} color="#27AE60" />
               <Text style={scModalS.clasificarText}>Clasificar</Text>
               <View style={{ flex: 1 }} />
-              <Text style={{ fontSize: 11, color: '#1F9D47', opacity: 0.55 }}>✦</Text>
+              <Text style={{ fontSize: 11, color: '#27AE60', opacity: 0.55 }}>✦</Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -1013,7 +1014,7 @@ function SinClasifInbox({ expenses, pendingTxs, categories, userId, onClassify, 
       ListFooterComponent={
         <View style={scModalS.progressCard}>
           <View style={scModalS.progressIconCircle}>
-            <Ionicons name="bar-chart-outline" size={20} color="#1F9D47" />
+            <Ionicons name="bar-chart-outline" size={20} color="#27AE60" />
           </View>
           <View style={{ flex: 1, gap: 3 }}>
             <Text style={scModalS.progressTitle}>Progreso de clasificación</Text>
@@ -1305,12 +1306,13 @@ export default function ExpensesScreen() {
   // ── Análisis integrado ──
   const now = new Date();
   const [activeView,      setActiveView]      = useState<'gastos' | 'analisis'>('gastos');
-  const [reportTab,       setReportTab]       = useState<'resumen' | 'categorias' | 'inflacion' | 'oportunidades'>('resumen');
+  const [reportTab,       setReportTab]       = useState<'resumen' | 'categorias' | 'oportunidades' | 'salud'>('resumen');
   const [reportRows,      setReportRows]      = useState<CategoryRow[]>([]);
   const [reportTotal,     setReportTotal]     = useState(0);
   const [history,         setHistory]         = useState<MonthSummary[]>([]);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [inflationRate,   setInflationRate]   = useState(0);
+  const [fciRate,         setFciRate]         = useState(0.03);
   const [pastOppData,     setPastOppData]     = useState<{ monthKey: string; disposable: number; categories: Record<string, number> }[]>([]);
   const [smartPlan,       setSmartPlan]       = useState<BudgetPlan | null>(null);
 
@@ -1389,6 +1391,7 @@ export default function ExpensesScreen() {
         if (!data) return;
         for (const row of data) {
           if (row.instrument === 'inflation') setInflationRate(Number(row.rate_monthly));
+          if (row.instrument === 'fci_mm')   setFciRate(Number(row.rate_monthly));
         }
       });
     }).catch(err => console.error('[Gastos/Análisis]', err)).finally(() => setIsReportLoading(false));
@@ -1933,7 +1936,7 @@ export default function ExpensesScreen() {
             style={styles.reportTabsScroll}
             contentContainerStyle={styles.reportTabsRow}
           >
-            {(['resumen', 'categorias', 'inflacion', 'oportunidades'] as const).map(tab => (
+            {(['resumen', 'categorias', 'salud', 'oportunidades'] as const).map(tab => (
               <TouchableOpacity
                 key={tab}
                 style={[styles.reportTabPill, reportTab === tab && styles.reportTabPillActive]}
@@ -1941,7 +1944,7 @@ export default function ExpensesScreen() {
                 activeOpacity={0.75}
               >
                 <Text style={[styles.reportTabText, reportTab === tab && styles.reportTabTextActive]}>
-                  {tab === 'resumen' ? 'Resumen' : tab === 'categorias' ? 'Categorías' : tab === 'inflacion' ? 'Inflación' : 'Oportunidades'}
+                  {tab === 'resumen' ? 'Resumen' : tab === 'categorias' ? 'Categorías' : tab === 'salud' ? 'Salud' : 'Oportunidades'}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -2038,9 +2041,136 @@ export default function ExpensesScreen() {
                 </>
               )}
 
-              {reportTab === 'inflacion' && (
-                <InflationThermometer userId={user!.id} year={reportYear} month={reportMonth} />
-              )}
+              {reportTab === 'salud' && (() => {
+                const diagRows = reportRows.map(r => ({
+                  id: r.id, name: r.name, color: r.color,
+                  amount: r.amount, pct: r.pct,
+                }));
+                // history solo tiene meses ANTERIORES al reportado; agregamos el
+                // mes actual para que el cálculo de tendencia sea idéntico al de home.
+                const currentMonthKey = `${reportYear}-${String(reportMonth).padStart(2, '0')}`;
+                const diagHistory = [
+                  ...history.map(h => ({
+                    monthKey: h.monthKey, label: h.label, total: h.total,
+                    necessary: h.necessary, disposable: h.disposable, investable: h.investable,
+                  })),
+                  ...(history.every(h => h.monthKey !== currentMonthKey) ? [{
+                    monthKey: currentMonthKey,
+                    label: MONTH_NAMES[reportMonth - 1].slice(0, 3),
+                    total: displayTotal,
+                    necessary: displayNecessary ?? 0,
+                    disposable: displayDisposable ?? 0,
+                    investable: displayInvestable ?? 0,
+                  }] : []),
+                ].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+                const diag = displayTotal > 0 ? computeFinancialDiagnosis({
+                  totalThisMonth:  displayTotal,
+                  totalNecessary:  displayNecessary,
+                  totalDisposable: displayDisposable,
+                  totalInvestable: displayInvestable,
+                  estimatedIncome: displayIncome,
+                  history:         diagHistory,
+                  rows:            diagRows,
+                  inflationRate,
+                  fciRate,
+                  dayOfMonth:      new Date().getDate(),
+                }) : null;
+                const score      = diag?.healthScore ?? 0;
+                const scoreLabel = diag?.healthLabel  ?? '—';
+                const scoreColor = diag?.healthColor  ?? '#9B9790';
+                const arc        = (score / 100) * 201;
+                // penúltimo de diagHistory = mes anterior al actual
+                const prevM   = diagHistory.length >= 2 ? diagHistory[diagHistory.length - 2] : null;
+                const prevPct = prevM && prevM.total > 0 && displayTotal > 0
+                  ? Math.round(((displayTotal - prevM.total) / prevM.total) * 100)
+                  : null;
+                return (
+                  <View style={{ gap: 12 }}>
+                    {/* Score card */}
+                    <View style={[styles.healthCard]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                        {/* Circular gauge */}
+                        <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
+                          <Svg width={80} height={80}>
+                            <SvgPath
+                              d="M 10 60 A 30 30 0 1 1 70 60"
+                              stroke="#E5E7EB" strokeWidth={8} fill="none"
+                              strokeLinecap="round"
+                            />
+                            <SvgPath
+                              d="M 10 60 A 30 30 0 1 1 70 60"
+                              stroke={scoreColor} strokeWidth={8} fill="none"
+                              strokeDasharray={`${arc} 201`}
+                              strokeDashoffset={50} strokeLinecap="round"
+                            />
+                          </Svg>
+                          <View style={{ position: 'absolute', alignItems: 'center' }}>
+                            <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 18, color: scoreColor, lineHeight: 22 }}>{score}</Text>
+                            <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 9, color: '#9B9790', lineHeight: 12 }}>/100</Text>
+                          </View>
+                        </View>
+                        {/* Info */}
+                        <View style={{ flex: 1, gap: 6 }}>
+                          <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 16, color: '#1C1C1C' }}>Tu salud financiera</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: scoreColor + '18', alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 }}>
+                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: scoreColor }} />
+                            <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 11, color: scoreColor }}>{scoreLabel}</Text>
+                          </View>
+                          {prevPct !== null && (
+                            <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63', lineHeight: 16 }}>
+                              {prevPct > 0 ? `Gastaste ${prevPct}% más que el mes pasado.` : prevPct < 0 ? `Gastaste ${Math.abs(prevPct)}% menos que el mes pasado.` : 'Igual que el mes pasado.'}
+                            </Text>
+                          )}
+                        </View>
+                        {prevPct !== null && (
+                          <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 16, color: prevPct > 0 ? '#EF4444' : '#27AE60' }}>
+                            {prevPct > 0 ? '+' : ''}{prevPct}%
+                          </Text>
+                        )}
+                      </View>
+                      {score < 70 && (
+                        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63', lineHeight: 18, borderTopWidth: 1, borderTopColor: '#F5F1E9', paddingTop: 10, marginTop: 4 }}>
+                          Hay oportunidades de mejora. Revisá tus prescindibles.
+                        </Text>
+                      )}
+                      {score >= 70 && (
+                        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63', lineHeight: 18, borderTopWidth: 1, borderTopColor: '#F5F1E9', paddingTop: 10, marginTop: 4 }}>
+                          ¡Vas por buen camino! Seguí manteniendo tus gastos bajo control.
+                        </Text>
+                      )}
+                    </View>
+                    {/* Componentes del score */}
+                    {diag && diag.components.length > 0 && (
+                      <View style={styles.healthCard}>
+                        <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#1C1C1C', marginBottom: 8 }}>Desglose del puntaje</Text>
+                        {diag.components.map(c => (
+                          <View key={c.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 12, color: '#1C1C1C' }}>{c.label}</Text>
+                              <View style={{ height: 4, backgroundColor: '#F5F1E9', borderRadius: 2, marginTop: 4 }}>
+                                <View style={{ height: 4, width: `${Math.min(c.score, 100)}%` as any, backgroundColor: c.color, borderRadius: 2 }} />
+                              </View>
+                            </View>
+                            <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 13, color: c.color, minWidth: 28, textAlign: 'right' }}>{c.score}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                    {/* Acciones sugeridas */}
+                    {diag && diag.actions.length > 0 && (
+                      <View style={styles.healthCard}>
+                        <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#1C1C1C', marginBottom: 8 }}>Qué podés mejorar</Text>
+                        {diag.actions.slice(0, 3).map((a, i) => (
+                          <View key={i} style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
+                            <Text style={{ fontSize: 14 }}>{a.icon}</Text>
+                            <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#1C1C1C', flex: 1, lineHeight: 18 }}>{a.text}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
 
               {reportTab === 'oportunidades' && (
                 <>
@@ -2346,9 +2476,9 @@ export default function ExpensesScreen() {
                       <Text style={clsModal.sectionTitle}>Tipo de gasto</Text>
                       <View style={clsModal.typeRow}>
                         {([
-                          { key: 'necessary',  label: 'Necesario',   icon: 'shield-checkmark-outline', color: '#16A34A', bg: '#F0FDF4', border: '#22C55E' },
+                          { key: 'necessary',  label: 'Necesario',   icon: 'shield-checkmark-outline', color: '#27AE60', bg: '#D1F7E3', border: '#27AE60' },
                           { key: 'disposable', label: 'Prescindible', icon: 'cart-outline',             color: '#DC2626', bg: '#FEF2F2', border: '#EF4444' },
-                          { key: 'investable', label: 'Invertible',  icon: 'trending-up-outline',      color: '#2563EB', bg: '#EFF6FF', border: '#3B82F6' },
+                          { key: 'investable', label: 'Invertible',  icon: 'trending-up-outline',      color: '#27AE60', bg: '#D1F7E3', border: '#27AE60' },
                         ] as const).map(opt => {
                           const active = editExpenseValues.classification === opt.key;
                           return (
@@ -2358,8 +2488,8 @@ export default function ExpensesScreen() {
                               onPress={() => setEditExpenseValues(p => p ? { ...p, classification: opt.key as ExpenseClassification } : p)}
                               activeOpacity={0.8}
                             >
-                              <Ionicons name={opt.icon} size={20} color={active ? opt.color : '#C4C9D4'} />
-                              <Text style={[clsModal.typeBtnLabel, { color: active ? opt.color : '#9CA3AF' }]}>{opt.label}</Text>
+                              <Ionicons name={opt.icon} size={20} color={active ? opt.color : '#9B9790'} />
+                              <Text style={[clsModal.typeBtnLabel, { color: active ? opt.color : '#9B9790' }]}>{opt.label}</Text>
                             </TouchableOpacity>
                           );
                         })}
@@ -2390,7 +2520,7 @@ export default function ExpensesScreen() {
                                     <Text style={clsModal.matchHistoryTag}>Ya usaste esta categoría</Text>
                                   )}
                                 </View>
-                                <Text style={[clsModal.matchPct, m.fromHistory && { color: '#7C3AED' }]}>
+                                <Text style={[clsModal.matchPct, m.fromHistory && { color: '#27AE60' }]}>
                                   {m.fromHistory ? '🧠 ' : ''}{m.score}%
                                 </Text>
                                 {isActive
@@ -2427,11 +2557,11 @@ export default function ExpensesScreen() {
                               onPress={() => setEditExpenseValues(p => p ? { ...p, category_id: p.category_id === cat.id ? null : cat.id } : p)}
                               activeOpacity={0.75}
                             >
-                              <View style={[clsModal.catIconWrap, { backgroundColor: (cat.color ?? '#6366F1') + '20' }]}>
+                              <View style={[clsModal.catIconWrap, { backgroundColor: (cat.color ?? '#27AE60') + '20' }]}>
                                 <CategoryIcon categoryName={cat.name_es} size={26} />
                               </View>
                               <Text
-                                style={[clsModal.catName, isActive && { color: '#111827', fontFamily: 'Montserrat_600SemiBold' }]}
+                                style={[clsModal.catName, isActive && { color: '#1C1C1C', fontFamily: 'Montserrat_600SemiBold' }]}
                                 numberOfLines={1}
                               >
                                 {cat.name_es}
@@ -2490,7 +2620,7 @@ export default function ExpensesScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowSinClasifModal(false)}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#F6F7F9' }} edges={['top']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#FAFAF7' }} edges={['top']}>
           {/* Header */}
           <View style={scModalS.topRow}>
             <View style={{ flex: 1 }} />
@@ -2572,7 +2702,7 @@ function DayHeader({ date, total }: { date: string; total: number }) {
 function ExpenseItem({ expense, onPress }: { expense: Expense; onPress: () => void }) {
   const isUnclassified = expense.category_id === null;
   const catName = (expense.category as any)?.name_es ?? '';
-  const catColor = isUnclassified ? '#9CA3AF' : getCategoryColor(catName, 0);
+  const catColor = isUnclassified ? '#9B9790' : getCategoryColor(catName, 0);
 
   return (
     <TouchableOpacity style={styles.expenseItem} onPress={onPress} activeOpacity={0.75}>
@@ -2607,7 +2737,7 @@ function ExpenseItem({ expense, onPress }: { expense: Expense; onPress: () => vo
 
 const sinClasifS = StyleSheet.create({
   badge: {
-    backgroundColor: '#FFF3E0', borderRadius: 999,
+    backgroundColor: '#D1F7E3', borderRadius: 999,
     paddingHorizontal: 6, paddingVertical: 2,
     alignSelf: 'flex-start',
   },
@@ -2617,13 +2747,13 @@ const sinClasifS = StyleSheet.create({
 const sinClasifBannerS = StyleSheet.create({
   card: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#FFFBF0', borderWidth: 1, borderColor: '#FFE5A0',
+    backgroundColor: '#FAFAF7', borderWidth: 1, borderColor: '#A8D5C2',
     borderRadius: 16, paddingVertical: 10, paddingHorizontal: 14,
     shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07, shadowRadius: 8, elevation: 2,
   },
-  title:      { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1A1A1A' },
-  sub:        { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9E8A6A' },
+  title:      { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1C1C1C' },
+  sub:        { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6D6A63' },
   countBadge: {
     backgroundColor: '#F59E0B', borderRadius: 10,
     paddingHorizontal: 6, paddingVertical: 2, minWidth: 20, alignItems: 'center',
@@ -2631,10 +2761,10 @@ const sinClasifBannerS = StyleSheet.create({
   countText:  { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: '#fff' },
   moreDot:    {
     width: 24, height: 24, borderRadius: 12,
-    backgroundColor: '#F5F1E8', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#F5F1E9', alignItems: 'center', justifyContent: 'center',
   },
-  moreText:   { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: '#9E8A6A' },
-  total:      { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#1A1A1A' },
+  moreText:   { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: '#6D6A63' },
+  total:      { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#1C1C1C' },
 });
 
 const styles = StyleSheet.create({
@@ -2674,10 +2804,10 @@ const styles = StyleSheet.create({
     width:           56,
     height:          56,
     borderRadius:    28,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#27AE60',
     alignItems:      'center',
     justifyContent:  'center',
-    shadowColor:     '#2E7D32',
+    shadowColor:     '#27AE60',
     shadowOffset:    { width: 0, height: 6 },
     shadowOpacity:   0.3,
     shadowRadius:    12,
@@ -3039,14 +3169,14 @@ const styles = StyleSheet.create({
     gap:             spacing[2],
     paddingVertical: spacing[3],
     borderWidth:     1,
-    borderColor:     '#8B5CF640',
+    borderColor:     '#27AE6040',
     borderRadius:    8,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: '#D1F7E3',
   },
   shareBtnText: {
     fontFamily: 'Montserrat_700Bold',
     fontSize: 12,
-    color: '#8B5CF6',
+    color: '#27AE60',
     letterSpacing: 0.4,
   },
   deleteBtn: {
@@ -3087,7 +3217,7 @@ const styles = StyleSheet.create({
   // Segmented control — Gastos / Análisis
   segControl: {
     flexDirection:   'row',
-    backgroundColor: '#F2F2F2',
+    backgroundColor: '#F5F1E9',
     borderRadius:    16,
     padding:         4,
     marginTop:       spacing[2],
@@ -3109,11 +3239,11 @@ const styles = StyleSheet.create({
   segBtnText: {
     fontFamily: 'Montserrat_500Medium',
     fontSize:   14,
-    color:      '#757575',
+    color:      '#6D6A63',
   },
   segBtnTextActive: {
     fontFamily: 'Montserrat_600SemiBold',
-    color:      '#212121',
+    color:      '#1C1C1C',
   },
   // Analysis scroll container
   analysisList: {
@@ -3139,6 +3269,18 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
     marginBottom:      -1,
   },
+  healthCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius:    16,
+    padding:         16,
+    borderWidth:     1,
+    borderColor:     '#F5F1E9',
+    shadowColor:     '#000',
+    shadowOffset:    { width: 0, height: 1 },
+    shadowOpacity:   0.05,
+    shadowRadius:    4,
+    elevation:       2,
+  },
   reportTabPillActive: {
     borderBottomColor: colors.primary,
   },
@@ -3156,12 +3298,12 @@ const styles = StyleSheet.create({
 const reportS = StyleSheet.create({
   precisionNotice: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: '#ECEFF1', borderRadius: 8,
+    backgroundColor: '#F5F1E9', borderRadius: 8,
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
     marginHorizontal: layout.screenPadding, marginBottom: spacing[2],
   },
   precisionText: {
-    fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#546E7A', flex: 1,
+    fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6D6A63', flex: 1,
   },
   heroCard: {
     backgroundColor: colors.bg.card,
@@ -3210,54 +3352,54 @@ const scModalS = StyleSheet.create({
   topRow:         { flexDirection: 'row', alignItems: 'center', paddingHorizontal: layout.screenPadding, paddingTop: spacing[3], paddingBottom: spacing[1] },
   closeBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
   titleBlock:     { paddingHorizontal: layout.screenPadding, paddingTop: spacing[3], paddingBottom: spacing[4], gap: spacing[2] },
-  titleLarge:     { fontFamily: 'Montserrat_800ExtraBold', fontSize: 30, color: '#111827', letterSpacing: -0.8 },
-  titleUnderline: { width: 40, height: 3, borderRadius: 2, backgroundColor: '#1F9D47', marginTop: -2 },
-  countBadge:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF3C7', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#FDE68A' },
+  titleLarge:     { fontFamily: 'Montserrat_800ExtraBold', fontSize: 30, color: '#1C1C1C', letterSpacing: -0.8 },
+  titleUnderline: { width: 40, height: 3, borderRadius: 2, backgroundColor: '#27AE60', marginTop: -2 },
+  countBadge:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#D1F7E3', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#A8D5C2' },
   countDot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: '#F59E0B' },
-  countText:      { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: '#92400E', letterSpacing: 0.4 },
-  descText:       { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#6B7280', lineHeight: 22 },
+  countText:      { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: '#1F8C4F', letterSpacing: 0.4 },
+  descText:       { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#6D6A63', lineHeight: 22 },
 
   // Section header (for manual unclassified, if both types exist)
   sectionHeader: { paddingTop: spacing[2] },
-  sectionTitle:  { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#111827' },
+  sectionTitle:  { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1C1C1C' },
 
   // Cards (manually-added unclassified expenses)
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#1F2937',
+    shadowColor: '#1C1C1C',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.07,
     shadowRadius: 16,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#EDEEF0',
+    borderColor: '#E8E2D9',
   },
   cardBody:     { padding: 14, gap: 10 },
   cardMain:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconCircle:   { width: 54, height: 54, borderRadius: 27, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
+  iconCircle:   { width: 54, height: 54, borderRadius: 27, backgroundColor: '#F5F1E9', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 },
   cardInfo:     { flex: 1, gap: 3 },
-  merchantName: { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#111827', letterSpacing: -0.2 },
-  dateLbl:      { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9CA3AF' },
+  merchantName: { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1C1C1C', letterSpacing: -0.2 },
+  dateLbl:      { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9B9790' },
   cardRight:    { alignItems: 'flex-end', gap: 3, flexShrink: 0 },
-  amount:       { fontFamily: 'Montserrat_800ExtraBold', fontSize: 16, color: '#111827', letterSpacing: -0.4 },
-  clasificarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#F0FDF4', borderWidth: 1.5, borderColor: '#22C55E', borderRadius: 12 },
-  clasificarText:{ fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1F9D47' },
+  amount:       { fontFamily: 'Montserrat_800ExtraBold', fontSize: 16, color: '#1C1C1C', letterSpacing: -0.4 },
+  clasificarRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#D1F7E3', borderWidth: 1.5, borderColor: '#27AE60', borderRadius: 12 },
+  clasificarText:{ fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#27AE60' },
 
   // Progress footer
-  progressCard:      { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18, shadowColor: '#1F9D47', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: '#D1FAE5', marginTop: spacing[2] },
-  progressIconCircle:{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  progressTitle:     { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#111827' },
-  progressSub:       { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6B7280', lineHeight: 17 },
-  progressCircle:    { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F0FDF4', borderWidth: 2, borderColor: '#BBF7D0', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  progressPct:       { fontFamily: 'Montserrat_800ExtraBold', fontSize: 13, color: '#1F9D47' },
+  progressCard:      { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 18, shadowColor: '#27AE60', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 2, borderWidth: 1, borderColor: '#D1FAE5', marginTop: spacing[2] },
+  progressIconCircle:{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#D1F7E3', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  progressTitle:     { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1C1C1C' },
+  progressSub:       { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63', lineHeight: 17 },
+  progressCircle:    { width: 48, height: 48, borderRadius: 24, backgroundColor: '#D1F7E3', borderWidth: 2, borderColor: '#A8D5C2', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  progressPct:       { fontFamily: 'Montserrat_800ExtraBold', fontSize: 13, color: '#27AE60' },
 
   // Empty state
   empty:          { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[3] },
-  emptyIconCircle:{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#1F9D47' + '14', alignItems: 'center', justifyContent: 'center' },
-  emptyTitle:     { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#111827' },
-  emptySub:       { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#9CA3AF', textAlign: 'center' },
+  emptyIconCircle:{ width: 72, height: 72, borderRadius: 36, backgroundColor: '#27AE60' + '14', alignItems: 'center', justifyContent: 'center' },
+  emptyTitle:     { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#1C1C1C' },
+  emptySub:       { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: '#9B9790', textAlign: 'center' },
 });
 
 // ─── Summary card styles ────────────────────────────────────────────────────────
@@ -3293,14 +3435,14 @@ const smS = StyleSheet.create({
   title: {
     fontFamily: 'Montserrat_600SemiBold',
     fontSize:   12,
-    color:      '#777777',
+    color:      '#9B9790',
     lineHeight: 16,
   },
   amount: {
     fontFamily: 'Montserrat_700Bold',
     fontSize:   28,
     lineHeight: 34,
-    color:      '#111111',
+    color:      '#1C1C1C',
   },
   varRow: {
     flexDirection: 'row',
@@ -3336,13 +3478,13 @@ const smS = StyleSheet.create({
     flex:       1,
     fontFamily: 'Montserrat_400Regular',
     fontSize:   12,
-    color:      '#444444',
+    color:      '#6D6A63',
     lineHeight: 16,
   },
   metricAmount: {
     fontFamily: 'Montserrat_600SemiBold',
     fontSize:   12,
-    color:      '#111111',
+    color:      '#1C1C1C',
     lineHeight: 16,
     minWidth:   60,
     textAlign:  'right',
@@ -3350,7 +3492,7 @@ const smS = StyleSheet.create({
   metricPct: {
     fontFamily: 'Montserrat_400Regular',
     fontSize:   11,
-    color:      '#999999',
+    color:      '#9B9790',
     lineHeight: 16,
     minWidth:   26,
     textAlign:  'right',
@@ -3378,7 +3520,7 @@ const clsModal = StyleSheet.create({
   aiBadgeText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#4F46E5' },
   aiSubtitle: {
     fontFamily: 'Montserrat_400Regular', fontSize: 13,
-    color: '#6B7280', lineHeight: 19,
+    color: '#6D6A63', lineHeight: 19,
   },
 
   // Expense card
@@ -3388,29 +3530,29 @@ const clsModal = StyleSheet.create({
     paddingVertical: 18, paddingHorizontal: 18,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07, shadowRadius: 14, elevation: 4,
-    borderWidth: 1, borderColor: '#F3F4F6',
+    borderWidth: 1, borderColor: '#F5F1E9',
   },
   expenseIconWrap: {
     width: 56, height: 56, borderRadius: 28,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAFAF7',
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
     flexShrink: 0,
   },
-  expenseName: { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: '#6366F1' },
-  expenseMeta: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#9CA3AF', lineHeight: 17 },
-  expenseAmount: { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#111827', flexShrink: 0 },
+  expenseName: { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: '#27AE60' },
+  expenseMeta: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#9B9790', lineHeight: 17 },
+  expenseAmount: { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: '#1C1C1C', flexShrink: 0 },
 
-  sectionTitle: { fontFamily: 'Montserrat_600SemiBold', fontSize: 15, color: '#111827' },
+  sectionTitle: { fontFamily: 'Montserrat_600SemiBold', fontSize: 15, color: '#1C1C1C' },
   descInput: {
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#FAFAF7',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E8E2D9',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontFamily: 'Montserrat_400Regular',
     fontSize: 14,
-    color: '#111827',
+    color: '#1C1C1C',
   },
 
   // Type buttons
@@ -3419,7 +3561,7 @@ const clsModal = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center', gap: 7,
     paddingVertical: 14, borderRadius: 14, borderWidth: 1.5,
   },
-  typeBtnInactive: { backgroundColor: '#FFFFFF', borderColor: '#E5E7EB' },
+  typeBtnInactive: { backgroundColor: '#FFFFFF', borderColor: '#E8E2D9' },
   typeBtnLabel: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12 },
 
   // Best match card
@@ -3427,27 +3569,27 @@ const clsModal = StyleSheet.create({
     backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
-    borderWidth: 1, borderColor: '#F3F4F6',
+    borderWidth: 1, borderColor: '#F5F1E9',
   },
   matchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 14, paddingHorizontal: 16,
   },
-  matchRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
-  matchRowActive: { backgroundColor: '#F0FDF4' },
-  matchRank: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#C4C9D4', width: 16 },
-  matchName: { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 14, color: '#374151' },
-  matchPct: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#22C55E' },
+  matchRowBorder: { borderBottomWidth: 1, borderBottomColor: '#FAFAF7' },
+  matchRowActive: { backgroundColor: '#D1F7E3' },
+  matchRank: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#9B9790', width: 16 },
+  matchName: { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 14, color: '#1C1C1C' },
+  matchPct: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#27AE60' },
 
   // Search
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#F3F4F6', borderRadius: 12,
+    backgroundColor: '#F5F1E9', borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 12,
   },
   searchInput: {
     flex: 1, fontFamily: 'Montserrat_400Regular',
-    fontSize: 14, color: '#111827', paddingVertical: 0,
+    fontSize: 14, color: '#1C1C1C', paddingVertical: 0,
   },
 
   // Category list
@@ -3455,32 +3597,32 @@ const clsModal = StyleSheet.create({
     backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden',
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
-    borderWidth: 1, borderColor: '#F3F4F6',
+    borderWidth: 1, borderColor: '#F5F1E9',
   },
   catRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingVertical: 13, paddingHorizontal: 16,
   },
-  catRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F9FAFB' },
-  catRowActive: { backgroundColor: '#F0FDF4' },
+  catRowBorder: { borderBottomWidth: 1, borderBottomColor: '#FAFAF7' },
+  catRowActive: { backgroundColor: '#D1F7E3' },
   catIconWrap: {
     width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0,
   },
-  catName: { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 14, color: '#374151' },
+  catName: { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 14, color: '#1C1C1C' },
 
   // Bottom bar
   bottomBar: {
     paddingHorizontal: 20, paddingBottom: 12, paddingTop: 12,
     gap: 8, backgroundColor: '#FFFFFF',
-    borderTopWidth: 1, borderTopColor: '#F3F4F6',
+    borderTopWidth: 1, borderTopColor: '#F5F1E9',
     shadowColor: '#000', shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.04, shadowRadius: 8, elevation: 4,
   },
   ctaBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#15803D', borderRadius: 16, paddingVertical: 17,
-    shadowColor: '#15803D', shadowOffset: { width: 0, height: 4 },
+    backgroundColor: '#27AE60', borderRadius: 16, paddingVertical: 17,
+    shadowColor: '#27AE60', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28, shadowRadius: 12, elevation: 5,
   },
   ctaBtnText: { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: '#FFFFFF', letterSpacing: 0.2 },

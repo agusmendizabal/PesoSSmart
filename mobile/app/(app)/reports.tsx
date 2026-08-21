@@ -61,7 +61,7 @@ function buildPdfHtml({
       <td style="padding:6px 12px;border-bottom:1px solid #222;text-align:right;">${fmt(r.amount)}</td>
       <td style="padding:6px 12px;border-bottom:1px solid #222;text-align:right;">${Math.round(r.pct * 100)}%</td>
     </tr>`).join('');
-  const scoreColor = healthScore >= 70 ? '#C6F135' : healthScore >= 50 ? '#FFD740' : '#FF5252';
+  const scoreColor = healthScore >= 70 ? '#27AE60' : healthScore >= 50 ? '#FFD740' : colors.red;
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -84,7 +84,7 @@ tr:last-child td { border-bottom:none; }
 .footer { margin-top:24px; text-align:center; font-size:11px; color:#444; }
 .footer span { color:#C6F135; }
 </style></head><body>
-<div class="header"><div class="logo">PesoSmart</div>
+<div class="header"><div class="logo">Nomi</div>
 <div class="meta"><strong>${userName}</strong>Informe de ${monthLabel}</div></div>
 <div class="section"><h2>Salud Financiera</h2>
 <div class="score">${healthScore}</div>
@@ -100,7 +100,7 @@ ${incomePct ? `<p style="margin-top:12px;font-size:12px;color:#888;">Representa 
 </div>
 <div class="section"><h2>Top categorías de gasto</h2>
 <table><tr><th>Categoría</th><th style="text-align:right">Monto</th><th style="text-align:right">% del total</th></tr>${catRows}</table></div>
-<div class="footer">Generado por la <span>Inteligencia Financiera de PesoSmart</span> · ${new Date().toLocaleDateString('es-AR')}</div>
+<div class="footer">Generado por la <span>Inteligencia Financiera de Nomi</span> · ${new Date().toLocaleDateString('es-AR')}</div>
 </body></html>`;
 }
 
@@ -332,7 +332,7 @@ function RatesCard({ rates, inflationRate }: { rates: Record<string, number>; in
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text variant="label" color={colors.text.tertiary}>TASAS DEL MOMENTO</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#FF5252' }} />
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.red }} />
           <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 10, color: colors.text.tertiary }}>
             Inflación {inflationRate.toFixed(1)}%
           </Text>
@@ -642,7 +642,7 @@ export default function ReportsScreen() {
     if (!isPro || isTrialActive()) {
       Alert.alert(
         '⚡ Función Pro',
-        'El reporte en PDF es exclusivo de PesoSmart Pro.',
+        'El reporte en PDF es exclusivo de Nomi Pro.',
         [{ text: 'Ahora no', style: 'cancel' }, { text: '⚡ Ver planes', onPress: () => router.push('/(app)/plans' as any) }],
       );
       return;
@@ -663,7 +663,7 @@ export default function ReportsScreen() {
       const { uri } = await Print.printToFileAsync({ html, base64: false });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Informe ${MONTH_NAMES[month - 1]} ${year} — PesoSmart`, UTI: 'com.adobe.pdf' });
+        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Informe ${MONTH_NAMES[month - 1]} ${year} — Nomi`, UTI: 'com.adobe.pdf' });
       } else {
         Alert.alert('PDF generado', 'Archivo creado pero tu dispositivo no soporta compartir.');
       }
@@ -719,8 +719,8 @@ export default function ReportsScreen() {
           </View>
           <TouchableOpacity style={s.exportBtn} onPress={handleExportPdf} disabled={exporting} activeOpacity={0.8}>
             {exporting
-              ? <ActivityIndicator size="small" color={colors.bg.primary} />
-              : <Ionicons name="download-outline" size={15} color={colors.bg.primary} />
+              ? <ActivityIndicator size="small" color={colors.white} />
+              : <Ionicons name="download-outline" size={15} color={colors.white} />
             }
             <Text style={s.exportBtnText}>PDF</Text>
           </TouchableOpacity>
@@ -833,9 +833,6 @@ export default function ReportsScreen() {
                       <Text variant="labelMd" color={ganó ? colors.neon : colors.red}>{ganó ? '+' : ''}{formatCurrency(Math.round(ganancia - perdidaInfl))}</Text>
                     </View>
                   </View>
-                  <TouchableOpacity style={s.patrimonioBtn} onPress={() => router.push('/(app)/simulator' as any)} activeOpacity={0.85}>
-                    <Text variant="label" color={colors.primary}>Ver simulador →</Text>
-                  </TouchableOpacity>
                 </Card>
               );
             })()}
@@ -854,7 +851,7 @@ export default function ReportsScreen() {
         iconColor={colors.primary}
         features={[
           { icon: 'pulse-outline', color: colors.neon, title: 'Salud financiera real', body: 'Tu puntaje se construye con 5 factores objetivos: control de gasto, prescindibles, clasificación, tendencia y margen de ahorro. No es un número arbitrario.' },
-          { icon: 'sparkles-outline', color: colors.primary, title: 'Análisis con IA', body: 'SmartPesos analiza tus datos y genera un resumen narrativo en lenguaje natural, adaptado a tu situación concreta y al contexto económico argentino.' },
+          { icon: 'sparkles-outline', color: colors.primary, title: 'Análisis con IA', body: 'Nomi analiza tus datos y genera un resumen narrativo en lenguaje natural, adaptado a tu situación concreta y al contexto económico argentino.' },
           { icon: 'trending-up-outline', color: colors.yellow, title: 'Insights con datos', body: 'Cada insight muestra qué detectó, por qué y con qué datos. Sin frases vagas ni juicios morales.' },
         ]}
         onDismiss={markVisited}

@@ -67,7 +67,7 @@ const profileDescriptions: Record<RiskProfile, { label: string; description: str
   conservative: {
     label: 'Conservador',
     description: 'Preferís cuidar tu plata antes que arriesgarla. Opciones como FCI money market o bonos CER van bien para vos.',
-    color: colors.info ?? '#82b1ff',
+    color: colors.info ?? '#27AE60',
     icon: 'shield-checkmark-outline',
   },
   moderate: {

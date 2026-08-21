@@ -15,17 +15,17 @@ import { formatCurrency } from '@/utils/format';
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
 const C = {
-  bg:       '#F6F7F9',
-  white:    '#FFFFFF',
-  purple:   '#7B61FF',
-  purpleLt: '#F5F0FF',
-  green:    '#2E7D32',
-  greenLt:  '#EEF7EF',
-  text:     '#212121',
-  text2:    '#757575',
-  muted:    '#9E9E9E',
-  border:   '#E0E0E0',
-  red:      '#EF4444',
+  bg:      '#FAFAF7',   // fondo general
+  surface: '#F5F1E9',   // superficies / cards elevadas
+  cream:   '#F2E8D5',   // crema secundario
+  white:   '#FFFFFF',
+  green:   '#27AE60',   // verde principal — CTAs, iconos, énfasis
+  accent:  '#D1F7E3',   // acento verde claro — badges, tints
+  black:   '#1C1C1C',   // texto principal
+  text2:   '#6D6A63',   // texto secundario
+  muted:   '#9B9790',   // texto muted
+  border:  '#E8E2D9',   // bordes crema
+  red:     '#EF4444',
 } as const;
 
 const sp = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28 } as const;
@@ -39,7 +39,6 @@ type MemberRole = 'Admin' | 'Miembro';
 interface Member {
   name:       string;
   initial:    string;
-  color:      string;
   monthTotal: number;
   isMe:       boolean;
 }
@@ -53,13 +52,11 @@ interface Group {
   myMonthTotal: number;
   hasActivity:  boolean;
   members:      Member[];
-  color:        string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const GROUP_COLORS  = ['#7C3AED', '#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#EC4899'];
-const AVATAR_COLORS = ['#4361ee', '#e63946', '#2d6a4f', '#f4a261', '#7209b7', '#3a86ff'];
+const AVATAR_COLORS = ['#27AE60', '#2ECC71', '#1E8449', '#229954', '#58D68D', '#1A7A3D'];
 
 function hashIdx(str: string, len: number): number {
   let h = 0;
@@ -136,103 +133,147 @@ async function fetchGroups(userId: string): Promise<Group[]> {
       const name = p?.full_name || (p?.email ? p.email.split('@')[0] : null) || 'Miembro';
       return {
         name, initial: name.charAt(0).toUpperCase(),
-        color: AVATAR_COLORS[hashIdx(m.user_id, AVATAR_COLORS.length)],
         monthTotal: totals[m.user_id] ?? 0,
         isMe: m.user_id === userId,
       };
     });
 
-    const totalMonth    = members.reduce((s, m) => s + m.monthTotal, 0);
-    const myMonthTotal  = members.find(m => m.isMe)?.monthTotal ?? 0;
-    const hasActivity   = groupMembers.some(m => (lastDate[m.user_id] ?? '') >= recentDate);
+    const totalMonth   = members.reduce((s, m) => s + m.monthTotal, 0);
+    const myMonthTotal = members.find(m => m.isMe)?.monthTotal ?? 0;
+    const hasActivity  = groupMembers.some(m => (lastDate[m.user_id] ?? '') >= recentDate);
 
     return {
       id: g.id, name: g.name,
       kind:         mapKind(g.group_type),
       myRole:       mapRole(myMembership?.role ?? 'child'),
       totalMonth, myMonthTotal, hasActivity, members,
-      color: GROUP_COLORS[hashIdx(g.id, GROUP_COLORS.length)],
     };
   });
 }
+
+// ─── AvatarStack ──────────────────────────────────────────────────────────────
+
+function AvatarStack({ members }: { members: Member[] }) {
+  const visible = members.slice(0, 4);
+  const extra   = members.length - 4;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      {visible.map((m, i) => (
+        <View
+          key={i}
+          style={[
+            av.circle,
+            { backgroundColor: AVATAR_COLORS[hashIdx(m.name, AVATAR_COLORS.length)], marginLeft: i === 0 ? 0 : -8 },
+            m.isMe && av.isMe,
+          ]}
+        >
+          <Text style={av.initial}>{m.initial}</Text>
+        </View>
+      ))}
+      {extra > 0 && (
+        <View style={[av.circle, av.extra, { marginLeft: -8 }]}>
+          <Text style={av.extraText}>+{extra}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const av = StyleSheet.create({
+  circle:    { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.white },
+  isMe:      { borderColor: C.cream },
+  initial:   { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: C.white },
+  extra:     { backgroundColor: C.muted },
+  extraText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 10, color: C.white },
+});
 
 // ─── GroupCard ────────────────────────────────────────────────────────────────
 
 function GroupCard({ group, onPress }: { group: Group; onPress: () => void }) {
   const isFriends = group.kind === 'amigos';
-  const accentColor = isFriends ? C.purple : C.green;
-  const bgColor     = isFriends ? C.purpleLt : C.greenLt;
 
   return (
     <TouchableOpacity style={s.groupCard} onPress={onPress} activeOpacity={0.88}>
-      <View style={s.gcHeader}>
-        <View style={[s.gcIcon, { backgroundColor: bgColor }]}>
-          <Ionicons name={isFriends ? 'people' : 'home'} size={22} color={accentColor} />
-        </View>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={s.gcName} numberOfLines={1}>{group.name}</Text>
-          <Text style={s.gcMeta}>
-            {group.members.length} miembro{group.members.length !== 1 ? 's' : ''} · {isFriends ? 'Grupo de amigos' : 'Grupo familiar'}
-          </Text>
-        </View>
-        <Ionicons name="chevron-forward" size={18} color={C.muted} />
-      </View>
 
-      <View style={s.gcDivider} />
+      {/* Accent bar izquierda */}
+      <View style={s.gcBar} />
 
-      <View style={s.gcFooter}>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={s.gcAmtLabel}>Total del mes</Text>
-          <Text style={[s.gcAmt, { color: accentColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatCurrency(group.totalMonth)}</Text>
+      <View style={s.gcInner}>
+        {/* Header */}
+        <View style={s.gcHeader}>
+          <View style={s.gcIconWrap}>
+            <Ionicons name={isFriends ? 'people' : 'home-outline'} size={20} color={C.green} />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={s.gcName} numberOfLines={1}>{group.name}</Text>
+            <Text style={s.gcMeta}>
+              {isFriends ? 'Amigos' : 'Familia'} · {group.myRole}
+            </Text>
+          </View>
+          {group.hasActivity && <View style={s.activityDot} />}
+          <Ionicons name="chevron-forward" size={16} color={C.muted} />
         </View>
-        <View style={{ flex: 1, alignItems: 'flex-end' }}>
-          <Text style={s.gcAmtLabel}>Mi parte</Text>
-          <Text style={s.gcAmt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{formatCurrency(group.myMonthTotal)}</Text>
+
+        {/* Divider */}
+        <View style={s.gcDivider} />
+
+        {/* Footer */}
+        <View style={s.gcFooter}>
+          <AvatarStack members={group.members} />
+          <View style={s.gcAmounts}>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={s.gcAmtLabel}>Grupo este mes</Text>
+              <Text style={s.gcAmt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                {formatCurrency(group.totalMonth)}
+              </Text>
+            </View>
+            <View style={s.gcDividerV} />
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={s.gcAmtLabel}>Mi parte</Text>
+              <Text style={[s.gcAmt, { color: C.green }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                {formatCurrency(group.myMonthTotal)}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
   );
 }
 
-// ─── Modal Crear: tipo selector (paso 0) ─────────────────────────────────────
+// ─── Modal Crear: tipo selector ───────────────────────────────────────────────
 
-function TypeSelectorStep({
-  onCreate,
-}: {
-  onCreate: (kind: CreateKind) => void;
-}) {
+function TypeSelectorStep({ onCreate }: { onCreate: (kind: CreateKind) => void }) {
   return (
     <View style={ts.wrap}>
-      <Text style={ts.title}>Crear grupo</Text>
-      <Text style={ts.subtitle}>Elegí el tipo de grupo que querés crear</Text>
+      <Text style={ts.title}>¿Qué tipo de grupo?</Text>
+      <Text style={ts.subtitle}>Elegí cómo querés organizar los gastos</Text>
 
-      {/* Card Familia */}
-      <TouchableOpacity style={[ts.card, { backgroundColor: C.greenLt }]} onPress={() => onCreate('familiar')} activeOpacity={0.88}>
-        <View style={[ts.cardIcon, { backgroundColor: '#ffffff80' }]}>
-          <Ionicons name="home" size={32} color={C.green} />
+      <TouchableOpacity style={ts.cardDark} onPress={() => onCreate('familiar')} activeOpacity={0.88}>
+        <View style={ts.cardIconDark}>
+          <Ionicons name="home-outline" size={28} color={C.white} />
         </View>
-        <Text style={[ts.cardTitle, { color: C.green }]}>Familia</Text>
-        <Text style={ts.cardDesc}>
-          El admin puede ver los gastos de los miembros. Los miembros ven solo su información.
+        <Text style={ts.cardTitleDark}>Familia</Text>
+        <Text style={ts.cardDescDark}>
+          El admin ve los gastos de todos. Los miembros solo ven los propios.
         </Text>
-        <View style={[ts.badge, { backgroundColor: C.green + '18' }]}>
-          <Ionicons name="refresh-outline" size={12} color={C.green} />
-          <Text style={[ts.badgeText, { color: C.green }]}>Gastos automáticos</Text>
+        <View style={ts.badgeDark}>
+          <Ionicons name="refresh-outline" size={11} color={C.green} />
+          <Text style={ts.badgeDarkText}>Gastos automáticos</Text>
         </View>
       </TouchableOpacity>
 
-      {/* Card Amigos */}
-      <TouchableOpacity style={[ts.card, { backgroundColor: C.purpleLt }]} onPress={() => onCreate('amigos')} activeOpacity={0.88}>
-        <View style={[ts.cardIcon, { backgroundColor: '#ffffff80' }]}>
-          <Ionicons name="people" size={32} color={C.purple} />
+      <TouchableOpacity style={ts.cardMint} onPress={() => onCreate('amigos')} activeOpacity={0.88}>
+        <View style={ts.cardIconMint}>
+          <Ionicons name="people-outline" size={28} color={C.green} />
         </View>
-        <Text style={[ts.cardTitle, { color: C.purple }]}>Amigos</Text>
-        <Text style={ts.cardDesc}>
-          Todos son miembros. Solo se suben los gastos que vos elegís compartir.
+        <Text style={ts.cardTitleMint}>Amigos</Text>
+        <Text style={ts.cardDescMint}>
+          Todos ven los gastos compartidos. Vos elegís qué subir al grupo.
         </Text>
-        <View style={[ts.badge, { backgroundColor: C.purple + '18' }]}>
-          <Ionicons name="hand-left-outline" size={12} color={C.purple} />
-          <Text style={[ts.badgeText, { color: C.purple }]}>Gastos manuales</Text>
+        <View style={ts.badgeMint}>
+          <Ionicons name="hand-left-outline" size={11} color={C.green} />
+          <Text style={ts.badgeMintText}>Gastos manuales</Text>
         </View>
       </TouchableOpacity>
     </View>
@@ -240,59 +281,72 @@ function TypeSelectorStep({
 }
 
 const ts = StyleSheet.create({
-  wrap:      { flex: 1, paddingHorizontal: sp.xl, paddingTop: sp.xxl, gap: sp.xl },
-  title:     { fontFamily: 'Montserrat_800ExtraBold', fontSize: 28, color: C.text, letterSpacing: -0.5 },
-  subtitle:  { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.muted, lineHeight: 20, marginTop: -sp.sm },
-  card: {
-    borderRadius: 22, padding: sp.xl, gap: sp.md,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08, shadowRadius: 16, elevation: 4,
+  wrap:     { flex: 1, paddingHorizontal: sp.xl, paddingTop: sp.xxl, gap: sp.lg },
+  title:    { fontFamily: 'Montserrat_800ExtraBold', fontSize: 26, color: C.black, letterSpacing: -0.5 },
+  subtitle: { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.muted, lineHeight: 20, marginTop: -sp.sm },
+
+  cardDark: {
+    backgroundColor: C.green, borderRadius: 20, padding: sp.xl, gap: sp.md,
+    shadowColor: C.green, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25, shadowRadius: 16, elevation: 6,
   },
-  cardIcon: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
-  cardTitle: { fontFamily: 'Montserrat_800ExtraBold', fontSize: 22, letterSpacing: -0.3 },
-  cardDesc:  { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.text2, lineHeight: 21 },
-  badge: {
+  cardIconDark: {
+    width: 56, height: 56, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start',
+  },
+  cardTitleDark:  { fontFamily: 'Montserrat_800ExtraBold', fontSize: 22, color: C.white, letterSpacing: -0.3 },
+  cardDescDark:   { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: 'rgba(255,255,255,0.78)', lineHeight: 21 },
+  badgeDark: {
     flexDirection: 'row', alignItems: 'center', gap: sp.xs,
-    borderRadius: 20, paddingHorizontal: sp.md, paddingVertical: sp.xs,
-    alignSelf: 'flex-start',
+    backgroundColor: C.cream, borderRadius: 20,
+    paddingHorizontal: sp.md, paddingVertical: 5, alignSelf: 'flex-start',
   },
-  badgeText: { fontFamily: 'Montserrat_700Bold', fontSize: 12 },
+  badgeDarkText: { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: C.green },
+
+  cardMint: {
+    backgroundColor: C.surface, borderRadius: 20, padding: sp.xl, gap: sp.md,
+    borderWidth: 1.5, borderColor: C.border,
+  },
+  cardIconMint: {
+    width: 56, height: 56, borderRadius: 16,
+    backgroundColor: C.cream,
+    alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start',
+  },
+  cardTitleMint:  { fontFamily: 'Montserrat_800ExtraBold', fontSize: 22, color: C.black, letterSpacing: -0.3 },
+  cardDescMint:   { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.text2, lineHeight: 21 },
+  badgeMint: {
+    flexDirection: 'row', alignItems: 'center', gap: sp.xs,
+    backgroundColor: C.cream, borderRadius: 20,
+    paddingHorizontal: sp.md, paddingVertical: 5, alignSelf: 'flex-start',
+  },
+  badgeMintText: { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: C.green },
 });
 
-// ─── Modal Crear: nombre (paso 1) ─────────────────────────────────────────────
+// ─── Modal Crear: nombre ──────────────────────────────────────────────────────
 
 function NameInputStep({
-  kind,
-  groupName,
-  setGroupName,
-  loading,
-  onCreate,
-  onBack,
+  kind, groupName, setGroupName, loading, onCreate, onBack,
 }: {
-  kind:         CreateKind;
-  groupName:    string;
-  setGroupName: (v: string) => void;
-  loading:      boolean;
-  onCreate:     () => void;
-  onBack:       () => void;
+  kind: CreateKind; groupName: string; setGroupName: (v: string) => void;
+  loading: boolean; onCreate: () => void; onBack: () => void;
 }) {
-  const accentColor = kind === 'amigos' ? C.purple : C.green;
   const placeholder = kind === 'amigos' ? 'Ej: Viaje a Bariloche' : 'Ej: Familia García';
 
   return (
     <View style={ni.wrap}>
       <TouchableOpacity onPress={onBack} style={ni.backRow} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Ionicons name="arrow-back" size={18} color={C.text2} />
+        <Ionicons name="arrow-back" size={18} color={C.muted} />
         <Text style={ni.backText}>Elegir tipo</Text>
       </TouchableOpacity>
 
       <View style={ni.titleRow}>
-        <View style={[ni.iconBox, { backgroundColor: kind === 'amigos' ? C.purpleLt : C.greenLt }]}>
-          <Ionicons name={kind === 'amigos' ? 'people' : 'home'} size={24} color={accentColor} />
+        <View style={ni.iconBox}>
+          <Ionicons name={kind === 'amigos' ? 'people-outline' : 'home-outline'} size={22} color={C.green} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={ni.title}>{kind === 'amigos' ? 'Grupo de amigos' : 'Grupo familiar'}</Text>
-          <Text style={ni.subtitle}>Dale un nombre a tu grupo</Text>
+          <Text style={ni.subtitle}>Dale un nombre</Text>
         </View>
       </View>
 
@@ -310,15 +364,14 @@ function NameInputStep({
       />
 
       <TouchableOpacity
-        style={[ni.btn, { backgroundColor: accentColor }, (!groupName.trim() || loading) && ni.btnOff]}
+        style={[ni.btn, (!groupName.trim() || loading) && ni.btnOff]}
         onPress={onCreate}
         disabled={!groupName.trim() || loading}
         activeOpacity={0.85}
       >
         {loading
           ? <ActivityIndicator color={C.white} size="small" />
-          : <Text style={ni.btnText}>Crear grupo</Text>
-        }
+          : <Text style={ni.btnText}>Crear grupo</Text>}
       </TouchableOpacity>
     </View>
   );
@@ -327,24 +380,23 @@ function NameInputStep({
 const ni = StyleSheet.create({
   wrap:     { flex: 1, paddingHorizontal: sp.xl, paddingTop: sp.xl, gap: sp.lg },
   backRow:  { flexDirection: 'row', alignItems: 'center', gap: sp.sm, alignSelf: 'flex-start' },
-  backText: { fontFamily: 'Montserrat_500Medium', fontSize: 14, color: C.text2 },
+  backText: { fontFamily: 'Montserrat_500Medium', fontSize: 14, color: C.muted },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp.md, marginTop: sp.sm },
-  iconBox:  { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  title:    { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: C.text, letterSpacing: -0.2 },
+  iconBox:  { width: 52, height: 52, borderRadius: 16, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', flexShrink: 0, borderWidth: 1.5, borderColor: C.cream },
+  title:    { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: C.black, letterSpacing: -0.2 },
   subtitle: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.muted },
   label:    { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: C.muted, letterSpacing: 0.8 },
   input: {
-    fontFamily: 'Montserrat_500Medium', fontSize: 16, color: C.text,
+    fontFamily: 'Montserrat_500Medium', fontSize: 16, color: C.black,
     borderWidth: 1.5, borderColor: C.border, borderRadius: 14,
-    paddingHorizontal: sp.lg, paddingVertical: sp.md, backgroundColor: C.bg,
+    paddingHorizontal: sp.lg, paddingVertical: sp.md, backgroundColor: C.white,
   },
   btn: {
-    borderRadius: 14, paddingVertical: sp.md + 2,
-    alignItems: 'center', justifyContent: 'center',
-    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
-    shadowColor: C.purple,
+    backgroundColor: C.green, borderRadius: 14,
+    paddingVertical: sp.md + 2, alignItems: 'center', justifyContent: 'center',
+    shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
   },
-  btnOff:  { opacity: 0.4 },
+  btnOff:  { opacity: 0.45 },
   btnText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: C.white },
 });
 
@@ -402,10 +454,7 @@ export default function FamilyScreen() {
       const { error } = await db
         .from('family_members').insert({ group_id: group.id, user_id: user.id, role: 'member' });
       if (error?.code === '23505') { setJoinError('Ya sos miembro de ese grupo.'); return; }
-      if (error) {
-        setJoinError(`No pudimos unirte al grupo. ${error.message ?? 'Revisá el código.'}`);
-        return;
-      }
+      if (error) { setJoinError(`No pudimos unirte al grupo. ${error.message ?? 'Revisá el código.'}`); return; }
       setShowJoin(false);
       setJoinCode('');
       await loadGroups();
@@ -424,41 +473,34 @@ export default function FamilyScreen() {
       const code   = generateCode();
       const db     = supabase as any;
       const dbType = createKind === 'amigos' ? 'friends' : 'family';
-
       const { data, error } = await db.rpc('create_group_with_admin', {
-        p_name:        groupName.trim(),
-        p_group_type:  dbType,
-        p_invite_code: code,
+        p_name: groupName.trim(), p_group_type: dbType, p_invite_code: code,
       });
-
-      if (error) {
-        console.error('[handleCreate] rpc error', {
-          code: error.code, message: error.message,
-          details: error.details, hint: error.hint,
-          p_name: groupName.trim(), p_group_type: dbType, userId: user.id,
-        });
-        throw error;
-      }
-
+      if (error) throw error;
       setShowCreate(false);
       setGroupName('');
       await loadGroups();
       Alert.alert('Grupo creado 🎉', `Tu código de invitación: ${code}\n\nCompartilo para que otros se unan.`);
-    } catch (err: any) {
+    } catch {
       Alert.alert('No pudimos crear el grupo', 'Intentá nuevamente.');
     } finally {
       setCreatingLoad(false);
     }
   };
 
+  const hasGroups = groups.length > 0;
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
 
       {/* Header */}
       <View style={s.header}>
-        <Text style={s.headerTitle}>Grupos</Text>
+        <View>
+          <Text style={s.headerLabel}>NOMI</Text>
+          <Text style={s.headerTitle}>Grupos</Text>
+        </View>
         <TouchableOpacity style={s.addBtn} onPress={openCreate} activeOpacity={0.85}>
-          <Ionicons name="add" size={24} color={C.white} />
+          <Ionicons name="add" size={22} color={C.white} />
         </TouchableOpacity>
       </View>
 
@@ -469,60 +511,72 @@ export default function FamilyScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); loadGroups(); }}
-            tintColor={C.purple}
+            tintColor={C.green}
           />
         }
       >
-        {/* Promo card */}
-        {groups.length === 0 && !loading && (
-          <View style={s.promoCard}>
-            <View style={s.promoIconWrap}>
-              <Ionicons name="people" size={28} color={C.green} />
+        {/* Estado vacío */}
+        {!loading && !hasGroups && (
+          <View style={s.emptyWrap}>
+            <View style={s.emptyIconCircle}>
+              <Ionicons name="people-outline" size={36} color={C.green} />
             </View>
-            <Text style={s.promoTitle}>Organizá tus gastos en grupo</Text>
-            <Text style={s.promoSub}>
-              Creá un grupo para compartir gastos, ver resúmenes y mantener todo claro.
+            <Text style={s.emptyTitle}>Sin grupos todavía</Text>
+            <Text style={s.emptySub}>
+              Organizá gastos compartidos con tu familia o amigos. Cada uno registra los propios y todos ven el resumen.
             </Text>
-            <TouchableOpacity style={s.promoBtn} onPress={openCreate} activeOpacity={0.85}>
-              <Text style={s.promoBtnText}>Crear grupo</Text>
+            <TouchableOpacity style={s.emptyBtnPrimary} onPress={openCreate} activeOpacity={0.85}>
+              <Ionicons name="add" size={18} color={C.white} />
+              <Text style={s.emptyBtnPrimaryText}>Crear grupo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.emptyBtnSecondary}
+              onPress={() => { setJoinCode(''); setJoinError(null); setShowJoin(true); }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="enter-outline" size={18} color={C.green} />
+              <Text style={s.emptyBtnSecondaryText}>Unirme con código</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Mis grupos */}
-        {(loading || groups.length > 0) && (
-          <Text style={s.sectionLabel}>Mis grupos</Text>
+        {/* Loading */}
+        {loading && (
+          <ActivityIndicator color={C.green} style={{ marginVertical: 40 }} />
         )}
 
-        {loading ? (
-          <ActivityIndicator color={C.purple} style={{ marginVertical: 20 }} />
-        ) : (
-          groups.map(g => (
-            <GroupCard
-              key={g.id}
-              group={g}
-              onPress={() =>
-                router.push({ pathname: '/(app)/group-detail', params: { id: g.id } } as any)
-              }
-            />
-          ))
+        {/* Lista de grupos */}
+        {hasGroups && (
+          <>
+            <Text style={s.sectionLabel}>MIS GRUPOS</Text>
+            {groups.map(g => (
+              <GroupCard
+                key={g.id}
+                group={g}
+                onPress={() => router.push({ pathname: '/(app)/group-detail', params: { id: g.id } } as any)}
+              />
+            ))}
+
+            {/* Acciones secundarias */}
+            <View style={s.actionsRow}>
+              <TouchableOpacity
+                style={s.actionBtn}
+                onPress={() => { setJoinCode(''); setJoinError(null); setShowJoin(true); }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="enter-outline" size={16} color={C.green} />
+                <Text style={s.actionBtnText}>Unirme con código</Text>
+              </TouchableOpacity>
+
+              <View style={s.actionDividerV} />
+
+              <TouchableOpacity style={s.actionBtn} onPress={openCreate} activeOpacity={0.8}>
+                <Ionicons name="add-circle-outline" size={16} color={C.green} />
+                <Text style={s.actionBtnText}>Nuevo grupo</Text>
+              </TouchableOpacity>
+            </View>
+          </>
         )}
-
-        {/* Botones secundarios */}
-        <TouchableOpacity
-          style={s.joinDashed}
-          onPress={() => { setJoinCode(''); setJoinError(null); setShowJoin(true); }}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="enter-outline" size={18} color={C.purple} />
-          <Text style={s.joinDashedText}>Unirme con código</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={s.createDashed} onPress={openCreate} activeOpacity={0.8}>
-          <Ionicons name="add" size={20} color={C.muted} />
-          <Text style={s.createDashedText}>Crear nuevo grupo</Text>
-        </TouchableOpacity>
-
       </ScrollView>
 
       {/* MODAL: Unirme ──────────────────────────────────────────────────────── */}
@@ -542,7 +596,7 @@ export default function FamilyScreen() {
               key={i}
               style={[
                 s.codeBox,
-                joinCode.length > i && { borderColor: C.purple, backgroundColor: C.purpleLt },
+                joinCode.length > i && { borderColor: C.green, backgroundColor: C.accent },
               ]}
             >
               <Text style={s.codeChar}>{joinCode[i] ?? ''}</Text>
@@ -572,7 +626,7 @@ export default function FamilyScreen() {
 
         <FormSheetButton
           label="Confirmar"
-          color={C.purple}
+          color={C.green}
           loading={joiningLoad}
           disabled={joinCode.length < 6}
           onPress={handleJoin}
@@ -582,7 +636,7 @@ export default function FamilyScreen() {
       {/* MODAL: Crear ───────────────────────────────────────────────────────── */}
       <FormSheetModal
         visible={showCreate}
-        title={createStep === 0 ? 'Elegir tipo' : 'Nombre del grupo'}
+        title={createStep === 0 ? '' : 'Nombre del grupo'}
         onClose={() => setShowCreate(false)}
         presentationStyle="pageSheet"
         scrollable={false}
@@ -614,76 +668,100 @@ export default function FamilyScreen() {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
+  // Header
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: sp.xl, paddingTop: sp.xl, paddingBottom: sp.lg,
+    paddingHorizontal: sp.xl, paddingTop: sp.lg, paddingBottom: sp.lg,
   },
-  headerTitle: { fontFamily: 'Montserrat_800ExtraBold', fontSize: 34, color: C.text, letterSpacing: -0.5, lineHeight: 42 },
+  headerLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: C.green, letterSpacing: 1.5 },
+  headerTitle: { fontFamily: 'Montserrat_800ExtraBold', fontSize: 32, color: C.black, letterSpacing: -0.5, lineHeight: 38 },
   addBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: C.green,
+    width: 42, height: 42, borderRadius: 21, backgroundColor: C.green,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 8, elevation: 4,
   },
 
-  scroll: { paddingHorizontal: sp.xl, paddingBottom: 130, paddingTop: sp.sm, gap: sp.lg, flexGrow: 1 },
+  scroll: { paddingHorizontal: sp.xl, paddingBottom: 120, paddingTop: sp.sm, gap: sp.md, flexGrow: 1 },
 
-  promoCard: { backgroundColor: C.greenLt, borderRadius: 20, padding: sp.xl, gap: sp.md },
-  promoIconWrap: {
-    width: 56, height: 56, borderRadius: 20, backgroundColor: '#ffffff70',
-    alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start',
-  },
-  promoTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: C.text },
-  promoSub:   { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.text2, lineHeight: 20 },
-  promoBtn: {
-    backgroundColor: C.green, borderRadius: 999,
-    paddingVertical: 14, paddingHorizontal: sp.xxl,
-    alignItems: 'center', alignSelf: 'flex-start',
-  },
-  promoBtnText: { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.white },
+  // Sección
+  sectionLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: C.muted, letterSpacing: 1.2, marginBottom: sp.xs },
 
-  sectionLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: C.text, marginTop: sp.sm },
-
-  // Group card
+  // Group Card
   groupCard: {
-    backgroundColor: C.white, borderRadius: 20, padding: sp.xl, gap: sp.md,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
+    backgroundColor: C.surface, borderRadius: 20, overflow: 'hidden',
+    flexDirection: 'row',
+    shadowColor: '#27AE60', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 10, elevation: 2,
   },
+  gcBar:    { width: 4, backgroundColor: C.green },
+  gcInner:  { flex: 1, padding: sp.lg, gap: sp.md },
   gcHeader: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
-  gcIcon:   { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  gcName:   { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: C.text, letterSpacing: -0.2 },
-  gcMeta:   { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.muted },
-  gcDivider:{ height: 1, backgroundColor: C.border },
-  gcFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  gcAmtLabel:{ fontFamily: 'Montserrat_400Regular', fontSize: 11, color: C.muted },
-  gcAmt:     { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: C.text, letterSpacing: -0.4, marginTop: 2 },
-
-  // Dashed
-  joinDashed: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.sm,
-    borderRadius: 18, borderWidth: 1.5, borderColor: C.purple + '60', borderStyle: 'dashed',
-    padding: sp.lg, backgroundColor: C.purpleLt + '80',
+  gcIconWrap: {
+    width: 44, height: 44, borderRadius: 13,
+    backgroundColor: C.cream, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: C.border, flexShrink: 0,
   },
-  joinDashedText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: C.purple },
-  createDashed: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.sm,
-    borderRadius: 18, borderWidth: 1.5, borderColor: C.border, borderStyle: 'dashed',
-    padding: sp.lg, backgroundColor: C.white,
+  gcName:    { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: C.black, letterSpacing: -0.2 },
+  gcMeta:    { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.muted },
+  gcDivider: { height: 1, backgroundColor: C.border },
+  gcFooter:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  gcAmounts: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
+  gcDividerV:{ width: 1, height: 32, backgroundColor: C.border },
+  gcAmtLabel:{ fontFamily: 'Montserrat_400Regular', fontSize: 10, color: C.muted },
+  gcAmt:     { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: C.black, letterSpacing: -0.3, marginTop: 1 },
+  activityDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.green },
+
+  // Acciones secundarias (cuando hay grupos)
+  actionsRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.surface, borderRadius: 16,
+    borderWidth: 1, borderColor: C.border,
+    overflow: 'hidden', marginTop: sp.sm,
   },
-  createDashedText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 15, color: C.muted },
+  actionBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: sp.sm, paddingVertical: sp.lg,
+  },
+  actionBtnText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: C.green },
+  actionDividerV: { width: 1, height: 36, backgroundColor: C.border },
 
-  // Modal
-  modalSub:   { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.text2, lineHeight: 20 },
+  // Estado vacío
+  emptyWrap: { flex: 1, alignItems: 'center', paddingTop: 48, gap: sp.lg },
+  emptyIconCircle: {
+    width: 88, height: 88, borderRadius: 44,
+    backgroundColor: C.cream, borderWidth: 2, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center', marginBottom: sp.sm,
+  },
+  emptyTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 20, color: C.black, letterSpacing: -0.3 },
+  emptySub:   {
+    fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.muted,
+    lineHeight: 22, textAlign: 'center', paddingHorizontal: sp.xl, marginTop: -sp.sm,
+  },
+  emptyBtnPrimary: {
+    flexDirection: 'row', alignItems: 'center', gap: sp.sm,
+    backgroundColor: C.green, borderRadius: 14,
+    paddingVertical: 14, paddingHorizontal: sp.xxl,
+    shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
+  },
+  emptyBtnPrimaryText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: C.white },
+  emptyBtnSecondary: {
+    flexDirection: 'row', alignItems: 'center', gap: sp.sm,
+    borderWidth: 1.5, borderColor: C.border, borderRadius: 14,
+    paddingVertical: 13, paddingHorizontal: sp.xxl,
+    backgroundColor: C.surface,
+  },
+  emptyBtnSecondaryText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 15, color: C.green },
 
-  codeBoxRow: { flexDirection: 'row', gap: sp.sm, justifyContent: 'center' },
+  // Modal join
+  modalSub: { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.text2, lineHeight: 20, marginBottom: sp.sm },
+  codeBoxRow: { flexDirection: 'row', gap: sp.sm, justifyContent: 'center', marginVertical: sp.md },
   codeBox: {
     width: 46, height: 56, borderRadius: 12,
     borderWidth: 1.5, borderColor: C.border, backgroundColor: C.bg,
     alignItems: 'center', justifyContent: 'center',
   },
-  codeChar:    { fontFamily: 'Montserrat_700Bold', fontSize: 22, color: C.text },
+  codeChar:    { fontFamily: 'Montserrat_700Bold', fontSize: 22, color: C.black },
   hiddenInput: { position: 'absolute', opacity: 0, height: 0, width: 0 },
-
   errorBox: {
     flexDirection: 'row', alignItems: 'center', gap: sp.sm,
     backgroundColor: '#ef44441a', borderRadius: 10,

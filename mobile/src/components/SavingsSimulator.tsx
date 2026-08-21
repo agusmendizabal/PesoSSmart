@@ -256,7 +256,7 @@ export function SavingsSimulator({
                        : primary.id === 'fci_cer'     ? 'Cubre inflación'
                        : primary.id === 'cedear_spy'  ? 'Exposición en USD'
                        : 'Alta volatilidad';
-  const primaryColor   = primary.id === 'fci_mm'     ? '#82b1ff'
+  const primaryColor   = primary.id === 'fci_mm'     ? '#27AE60'
                        : primary.id === 'fci_cer'     ? '#a5d6a7'
                        : primary.id === 'cedear_spy'  ? '#ffb300'
                        : '#f0b429';
@@ -267,7 +267,7 @@ export function SavingsSimulator({
     : 'Alta volatilidad'
     : '';
   const secondaryColor = secondary
-    ? secondary.id === 'fci_mm'    ? '#82b1ff'
+    ? secondary.id === 'fci_mm'    ? '#27AE60'
     : secondary.id === 'fci_cer'   ? '#a5d6a7'
     : secondary.id === 'cedear_spy'? '#ffb300'
     : '#f0b429'

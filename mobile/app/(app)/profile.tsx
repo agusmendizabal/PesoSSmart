@@ -28,7 +28,7 @@ import { PLANS } from '@/lib/plans';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BIOMETRIC_KEY = '@smartpesos/biometric_enabled';
+const BIOMETRIC_KEY = '@nomi/biometric_enabled';
 
 const editSchema = z.object({
   full_name: z.string().min(1, 'Ingresá tu nombre.').max(80),
@@ -183,7 +183,7 @@ export default function ProfileScreen() {
                       await supabase.auth.signOut();
                       router.replace('/(auth)/login');
                     } catch (err) {
-                      Alert.alert('Error', 'No se pudo eliminar la cuenta. Contactá a soporte@smartpesos.app');
+                      Alert.alert('Error', 'No se pudo eliminar la cuenta. Contactá a soporte@nomi.app');
                     }
                   },
                 },
@@ -219,7 +219,7 @@ export default function ProfileScreen() {
       }
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 
-      // URL de retorno adaptada al entorno (exp:// en dev, pesossmart:// en producción)
+      // URL de retorno adaptada al entorno (exp:// en dev, nomi:// en producción)
       const redirectUrl = ExpoLinking.createURL('mp-connected');
 
       const res = await fetch(
@@ -473,9 +473,9 @@ export default function ProfileScreen() {
             <View style={styles.menuDivider} />
             <MenuItem icon="help-circle-outline" label="Centro de ayuda" description="Repasá cómo funciona cada pantalla" onPress={() => router.push('/(app)/help')} />
             <View style={styles.menuDivider} />
-            <MenuItem icon="mail-outline" label="Contactar soporte" onPress={() => Alert.alert('Soporte', 'Escribinos a soporte@smartpesos.app')} />
+            <MenuItem icon="mail-outline" label="Contactar soporte" onPress={() => Alert.alert('Soporte', 'Escribinos a soporte@nomi.app')} />
             <View style={styles.menuDivider} />
-            <MenuItem icon="information-circle-outline" label="Sobre SmartPesos" onPress={() => Alert.alert('SmartPesos', 'v1.0 — Tu asistente financiero argentino.')} />
+            <MenuItem icon="information-circle-outline" label="Sobre Nomi" onPress={() => Alert.alert('Nomi', 'v1.0 — Tu asistente financiero argentino.')} />
           </Card>
         </View>
 
@@ -485,7 +485,7 @@ export default function ProfileScreen() {
             <Text variant="label" color={colors.text.tertiary} style={styles.sectionTitle}>GMAIL</Text>
             <Card style={styles.menuCard}>
               <TouchableOpacity style={styles.menuItem} onPress={disconnectGmail}>
-                <View style={[styles.menuIcon, { width: 36, height: 36, borderRadius: 18, backgroundColor: '#E8F5E9', alignItems: 'center', justifyContent: 'center' }]}>
+                <View style={[styles.menuIcon, { width: 36, height: 36, borderRadius: 18, backgroundColor: '#D1F7E3', alignItems: 'center', justifyContent: 'center' }]}>
                   <Ionicons name="mail-outline" size={20} color={colors.primary} />
                 </View>
                 <View style={styles.menuText}>
@@ -519,19 +519,19 @@ export default function ProfileScreen() {
                 {/* Estado de conexión */}
                 <TouchableOpacity style={styles.menuItem} onPress={disconnectMp}>
                   <View style={[styles.menuIcon, { width: 36, height: 36, borderRadius: 18,
-                    backgroundColor: mpSyncStatus === 'token_expired' ? '#FFF3E0' : '#E3F2FD',
+                    backgroundColor: mpSyncStatus === 'token_expired' ? '#FFFBEB' : '#D1F7E3',
                     alignItems: 'center', justifyContent: 'center' }]}>
                     <Ionicons
                       name={mpSyncStatus === 'token_expired' ? 'warning-outline' : 'wallet-outline'}
                       size={20}
-                      color={mpSyncStatus === 'token_expired' ? '#E65100' : '#1565C0'}
+                      color={mpSyncStatus === 'token_expired' ? '#F59E0B' : '#27AE60'}
                     />
                   </View>
                   <View style={styles.menuText}>
                     <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }}>
                       {mpSyncStatus === 'token_expired' ? 'Reconectar Mercado Pago' : 'Mercado Pago conectado'}
                     </Text>
-                    <Text variant="caption" color={mpSyncStatus === 'token_expired' ? '#E65100' : '#1565C0'}>
+                    <Text variant="caption" color={mpSyncStatus === 'token_expired' ? '#F59E0B' : '#27AE60'}>
                       {mpSyncStatus === 'token_expired'
                         ? 'Token vencido — tocá para desconectar y volver a conectar'
                         : mpEmail}
@@ -540,7 +540,7 @@ export default function ProfileScreen() {
                   <Ionicons
                     name={mpSyncStatus === 'token_expired' ? 'chevron-forward' : 'checkmark-circle'}
                     size={20}
-                    color={mpSyncStatus === 'token_expired' ? colors.text.tertiary : '#1565C0'}
+                    color={mpSyncStatus === 'token_expired' ? colors.text.tertiary : '#27AE60'}
                   />
                 </TouchableOpacity>
 
@@ -575,10 +575,10 @@ export default function ProfileScreen() {
                   disabled={mpSyncing}
                 >
                   <View style={[styles.menuIcon, { width: 36, height: 36, borderRadius: 18,
-                    backgroundColor: '#E8F5E9', alignItems: 'center', justifyContent: 'center' }]}>
+                    backgroundColor: '#D1F7E3', alignItems: 'center', justifyContent: 'center' }]}>
                     {mpSyncing
-                      ? <ActivityIndicator size="small" color="#2E7D32" />
-                      : <Ionicons name="sync-outline" size={20} color="#2E7D32" />}
+                      ? <ActivityIndicator size="small" color="#27AE60" />
+                      : <Ionicons name="sync-outline" size={20} color="#27AE60" />}
                   </View>
                   <View style={styles.menuText}>
                     <Text variant="bodySmall" color={colors.text.primary}>
@@ -594,7 +594,7 @@ export default function ProfileScreen() {
             ) : (
               <TouchableOpacity style={styles.menuItem} onPress={connectMp} disabled={mpConnecting}>
                 <View style={[styles.menuIcon, { width: 36, height: 36, borderRadius: 18,
-                  backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' }]}>
+                  backgroundColor: '#F5F1E9', alignItems: 'center', justifyContent: 'center' }]}>
                   {mpConnecting
                     ? <ActivityIndicator size="small" color={colors.text.tertiary} />
                     : <Ionicons name="wallet-outline" size={20} color={colors.text.secondary} />}
@@ -632,7 +632,7 @@ export default function ProfileScreen() {
         </Card>
 
         <Text variant="caption" color={colors.text.tertiary} align="center" style={styles.version}>
-          SmartPesos v1.0.0 · Tu plata, inteligente.
+          Nomi v1.0.0 · Tu plata, inteligente.
         </Text>
       </ScrollView>
 

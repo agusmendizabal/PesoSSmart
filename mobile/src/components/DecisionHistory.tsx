@@ -24,10 +24,34 @@ export interface MonthOpportunity {
   disposable:    number;
   halfAmount:    number;
   fciReturn:     number;
-  pfReturn:      number;
+  cedearReturn:  number;
+  cedearName:    string;
+  cedearTicker:  string;
+  cedearColor:   string;
   monthsAgo:     number;
   topCategories: { name: string; amount: number }[];
 }
+
+// ─── CEDEAR por categoría ────────────────────────────────────────────────────
+
+const CEDEAR_BY_CATEGORY: Record<string, { name: string; ticker: string; color: string; monthlyRate: number }> = {
+  'Comida y restaurantes': { name: "McDonald's", ticker: 'MCD',   color: '#FFC300', monthlyRate: 0.050 },
+  'Café':                  { name: 'Starbucks',  ticker: 'SBUX',  color: '#00704A', monthlyRate: 0.050 },
+  'Entretenimiento':       { name: 'Netflix',    ticker: 'NFLX',  color: '#E50914', monthlyRate: 0.070 },
+  'Suscripciones':         { name: 'Netflix',    ticker: 'NFLX',  color: '#E50914', monthlyRate: 0.070 },
+  'Ropa':                  { name: 'Nike',       ticker: 'NKE',   color: '#FF6B35', monthlyRate: 0.055 },
+  'Deporte':               { name: 'Nike',       ticker: 'NKE',   color: '#FF6B35', monthlyRate: 0.055 },
+  'Transporte':            { name: 'Tesla',      ticker: 'TSLA',  color: '#CC0000', monthlyRate: 0.075 },
+  'Salud':                 { name: 'J&J',        ticker: 'JNJ',   color: '#D42B2B', monthlyRate: 0.045 },
+  'Hogar':                 { name: 'Home Depot', ticker: 'HD',    color: '#F96302', monthlyRate: 0.050 },
+  'Hogar y servicios':     { name: 'Home Depot', ticker: 'HD',    color: '#F96302', monthlyRate: 0.050 },
+  'Tecnología':            { name: 'Apple',      ticker: 'AAPL',  color: '#555555', monthlyRate: 0.060 },
+  'Educación':             { name: 'Alphabet',   ticker: 'GOOGL', color: '#4285F4', monthlyRate: 0.060 },
+  'Peluquería':            { name: 'LVMH',       ticker: 'MC',    color: '#C8A96E', monthlyRate: 0.050 },
+  'Seguros':               { name: 'Berkshire',  ticker: 'BRKB',  color: '#8B4513', monthlyRate: 0.045 },
+};
+
+const DEFAULT_CEDEAR = { name: 'S&P 500', ticker: 'SPY', color: '#27AE60', monthlyRate: 0.055 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -57,8 +81,7 @@ export function buildOpportunities(
     );
 
     const half   = Math.round(entry.disposable * 0.5);
-    const fciRet = compound(half, 0.03,  monthsAgo);
-    const pfRet  = compound(half, 0.045, monthsAgo);
+    const fciRet = compound(half, 0.03, monthsAgo);
     const label  = `${MONTH_NAMES_ES[m - 1]} ${y}`;
 
     const topCategories = Object.entries(entry.categories ?? {})
@@ -66,7 +89,17 @@ export function buildOpportunities(
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 3);
 
-    results.push({ monthKey: entry.monthKey, monthLabel: label, disposable: entry.disposable, halfAmount: half, fciReturn: fciRet, pfReturn: pfRet, monthsAgo, topCategories });
+    const topCatName = topCategories[0]?.name ?? '';
+    const cedear     = CEDEAR_BY_CATEGORY[topCatName] ?? DEFAULT_CEDEAR;
+    const cedearRet  = compound(half, cedear.monthlyRate, monthsAgo);
+
+    results.push({
+      monthKey: entry.monthKey, monthLabel: label, disposable: entry.disposable,
+      halfAmount: half, fciReturn: fciRet,
+      cedearReturn: cedearRet, cedearName: cedear.name,
+      cedearTicker: cedear.ticker, cedearColor: cedear.color,
+      monthsAgo, topCategories,
+    });
   }
 
   return results.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
@@ -75,11 +108,13 @@ export function buildOpportunities(
 // ─── OpportunityCard ─────────────────────────────────────────────────────────
 
 function OpportunityCard({ opp }: { opp: MonthOpportunity }) {
-  const bestReturn = Math.max(opp.fciReturn, opp.pfReturn);
-  const bestLabel  = opp.pfReturn >= opp.fciReturn ? 'Plazo Fijo UVA' : 'FCI Money Market';
+  const bestReturn = Math.max(opp.fciReturn, opp.cedearReturn);
+  const bestLabel  = opp.cedearReturn >= opp.fciReturn
+    ? `${opp.cedearName} (${opp.cedearTicker})`
+    : 'FCI Money Market';
   const top        = opp.topCategories[0];
   const fciTotal   = opp.halfAmount + opp.fciReturn;
-  const pfTotal    = opp.halfAmount + opp.pfReturn;
+  const cedearTotal = opp.halfAmount + opp.cedearReturn;
 
   return (
     <View style={cardStyles.card}>
@@ -159,19 +194,24 @@ function OpportunityCard({ opp }: { opp: MonthOpportunity }) {
           </View>
           <View style={cardStyles.compareDivider} />
           <View style={cardStyles.compareCol}>
-            <View style={[cardStyles.compareIcon, { backgroundColor: '#A78BFA18' }]}>
-              <Ionicons name="timer-outline" size={14} color="#A78BFA" />
+            <View style={[cardStyles.compareIcon, { backgroundColor: opp.cedearColor + '22' }]}>
+              <Ionicons name="bar-chart-outline" size={14} color={opp.cedearColor} />
             </View>
             <View style={cardStyles.bestRow}>
-              <Text variant="caption" color={colors.text.tertiary}>Plazo Fijo UVA</Text>
-              {opp.pfReturn >= opp.fciReturn && (
+              <View>
+                <Text variant="caption" color={colors.text.tertiary}>{opp.cedearName}</Text>
+                <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 9, color: opp.cedearColor }}>
+                  CEDEAR {opp.cedearTicker}
+                </Text>
+              </View>
+              {opp.cedearReturn >= opp.fciReturn && (
                 <View style={cardStyles.bestBadge}>
                   <Text style={cardStyles.bestText}>MEJOR</Text>
                 </View>
               )}
             </View>
-            <Text style={[cardStyles.compareGain, { color: '#A78BFA' }]}>+{formatCurrency(opp.pfReturn)}</Text>
-            <Text variant="caption" color={colors.text.secondary}>{formatCurrency(pfTotal)} total</Text>
+            <Text style={[cardStyles.compareGain, { color: opp.cedearColor }]}>+{formatCurrency(opp.cedearReturn)}</Text>
+            <Text variant="caption" color={colors.text.secondary}>{formatCurrency(cedearTotal)} total</Text>
           </View>
         </View>
       </View>
@@ -184,7 +224,7 @@ function OpportunityCard({ opp }: { opp: MonthOpportunity }) {
           <Text variant="caption" color={colors.neon} style={{ fontFamily: 'Montserrat_700Bold' }}>
             +{formatCurrency(bestReturn)}
           </Text>{' '}
-          más. Dato para reflexionar, no para culparte.
+          más. Los CEDEARs son de mayor riesgo pero se alinean con lo que consumís.
         </Text>
       </View>
     </View>
@@ -292,7 +332,7 @@ export function DecisionHistorySection({ opportunities }: Props) {
           <View style={sectionStyles.disclaimer}>
             <Ionicons name="information-circle-outline" size={13} color={colors.text.tertiary} />
             <Text variant="caption" color={colors.text.tertiary} style={{ flex: 1, lineHeight: 17 }}>
-              Rendimientos estimados con tasas históricas de FCI MM (3%/mes) y PF UVA (4.5%/mes). No son garantía de resultados futuros.
+              Rendimientos estimados con tasas históricas de FCI MM (3%/mes) y CEDEARs del sector (4.5–8%/mes en ARS). No son garantía de resultados futuros. CEDEARs implican mayor riesgo.
             </Text>
           </View>
         </View>

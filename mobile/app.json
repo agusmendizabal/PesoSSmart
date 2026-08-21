@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Pesos$mart",
-    "slug": "pesossmart",
+    "name": "Nomi",
+    "slug": "nomi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -9,15 +9,16 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0a0a0a"
+      "backgroundColor": "#FAFAF7"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.pesossmart.app",
+      "bundleIdentifier": "ar.nomi.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Usamos la cámara para escanear tus tickets de compra.",
         "NSPhotoLibraryUsageDescription": "Necesitamos acceso a tus fotos para subir tickets de compra.",
-        "NSFaceIDUsageDescription": "SmartPesos usa Face ID para proteger tu información financiera."
+        "NSFaceIDUsageDescription": "Nomi usa Face ID para proteger tu información financiera.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -26,14 +27,15 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.pesossmart.app",
+      "package": "ar.nomi.app",
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE",
-        "USE_BIOMETRIC",
-        "USE_FINGERPRINT"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -60,20 +62,24 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "SmartPesos usa Face ID para proteger tu información financiera."
+          "faceIDPermission": "Nomi usa Face ID para proteger tu información financiera."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "assetBundlePatterns": [
       "assets/**"
     ],
-    "scheme": "pesossmart",
+    "scheme": "nomi",
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "7ad4add8-78ae-4459-9ea8-4c23a557cf3c"
       }
     }
   }

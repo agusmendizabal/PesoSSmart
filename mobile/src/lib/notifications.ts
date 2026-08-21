@@ -1,5 +1,5 @@
 /**
- * Sistema de notificaciones push de SmartPesos.
+ * Sistema de notificaciones push de Nomi.
  *
  * Tipos implementados:
  *  - Diarias:    inactividad (> 2 días sin cargar)
@@ -167,7 +167,7 @@ async function scheduleMonthly(
 
 // ─── DIARIAS — Inactividad ────────────────────────────────────────────────────
 
-const LAST_EXPENSE_KEY = '@smartpesos/last_expense_date';
+const LAST_EXPENSE_KEY = '@nomi/last_expense_date';
 
 export async function recordExpenseActivity() {
   const today = new Date().toISOString().slice(0, 10);
@@ -195,7 +195,7 @@ export async function scheduleDailyInactivityCheck() {
     );
   } else {
     await schedule(
-      '📋 SmartPesos',
+      '📋 Nomi',
       '¿Ya cargaste tus gastos de hoy?',
       tomorrow,
       'daily_inactivity',
@@ -206,8 +206,8 @@ export async function scheduleDailyInactivityCheck() {
 
 // ─── EVENTO — 3er delivery de la semana ──────────────────────────────────────
 
-const DELIVERY_COUNT_KEY = '@smartpesos/weekly_delivery_count';
-const DELIVERY_WEEK_KEY  = '@smartpesos/delivery_week';
+const DELIVERY_COUNT_KEY = '@nomi/weekly_delivery_count';
+const DELIVERY_WEEK_KEY  = '@nomi/delivery_week';
 
 export async function trackDeliveryExpense(amount: number) {
   const now         = new Date();
@@ -263,7 +263,7 @@ export async function scheduleBudgetAlert(
     await Notifications.cancelScheduledNotificationAsync('budget_alert').catch(() => {});
 
     if (spentPct >= 1) {
-      await send('⚠️ Te pasaste del presupuesto', `Gastaste más de tu ingreso estimado este mes. Revisá en SmartPesos.`);
+      await send('⚠️ Te pasaste del presupuesto', `Gastaste más de tu ingreso estimado este mes. Revisá en Nomi.`);
       return;
     }
     if (spentPct >= 0.8) {
@@ -333,7 +333,7 @@ export async function notifyStreakMilestone(days: number) {
 
 export async function scheduleWeeklySummary() {
   await scheduleWeekly(
-    '📅 Tu semana en SmartPesos',
+    '📅 Tu semana en Nomi',
     'Conocé cuánto gastaste esta semana y cómo vas respecto a la anterior.',
     2, // Lunes (1=Dom en algunas librerías — Expo usa 1=Dom, 2=Lun)
     9,
@@ -379,7 +379,7 @@ export async function scheduleEndOfMonthProjection(
 
 // ─── ALERTAS DE MERCADO ───────────────────────────────────────────────────────
 
-const LAST_DOLAR_KEY = '@smartpesos/last_dolar_rate';
+const LAST_DOLAR_KEY = '@nomi/last_dolar_rate';
 
 export async function checkDolarAlert(currentRate: number) {
   const lastStr = await AsyncStorage.getItem(LAST_DOLAR_KEY);
