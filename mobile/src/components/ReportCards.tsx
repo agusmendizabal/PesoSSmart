@@ -2,12 +2,13 @@
  * ReportCards — Componentes y lógica compartidos entre ReportsScreen y el tab Análisis de Gastos.
  */
 
-import React from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { colors, spacing } from '@/theme';
-import { Text, Card } from '@/components/ui';
+import { colors, spacing, layout } from '@/theme';
+import { Text, Card, MiniLineChart } from '@/components/ui';
 import { formatCurrency } from '@/utils/format';
 import { ADVISOR_ENABLED } from '@/lib/features';
 
@@ -508,6 +509,180 @@ const resStyles = StyleSheet.create({
   breakdownItem: { gap: 2 },
 });
 
+// ─── CategoryDonut ────────────────────────────────────────────────────────────
+
+function buildSegments(rows: CategoryRow[], total: number, maxCats = 8) {
+  const top  = rows.slice(0, maxCats);
+  const rest = rows.slice(maxCats).reduce((s, r) => s + r.amount, 0);
+  return [
+    ...top,
+    ...(rest > 0 ? [{ id: 'otros', name: 'Otros', color: '#9B9790', amount: rest, pct: rest / total }] : []),
+  ] as CategoryRow[];
+}
+
+export function CategoryDonut({ rows, total, compact = false }: {
+  rows: CategoryRow[]; total: number; compact?: boolean;
+}) {
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+
+  if (rows.length === 0 || total === 0) return null;
+
+  const SIZE = compact ? 96  : 176;
+  const R    = compact ? 34  : 68;
+  const SW   = compact ? 10  : 18;
+  const CX   = SIZE / 2;
+  const CIRC = 2 * Math.PI * R;
+  const segments = buildSegments(rows, total, compact ? 6 : 8);
+  const GAP_LEN  = ((compact ? 3 : 2.5) / 360) * CIRC;
+
+  const sel = selectedIdx !== null ? segments[selectedIdx] : null;
+
+  // Detecta qué segmento corresponde al punto tocado en el donut
+  const hitTest = (locationX: number, locationY: number) => {
+    const dx = locationX - CX;
+    const dy = locationY - CX;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const innerR = R - SW / 2 - 4;
+    const outerR = R + SW / 2 + 4;
+    if (dist < innerR || dist > outerR) return null; // fuera del anillo
+
+    // Ángulo desde la parte superior (12 o'clock), en sentido horario
+    let angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+    if (angle < 0) angle += 360;
+
+    let cumulative = 0;
+    for (let i = 0; i < segments.length; i++) {
+      const segDeg = (segments[i].amount / total) * 360;
+      if (angle >= cumulative && angle < cumulative + segDeg) return i;
+      cumulative += segDeg;
+    }
+    return null;
+  };
+
+  const touchHandlers = compact ? {} : {
+    onStartShouldSetResponder: () => true,
+    onMoveShouldSetResponder:  () => true,
+    onResponderGrant: (e: any) => {
+      const idx = hitTest(e.nativeEvent.locationX, e.nativeEvent.locationY);
+      setSelectedIdx(idx);
+    },
+    onResponderMove: (e: any) => {
+      const idx = hitTest(e.nativeEvent.locationX, e.nativeEvent.locationY);
+      if (idx !== null) setSelectedIdx(idx);
+    },
+    onResponderRelease: () => {
+      // mantiene la selección visible para leer; se limpia con tap en leyenda
+    },
+  };
+
+  let offset = 0;
+
+  return (
+    <View style={compact ? cdS.wrapCompact : cdS.wrap}>
+      {/* Donut ring + overlay táctil */}
+      <View
+        style={{ position: 'relative', width: SIZE, height: SIZE, alignSelf: compact ? undefined : 'center' }}
+        {...touchHandlers}
+      >
+        <Svg width={SIZE} height={SIZE}>
+          <SvgCircle cx={CX} cy={CX} r={R} fill="none" stroke={colors.border.subtle} strokeWidth={SW} />
+          {segments.map((seg, i) => {
+            const len    = Math.max(0, (seg.amount / total) * CIRC - GAP_LEN);
+            const off    = -offset;
+            offset += (seg.amount / total) * CIRC;
+            const dimmed = selectedIdx !== null && selectedIdx !== i;
+            return (
+              <SvgCircle
+                key={i} cx={CX} cy={CX} r={R}
+                fill="none"
+                stroke={seg.color}
+                strokeWidth={selectedIdx === i ? SW + 4 : SW}
+                strokeDasharray={`${len} ${CIRC - len}`}
+                strokeDashoffset={off}
+                strokeLinecap="butt"
+                rotation="-90" origin={`${CX},${CX}`}
+                opacity={dimmed ? 0.25 : 1}
+              />
+            );
+          })}
+        </Svg>
+
+        {/* Centro: info del segmento seleccionado o total */}
+        <View style={[StyleSheet.absoluteFill, cdS.center]} pointerEvents="none">
+          {compact ? (
+            <Text style={cdS.centerAmountSm} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+              {formatCurrency(total).replace('$ ', '$')}
+            </Text>
+          ) : sel ? (
+            <>
+              <Text style={[cdS.centerLabel, { color: sel.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                {sel.name.toUpperCase()}
+              </Text>
+              <Text style={[cdS.centerPct, { color: sel.color }]}>
+                {Math.round(sel.pct * 100)}%
+              </Text>
+              <Text style={cdS.centerSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                {formatCurrency(sel.amount).replace('$ ', '$')}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text style={cdS.centerLabel}>TOTAL</Text>
+              <Text style={cdS.centerAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                {formatCurrency(total).replace('$ ', '$')}
+              </Text>
+              {!compact && (
+                <Text style={cdS.centerHint}>toca el gráfico</Text>
+              )}
+            </>
+          )}
+        </View>
+      </View>
+
+      {/* Leyenda — solo en modo full; tap para seleccionar / deseleccionar */}
+      {!compact && (
+        <View style={cdS.legend}>
+          {segments.map((seg, i) => {
+            const isSelected = selectedIdx === i;
+            const isDimmed   = selectedIdx !== null && !isSelected;
+            return (
+              <TouchableOpacity
+                key={i}
+                style={[cdS.legendItem, isSelected && { backgroundColor: seg.color + '18', borderRadius: 8 }]}
+                onPress={() => setSelectedIdx(isSelected ? null : i)}
+                activeOpacity={0.7}
+              >
+                <View style={[cdS.legendDot, { backgroundColor: seg.color, opacity: isDimmed ? 0.3 : 1 }]} />
+                <Text style={[cdS.legendName, isDimmed && { opacity: 0.35 }]} numberOfLines={1}>{seg.name}</Text>
+                <Text style={[cdS.legendPct, { color: isSelected ? seg.color : (isDimmed ? colors.text.tertiary : seg.color) }]}>
+                  {Math.round(seg.pct * 100)}%
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+const cdS = StyleSheet.create({
+  wrap:          { gap: 20 },
+  wrapCompact:   {},
+  center:        { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  centerLabel:   { fontFamily: 'Montserrat_600SemiBold', fontSize: 10, color: colors.text.tertiary, letterSpacing: 0.6, textAlign: 'center' },
+  centerPct:     { fontFamily: 'Montserrat_800ExtraBold', fontSize: 26, lineHeight: 32, marginTop: 1 },
+  centerAmount:  { fontFamily: 'Montserrat_800ExtraBold', fontSize: 16, color: colors.text.primary, marginTop: 2 },
+  centerSub:     { fontFamily: 'Montserrat_500Medium', fontSize: 10, color: colors.text.secondary, marginTop: 2, textAlign: 'center' },
+  centerHint:    { fontFamily: 'Montserrat_400Regular', fontSize: 9, color: colors.text.tertiary, marginTop: 3, letterSpacing: 0.3 },
+  centerAmountSm:{ fontFamily: 'Montserrat_700Bold', fontSize: 9, color: colors.text.primary, textAlign: 'center', paddingHorizontal: 4 },
+  legend:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-start' },
+  legendItem:    { flexDirection: 'row', alignItems: 'center', gap: 5, width: '47%', paddingVertical: 3, paddingHorizontal: 4 },
+  legendDot:     { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  legendName:    { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 11, color: colors.text.secondary },
+  legendPct:     { fontFamily: 'Montserrat_700Bold', fontSize: 11, flexShrink: 0 },
+});
+
 export function CategoryBreakdown({ rows, total }: { rows: CategoryRow[]; total: number }) {
   if (rows.length === 0) return null;
   const maxAmount = rows[0]?.amount ?? 1;
@@ -840,4 +1015,123 @@ const ctaStyles = StyleSheet.create({
   card:   { backgroundColor: colors.neon, borderRadius: 14, padding: spacing[4], flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[3] },
   left:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.white + '18', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+});
+
+// ─── AINarrativeCard ─────────────────────────────────────────────────────────
+// Narrativa mensual generada por IA (ai-advisor con generate_report:true).
+// Usada por Reportes y Home — el fetch/caché vive en el hook useAINarrative.
+
+export function AINarrativeCard({
+  narrative, keyFinding, nextStep, isLoading,
+}: { narrative: string; keyFinding: string; nextStep: string; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <Card style={aiCardStyles.card}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+          <ActivityIndicator size="small" color={colors.neon} />
+          <Text variant="label" color={colors.text.tertiary}>ANALIZANDO CON IA...</Text>
+        </View>
+        {[0.9, 0.75, 0.6].map((w, i) => (
+          <View key={i} style={{ height: 10, borderRadius: 5, backgroundColor: colors.border.subtle, width: `${w * 100}%` }} />
+        ))}
+      </Card>
+    );
+  }
+  if (!narrative) return null;
+  return (
+    <Card style={[aiCardStyles.card, { borderLeftWidth: 3, borderLeftColor: colors.neon }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.neon }} />
+        <Text variant="label" color={colors.text.tertiary}>ANÁLISIS IA DEL MES</Text>
+      </View>
+      <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 13, color: colors.text.primary, lineHeight: 20 }}>
+        {narrative}
+      </Text>
+      {keyFinding ? (
+        <View style={{ backgroundColor: colors.bg.elevated, borderRadius: 8, padding: spacing[3] }}>
+          <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 11, color: colors.text.tertiary, letterSpacing: 0.5, marginBottom: 4 }}>
+            HALLAZGO CLAVE
+          </Text>
+          <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 12, color: colors.text.primary, lineHeight: 18 }}>
+            {keyFinding}
+          </Text>
+        </View>
+      ) : null}
+      {nextStep ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] }}>
+          <Ionicons name="arrow-forward-circle-outline" size={16} color={colors.neon} style={{ marginTop: 1 }} />
+          <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 12, color: colors.neon, flex: 1, lineHeight: 18 }}>
+            {nextStep}
+          </Text>
+        </View>
+      ) : null}
+    </Card>
+  );
+}
+const aiCardStyles = StyleSheet.create({
+  card: { padding: spacing[4], gap: spacing[3] },
+});
+
+// ─── SmartPlanCard ────────────────────────────────────────────────────────────
+// Plan Inteligente basado en reglas (fetchBudgetPlan/potentialSavings) —
+// usado por Ahorros, Gastos y Home. No hay datos históricos reales
+// disponibles para el sparkline, así que se usa una serie ilustrativa fija.
+
+const SPC_ILLUSTRATIVE_TREND = [8, 12, 16, 14, 22, 26, 32];
+
+export function SmartPlanCard({ amount, onPress }: { amount: number; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={spcStyles.card} onPress={onPress} activeOpacity={0.88}>
+      <View style={spcStyles.badge}>
+        <Text style={spcStyles.badgeText}>NUEVO</Text>
+      </View>
+      <View style={spcStyles.inner}>
+        <View style={{ flex: 1, gap: spacing[2] }}>
+          <View style={spcStyles.titleRow}>
+            <Text style={spcStyles.sparkle}>✨</Text>
+            <Text style={spcStyles.title}>Plan Inteligente</Text>
+          </View>
+          <Text style={spcStyles.desc}>
+            Descubrí cuánto podés ahorrar en base a tus hábitos
+          </Text>
+          <Text style={spcStyles.amount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatCurrency(amount > 0 ? amount : 0)}</Text>
+          <Text style={spcStyles.amountLabel}>Podrías ahorrar este mes</Text>
+        </View>
+        <View style={spcStyles.rightCol}>
+          <View style={spcStyles.aiCircle}>
+            <Ionicons name="sparkles" size={18} color={colors.primary} />
+          </View>
+          <MiniLineChart data={SPC_ILLUSTRATIVE_TREND} color={colors.primary} width={90} height={34} />
+        </View>
+      </View>
+      <View style={spcStyles.footer}>
+        <View style={spcStyles.ctaBtn}>
+          <Text style={spcStyles.footerText}>Ver mi plan completo</Text>
+          <Ionicons name="arrow-forward" size={13} color={colors.primary} />
+        </View>
+        <View style={spcStyles.arrowBtn}>
+          <Ionicons name="arrow-forward" size={14} color={colors.bg.card} />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const spcStyles = StyleSheet.create({
+  card:        { backgroundColor: colors.bg.card, borderRadius: 20, borderWidth: 1.5, borderColor: colors.primary + '35', ...layout.cardShadow },
+  badge:       { position: 'absolute', top: 14, right: 14, backgroundColor: colors.primary, borderRadius: 20, paddingHorizontal: spacing[3], paddingVertical: 3, zIndex: 2 },
+  badgeText:   { fontFamily: 'Montserrat_700Bold', fontSize: 9, color: '#FFF', letterSpacing: 0.6 },
+  inner:       { flexDirection: 'row', padding: spacing[5], paddingBottom: spacing[3], gap: spacing[3] },
+  titleRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
+  sparkle:     { fontSize: 16 },
+  title:       { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: colors.text.primary },
+  desc:        { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: colors.text.secondary, lineHeight: 18 },
+  amount:      { fontFamily: 'Montserrat_800ExtraBold', fontSize: 28, color: colors.primary, lineHeight: 34 },
+  amountLabel: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: colors.text.secondary },
+  rightCol:    { alignItems: 'flex-end', justifyContent: 'space-between', paddingTop: spacing[6], paddingBottom: spacing[1] },
+  aiCircle:    { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.primary + '14', alignItems: 'center', justifyContent: 'center' },
+  footer:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing[5], paddingBottom: spacing[5], paddingTop: spacing[1] },
+  ctaBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2], borderWidth: 1.5, borderColor: colors.primary + '50', borderRadius: 12, paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
+  footerText:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: colors.primary },
+  arrowBtn:    { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
 });

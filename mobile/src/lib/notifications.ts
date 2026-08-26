@@ -191,7 +191,7 @@ export async function scheduleDailyInactivityCheck() {
     await send(
       '📋 ¿Cómo vas este mes?',
       `Hace ${daysDiff} día${daysDiff > 1 ? 's' : ''} que no registrás nada. Tardás menos de un minuto.`,
-      { route: '/(app)/expenses' },
+      { route: '/(app)/movimientos' },
     );
   } else {
     await schedule(
@@ -199,7 +199,7 @@ export async function scheduleDailyInactivityCheck() {
       '¿Ya cargaste tus gastos de hoy?',
       tomorrow,
       'daily_inactivity',
-      { route: '/(app)/expenses' },
+      { route: '/(app)/movimientos' },
     );
   }
 }
@@ -223,7 +223,7 @@ export async function trackDeliveryExpense(amount: number) {
     await send(
       '🛵 Tercer delivery de la semana',
       `Llevás ${fmt(amount)} esta semana. ¿Lo tenías presupuestado?`,
-      { route: '/(app)/expenses' },
+      { route: '/(app)/movimientos' },
     );
   }
 }
@@ -248,7 +248,7 @@ export async function notifyCategoryBudget80(
   await send(
     `🟡 80% del presupuesto de ${categoryName}`,
     `Usaste el 80% de tu presupuesto de ${categoryName}. Te quedan ${fmt(remaining)} para los próximos ${daysLeft} días.`,
-    { route: '/(app)/expenses' },
+    { route: '/(app)/movimientos' },
   );
 }
 
@@ -295,7 +295,7 @@ export async function notifyNewSubscription(name: string, amount: number) {
   await send(
     '🔄 Nuevo débito recurrente',
     `Detectamos un nuevo débito de ${fmt(amount)} de "${name}". ¿Lo sumamos a tus gastos fijos?`,
-    { route: '/(app)/expenses' },
+    { route: '/(app)/movimientos' },
   );
 }
 
@@ -373,7 +373,7 @@ export async function scheduleEndOfMonthProjection(
     `A este ritmo cerrarías el mes con ${fmt(projected)} gastados — ${fmt(over)} más de lo planeado.`,
     notifDate,
     'eom_projection',
-    { route: '/(app)/expenses?tab=analisis' },
+    { route: '/(app)/expenses' },
   );
 }
 

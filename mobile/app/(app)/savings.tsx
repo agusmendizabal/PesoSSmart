@@ -16,7 +16,6 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, layout } from '@/theme';
 import { Text } from '@/components/ui/Text';
-import { MiniLineChart } from '@/components/ui/MiniLineChart';
 import { FormSheetModal, FormSheetButton } from '@/components/ui/FormSheetModal';
 import { useAuthStore } from '@/store/authStore';
 import { useSavingsStore, type Saving, type SavingCurrency, type Investment, type InstrumentType } from '@/store/savingsStore';
@@ -24,6 +23,7 @@ import { useGoalsStore, type SavingsGoal } from '@/store/goalsStore';
 import { fetchDolarRateNow } from '@/hooks/useDolarRates';
 import { formatCurrency } from '@/utils/format';
 import { fetchBudgetPlan, type BudgetPlan } from '@/lib/budgetPlan';
+import { SmartPlanCard } from '@/components/ReportCards';
 import { checkAndNotifyBudgetLimits } from '@/lib/budgetNotifications';
 import { ADVISOR_ENABLED } from '@/lib/features';
 import { useFirstVisit } from '@/hooks/useFirstVisit';
@@ -48,69 +48,6 @@ const C = {
 const shadow = layout.cardShadow;
 
 const GOAL_EMOJIS = ['🎯','🏖️','🚗','🏠','✈️','📱','👶','💍','🎓','💪','🐕','🌱','💻','🎸','🏋️','🍕'];
-
-// Serie ilustrativa de tendencia (ahorro creciente) para el sparkline del
-// SmartPlanCard — no hay datos históricos reales disponibles en este scope.
-const ILLUSTRATIVE_TREND = [8, 12, 16, 14, 22, 26, 32];
-
-// ─── Smart Plan Card ──────────────────────────────────────────────────────────
-
-function SmartPlanCard({ amount, onPress }: { amount: number; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={spc.card} onPress={onPress} activeOpacity={0.88}>
-      <View style={spc.badge}>
-        <Text style={spc.badgeText}>NUEVO</Text>
-      </View>
-      <View style={spc.inner}>
-        <View style={{ flex: 1, gap: spacing[2] }}>
-          <View style={spc.titleRow}>
-            <Text style={spc.sparkle}>✨</Text>
-            <Text style={spc.title}>Plan Inteligente</Text>
-          </View>
-          <Text style={spc.desc}>
-            Descubrí cuánto podés ahorrar en base a tus hábitos
-          </Text>
-          <Text style={spc.amount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{formatCurrency(amount > 0 ? amount : 0)}</Text>
-          <Text style={spc.amountLabel}>Podrías ahorrar este mes</Text>
-        </View>
-        <View style={spc.rightCol}>
-          <View style={spc.aiCircle}>
-            <Ionicons name="sparkles" size={18} color={C.violet} />
-          </View>
-          <MiniLineChart data={ILLUSTRATIVE_TREND} color={C.green} width={90} height={34} />
-        </View>
-      </View>
-      <View style={spc.footer}>
-        <View style={spc.ctaBtn}>
-          <Text style={spc.footerText}>Ver mi plan completo</Text>
-          <Ionicons name="arrow-forward" size={13} color={C.violet} />
-        </View>
-        <View style={spc.arrowBtn}>
-          <Ionicons name="arrow-forward" size={14} color={C.card} />
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-const spc = StyleSheet.create({
-  card:        { backgroundColor: C.card, borderRadius: 20, borderWidth: 1.5, borderColor: C.violet + '35', ...shadow },
-  badge:       { position: 'absolute', top: 14, right: 14, backgroundColor: C.violet, borderRadius: 20, paddingHorizontal: spacing[3], paddingVertical: 3, zIndex: 2 },
-  badgeText:   { fontFamily: 'Montserrat_700Bold', fontSize: 9, color: '#FFF', letterSpacing: 0.6 },
-  inner:       { flexDirection: 'row', padding: spacing[5], paddingBottom: spacing[3], gap: spacing[3] },
-  titleRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
-  sparkle:     { fontSize: 16 },
-  title:       { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: C.text },
-  desc:        { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.sub, lineHeight: 18 },
-  amount:      { fontFamily: 'Montserrat_800ExtraBold', fontSize: 28, color: C.green, lineHeight: 34 },
-  amountLabel: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: C.sub },
-  rightCol:    { alignItems: 'flex-end', justifyContent: 'space-between', paddingTop: spacing[6], paddingBottom: spacing[1] },
-  aiCircle:    { width: 38, height: 38, borderRadius: 19, backgroundColor: C.violet + '14', alignItems: 'center', justifyContent: 'center' },
-  footer:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing[5], paddingBottom: spacing[5], paddingTop: spacing[1] },
-  ctaBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing[2], borderWidth: 1.5, borderColor: C.violet + '50', borderRadius: 12, paddingHorizontal: spacing[3], paddingVertical: spacing[2] },
-  footerText:  { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: C.violet },
-  arrowBtn:    { width: 30, height: 30, borderRadius: 15, backgroundColor: C.violet, alignItems: 'center', justifyContent: 'center' },
-});
 
 // ─── Goal Card ────────────────────────────────────────────────────────────────
 

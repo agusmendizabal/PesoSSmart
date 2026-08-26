@@ -608,7 +608,7 @@ serve(async (req) => {
           userId,
           title: `🔍 Detectamos ${plural} de tu Gmail`,
           body:  'Tu presupuesto se actualizó automáticamente. Tocá para revisar.',
-          data:  { route: '/(app)/expenses' },
+          data:  { route: '/(app)/movimientos' },
         }),
       }).catch(err => console.warn('[gmail-poll] push error:', err));
     }

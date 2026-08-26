@@ -17,7 +17,8 @@ interface GuideItem {
 
 const GUIDE_ITEMS: GuideItem[] = [
   { key: 'home',          route: '/(app)/home',          label: 'Home',            description: 'Resumen del mes, insights y actividad reciente', icon: 'home-outline' },
-  { key: 'expenses',      route: '/(app)/expenses',      label: 'Gastos',          description: 'Cargar, clasificar y filtrar tus gastos',          icon: 'wallet-outline' },
+  { key: 'expenses',      route: '/(app)/movimientos',   label: 'Gastos',          description: 'Cargar, clasificar y filtrar tus gastos',          icon: 'wallet-outline' },
+  { key: 'analisis',      route: '/(app)/expenses',      label: 'Análisis',        description: 'Resumen del mes, categorías, salud y oportunidades', icon: 'pie-chart-outline' },
   { key: 'reports',       route: '/(app)/reports',       label: 'Reportes',        description: 'Salud financiera, análisis con IA e inflación',    icon: 'bar-chart-outline' },
   { key: 'savings',       route: '/(app)/savings',       label: 'Ahorros',         description: 'Metas, bolsillos y Plan Inteligente',              icon: 'trending-up-outline' },
   { key: 'plans',         route: '/(app)/plans',         label: 'Tu plan',         description: 'Comparar y cambiar de plan',                       icon: 'star-outline' },

@@ -32,6 +32,7 @@ import {
   CategoryBreakdown,
   HistoryComparisonCard,
   AdvisorCTA,
+  AINarrativeCard,
 } from '@/components/ReportCards';
 
 import {
@@ -40,6 +41,7 @@ import {
   type DiagnosticInsight,
   type HealthComponent,
 } from '@/lib/financialDiagnosis';
+import { useAINarrative } from '@/hooks/useAINarrative';
 
 // ─── PDF Builder ─────────────────────────────────────────────────────────────
 
@@ -236,56 +238,6 @@ const insightStyles = StyleSheet.create({
   body:   { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: colors.text.secondary, lineHeight: 18 },
 });
 
-// ─── AINarrativeCard ─────────────────────────────────────────────────────────
-
-function AINarrativeCard({
-  narrative, keyFinding, nextStep, isLoading,
-}: { narrative: string; keyFinding: string; nextStep: string; isLoading: boolean }) {
-  if (isLoading) {
-    return (
-      <Card style={[cardStyles.card, { gap: spacing[3] }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
-          <ActivityIndicator size="small" color={colors.neon} />
-          <Text variant="label" color={colors.text.tertiary}>ANALIZANDO CON IA...</Text>
-        </View>
-        {[0.9, 0.75, 0.6].map((w, i) => (
-          <View key={i} style={{ height: 10, borderRadius: 5, backgroundColor: colors.border.subtle, width: `${w * 100}%` }} />
-        ))}
-      </Card>
-    );
-  }
-  if (!narrative) return null;
-  return (
-    <Card style={[cardStyles.card, { borderLeftWidth: 3, borderLeftColor: colors.neon }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.neon }} />
-        <Text variant="label" color={colors.text.tertiary}>ANÁLISIS IA DEL MES</Text>
-      </View>
-      <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 13, color: colors.text.primary, lineHeight: 20 }}>
-        {narrative}
-      </Text>
-      {keyFinding ? (
-        <View style={{ backgroundColor: colors.bg.elevated, borderRadius: 8, padding: spacing[3] }}>
-          <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 11, color: colors.text.tertiary, letterSpacing: 0.5, marginBottom: 4 }}>
-            HALLAZGO CLAVE
-          </Text>
-          <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 12, color: colors.text.primary, lineHeight: 18 }}>
-            {keyFinding}
-          </Text>
-        </View>
-      ) : null}
-      {nextStep ? (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] }}>
-          <Ionicons name="arrow-forward-circle-outline" size={16} color={colors.neon} style={{ marginTop: 1 }} />
-          <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 12, color: colors.neon, flex: 1, lineHeight: 18 }}>
-            {nextStep}
-          </Text>
-        </View>
-      ) : null}
-    </Card>
-  );
-}
-
 // ─── ActionsCard ─────────────────────────────────────────────────────────────
 
 function ActionsCard({ actions }: { actions: FinancialDiagnosis['actions'] }) {
@@ -430,11 +382,6 @@ export default function ReportsScreen() {
   const [pastOppData,   setPastOppData]   = useState<{ monthKey: string; disposable: number; categories: Record<string, number> }[]>([]);
 
   // AI narrative state
-  const [aiNarrative,   setAiNarrative]   = useState('');
-  const [aiKeyFinding,  setAiKeyFinding]  = useState('');
-  const [aiNextStep,    setAiNextStep]    = useState('');
-  const [aiLoading,     setAiLoading]     = useState(false);
-  const aiAbortRef = useRef<AbortController | null>(null);
 
   const { isFirstVisit, markVisited } = useFirstVisit('reports');
 
@@ -451,10 +398,6 @@ export default function ReportsScreen() {
   const loadData = useCallback(async () => {
     if (!user?.id) return;
     setIsLoading(true);
-    // Clear AI narrative when month changes
-    setAiNarrative('');
-    setAiKeyFinding('');
-    setAiNextStep('');
     try {
       const oppStart = (() => {
         const d = new Date(year, month - 4, 1);
@@ -587,53 +530,9 @@ export default function ReportsScreen() {
     });
   }, [displayTotal, displayNecessary, displayDisposable, displayInvestable, displayIncome, history, rows, inflationRate, fciRate, isCurrentMonth]);
 
-  // ── Llamada AI para narrativa (async, solo cuando hay datos) ────────────────
-  useEffect(() => {
-    if (!diagnosis || !user?.id) return;
-    if (aiNarrative) return; // ya generado para este mes/datos
-
-    aiAbortRef.current?.abort();
-    const ctrl = new AbortController();
-    aiAbortRef.current = ctrl;
-    setAiLoading(true);
-
-    (async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session || ctrl.signal.aborted) return;
-
-        const res = await fetch(
-          `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/ai-advisor`,
-          {
-            method: 'POST',
-            signal: ctrl.signal,
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              generate_report: true,
-              user_id:         user.id,
-              report_context:  diagnosis.reportPayload,
-            }),
-          },
-        );
-        if (!res.ok || ctrl.signal.aborted) return;
-        const data = await res.json();
-        if (!ctrl.signal.aborted) {
-          setAiNarrative(data.narrative   ?? '');
-          setAiKeyFinding(data.key_finding ?? '');
-          setAiNextStep(data.next_step     ?? '');
-        }
-      } catch (e: any) {
-        if (e?.name !== 'AbortError') console.warn('[Report AI]', e);
-      } finally {
-        if (!ctrl.signal.aborted) setAiLoading(false);
-      }
-    })();
-
-    return () => ctrl.abort();
-  }, [diagnosis?.healthScore, month, year]);
+  // ── Narrativa IA del mes (compartida/cacheada con Home) ─────────────────────
+  const { narrative: aiNarrative, keyFinding: aiKeyFinding, nextStep: aiNextStep, isLoading: aiLoading } =
+    useAINarrative(diagnosis, user?.id, month, year);
 
   // ── Export PDF ─────────────────────────────────────────────────────────────
   const [exporting, setExporting] = useState(false);
@@ -743,7 +642,7 @@ export default function ReportsScreen() {
             <Text variant="body" color={colors.text.secondary} align="center" style={{ lineHeight: 22 }}>
               Cargá gastos para ver tu análisis, salud financiera y oportunidades de ahorro.
             </Text>
-            <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/(app)/expenses')} activeOpacity={0.8}>
+            <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/(app)/movimientos' as any)} activeOpacity={0.8}>
               <Ionicons name="add" size={16} color={colors.white} />
               <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: colors.white }}>
                 Ir a cargar gastos

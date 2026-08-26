@@ -52,7 +52,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="expenses"
         options={{
-          title: 'Gastos',
+          title: 'Análisis',
           tabBarIcon: ({ focused, color }) => (
             <TabIcon name="bag" focused={focused} color={color} />
           ),
@@ -85,6 +85,7 @@ export default function AppLayout() {
           ),
         }}
       />
+      <Tabs.Screen name="movimientos"    options={{ href: null }} />
       <Tabs.Screen name="reports"        options={{ href: null }} />
       <Tabs.Screen name="advisor"        options={{ href: null }} />
       <Tabs.Screen name="group-detail"   options={{ href: null }} />

@@ -419,7 +419,7 @@ serve(async (req) => {
           userId,
           title: `📲 ${newFound > 1 ? `${newFound} gastos nuevos` : '1 gasto nuevo'} de Mercado Pago`,
           body:  'Tu presupuesto se actualizó automáticamente.',
-          data:  { route: '/(app)/expenses' },
+          data:  { route: '/(app)/movimientos' },
         }),
       }).catch(e => console.warn('[mp-poll] push error:', e));
     }

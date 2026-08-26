@@ -10,8 +10,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as LocalAuth from 'expo-local-authentication';
-import * as WebBrowser from 'expo-web-browser';
-import * as ExpoLinking from 'expo-linking';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,6 +25,7 @@ import type { RoundTo, RoundDest } from '@/store/roundUpStore';
 import { PLANS } from '@/lib/plans';
 import { supabase } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useMpConnect } from '@/hooks/useMpConnect';
 
 const BIOMETRIC_KEY = '@nomi/biometric_enabled';
 
@@ -100,7 +99,6 @@ export default function ProfileScreen() {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [gmailEmail,    setGmailEmail]    = useState<string | null>(null);
   const [mpEmail,       setMpEmail]       = useState<string | null>(null);
-  const [mpConnecting,  setMpConnecting]  = useState(false);
   const [mpSyncing,     setMpSyncing]     = useState(false);
   const [mpLastSync,    setMpLastSync]    = useState<Date | null>(null);
   const [mpSyncCount,   setMpSyncCount]   = useState(0);
@@ -208,46 +206,15 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const { connecting: mpConnecting, connect: connectMpFlow } = useMpConnect(user?.id);
+
   const connectMp = async () => {
-    if (!user?.id) return;
-    setMpConnecting(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        Alert.alert('Sesión expirada', 'Cerrá sesión y volvé a ingresar.');
-        return;
-      }
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-
-      // URL de retorno adaptada al entorno (exp:// en dev, nomi:// en producción)
-      const redirectUrl = ExpoLinking.createURL('mp-connected');
-
-      const res = await fetch(
-        `${supabaseUrl}/functions/v1/mp-auth?action=url&redirect_url=${encodeURIComponent(redirectUrl)}`,
-        { headers: { Authorization: `Bearer ${session.access_token}` } },
-      );
-      if (!res.ok) throw new Error('No se pudo obtener la URL de Mercado Pago');
-      const { url } = await res.json();
-
-      // openAuthSessionAsync intercepta automáticamente cuando el browser navega a redirectUrl
-      const result = await WebBrowser.openAuthSessionAsync(url, redirectUrl);
-
-      if (result.type === 'success') {
-        const deepLink = result.url;
-        const match    = deepLink.match(/email=([^&]+)/);
-        const hasError = deepLink.includes('error=');
-        if (match) {
-          setMpEmail(decodeURIComponent(match[1]));
-          Alert.alert('Mercado Pago conectado', 'Ahora detectamos tus gastos directamente desde MP.');
-        } else if (hasError) {
-          const errMatch = deepLink.match(/error=([^&]+)/);
-          Alert.alert('Error', errMatch ? decodeURIComponent(errMatch[1]) : 'No se pudo conectar.');
-        }
-      }
-    } catch (err) {
-      Alert.alert('Error', 'No se pudo conectar con Mercado Pago.');
-    } finally {
-      setMpConnecting(false);
+    const result = await connectMpFlow();
+    if (result.success) {
+      setMpEmail(result.email ?? null);
+      Alert.alert('Mercado Pago conectado', 'Ahora detectamos tus gastos directamente desde MP.');
+    } else if (result.error) {
+      Alert.alert('Error', result.error);
     }
   };
 
