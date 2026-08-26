@@ -158,6 +158,7 @@ function CategorizarSheet({
   const [selectedClass, setSelectedClass] = useState<string | null>(tx.suggested_classification ?? null);
   const [catSearch,     setCatSearch]     = useState('');
   const [description,   setDescription]  = useState(tx.merchant ?? tx.description ?? '');
+  const looksLikeTransfer = /transfer/i.test((tx.merchant ?? '') + ' ' + (tx.description ?? ''));
 
   const canConfirm = !!selectedCat && !!selectedClass && !isSaving;
   const searchLow  = catSearch.toLowerCase();
@@ -223,6 +224,11 @@ function CategorizarSheet({
               maxLength={80}
               returnKeyType="done"
             />
+            {looksLikeTransfer && (
+              <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9B9790' }}>
+                Contá a quién se lo transferiste o para qué fue, así después sabés de dónde salió este gasto.
+              </Text>
+            )}
           </View>
 
           <View style={{ gap: 12 }}>

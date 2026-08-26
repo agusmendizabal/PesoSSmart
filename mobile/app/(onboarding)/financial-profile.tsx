@@ -111,7 +111,7 @@ export default function FinancialProfileScreen() {
     if (!user?.id) return;
     try {
       await saveFinancialProfile(user.id);
-      router.push('/(onboarding)/interests');
+      router.push('/(onboarding)/last-month-expenses');
     } catch {
       // error en store
     }

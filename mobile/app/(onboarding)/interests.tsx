@@ -108,7 +108,7 @@ export default function InterestsScreen() {
     <SafeAreaView style={styles.safe}>
       {/* Progress */}
       <View style={styles.progressContainer}>
-        <View style={[styles.progressBar, { width: '66%' }]} />
+        <View style={[styles.progressBar, { width: '75%' }]} />
       </View>
 
       {/* Header */}
@@ -116,7 +116,7 @@ export default function InterestsScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text variant="label" color={colors.text.secondary}>PASO 2 DE 3</Text>
+        <Text variant="label" color={colors.text.secondary}>PASO 3 DE 4</Text>
         <View style={{ width: 24 }} />
       </View>
 

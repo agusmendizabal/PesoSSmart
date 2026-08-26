@@ -131,7 +131,7 @@ export default function RiskProfileScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text variant="label" color={colors.text.secondary}>PASO 3 DE 3</Text>
+        <Text variant="label" color={colors.text.secondary}>PASO 4 DE 4</Text>
         <View style={{ width: 24 }} />
       </View>
 

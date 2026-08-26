@@ -2281,6 +2281,7 @@ export default function ExpensesScreen() {
                     onChangeText={onChange}
                     onBlur={onBlur}
                     error={errors.description?.message}
+                    hint={selectedPayment === 'transfer' ? 'Contá a quién se lo transferiste o para qué fue, así después sabés de dónde salió este gasto.' : undefined}
                     autoCapitalize="sentences"
                   />
                 )}
@@ -2469,6 +2470,11 @@ export default function ExpensesScreen() {
                         maxLength={80}
                         returnKeyType="done"
                       />
+                      {editingExpense?.payment_method === 'transfer' && (
+                        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9B9790' }}>
+                          Contá a quién se lo transferiste o para qué fue, así después sabés de dónde salió este gasto.
+                        </Text>
+                      )}
                     </View>
 
                     {/* Tipo de gasto */}
