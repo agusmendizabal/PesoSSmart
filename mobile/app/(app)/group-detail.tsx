@@ -123,18 +123,27 @@ interface DebtEntry {
   iOweThem:     boolean;
 }
 
+interface LeaveRequest {
+  id:          string;
+  userId:      string;
+  userName:    string;
+  userInitial: string;
+  userColor:   string;
+}
+
 interface GroupDetail {
-  id:           string;
-  name:         string;
-  kind:         GroupKind;
-  inviteCode:   string;
-  groupColor:   string;
-  myRole:       MemberRole;
-  members:      MemberDetail[];
-  totalMonth:   number;
-  myMonthTotal: number;
-  expenses:     GroupExpense[];
-  debts:        DebtEntry[];
+  id:             string;
+  name:           string;
+  kind:           GroupKind;
+  inviteCode:     string;
+  groupColor:     string;
+  myRole:         MemberRole;
+  members:        MemberDetail[];
+  totalMonth:     number;
+  myMonthTotal:   number;
+  expenses:       GroupExpense[];
+  debts:          DebtEntry[];
+  leaveRequests:  LeaveRequest[];
 }
 
 interface FetchResult extends GroupDetail {
@@ -559,10 +568,28 @@ async function fetchGroupDetail(groupId: string, userId: string): Promise<FetchR
   const totalMonth   = members.reduce((s, m) => s + m.monthTotal, 0);
   const myMonthTotal = members.find(m => m.isMe)?.monthTotal ?? 0;
 
+  let leaveRequests: LeaveRequest[] = [];
+  if (!isFriends) {
+    const { data: lrRaw } = await db
+      .from('group_leave_requests')
+      .select('id, user_id')
+      .eq('group_id', groupId);
+    leaveRequests = (lrRaw ?? []).map((lr: any) => {
+      const m = members.find(m => m.userId === lr.user_id);
+      return {
+        id: lr.id,
+        userId: lr.user_id,
+        userName: m?.name ?? 'Miembro',
+        userInitial: m?.initial ?? '?',
+        userColor: m?.color ?? C.muted,
+      };
+    });
+  }
+
   return {
     id: group.id, name: group.name, kind, inviteCode: group.invite_code,
     groupColor, myRole, members, totalMonth, myMonthTotal, expenses, debts,
-    rawExpenses, rawSplits,
+    leaveRequests, rawExpenses, rawSplits,
   };
 }
 
@@ -2653,7 +2680,24 @@ export default function GroupDetailScreen() {
           onPress={() => Alert.alert('Opciones', '', [
             { text: 'Salir del grupo', style: 'destructive', onPress: async () => {
               if (!id || !user?.id) return;
-              await (supabase as any).from('family_members').delete().eq('group_id', id).eq('user_id', user.id);
+              const db = supabase as any;
+              // Grupos familiares: miembro no-admin pide permiso al admin
+              if (!isFriends && !isAdmin) {
+                const { data: existing } = await db
+                  .from('group_leave_requests').select('id')
+                  .eq('group_id', id).eq('user_id', user.id).maybeSingle();
+                if (existing) {
+                  Alert.alert('Solicitud pendiente', 'Ya enviaste una solicitud para salir. El admin debe aprobarla.');
+                  return;
+                }
+                const { error } = await db
+                  .from('group_leave_requests').insert({ group_id: id, user_id: user.id });
+                if (error) { Alert.alert('Error', 'No pudimos enviar tu solicitud. Intentá de nuevo.'); return; }
+                Alert.alert('Solicitud enviada', 'El admin del grupo debe aprobar tu salida.');
+                return;
+              }
+              // Amigos o admin: salida directa
+              await db.from('family_members').delete().eq('group_id', id).eq('user_id', user.id);
               router.replace('/(app)/family' as any);
             }},
             { text: 'Cancelar', style: 'cancel' },
@@ -2719,9 +2763,56 @@ export default function GroupDetailScreen() {
           )}
           {/* Modal miembros */}
           <FormSheetModal visible={showMembers} title="Miembros" onClose={() => setShowMembers(false)} presentationStyle="formSheet">
+
+            {/* Solicitudes de salida (solo admin, grupos familiares) */}
+            {isAdmin && !isFriends && detail.leaveRequests.length > 0 && (
+              <View style={[s.card, { borderWidth: 1.5, borderColor: C.orange + '60', backgroundColor: C.orangeLt, marginBottom: sp.md }]}>
+                <View style={{ padding: sp.lg, gap: sp.sm }}>
+                  <Text style={[s.sectionLabel, { color: C.orange }]}>SOLICITUDES DE SALIDA</Text>
+                  {detail.leaveRequests.map((lr, i) => (
+                    <View key={lr.id}>
+                      {i > 0 && <View style={[s.divider, { marginHorizontal: 0, marginVertical: sp.sm }]} />}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                        <Avatar name={lr.userName} color={lr.userColor} size={38} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.memberName}>{lr.userName}</Text>
+                          <Text style={[s.memberMeta, { color: C.orange }]}>Quiere salir del grupo</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={{ backgroundColor: C.red, borderRadius: 8, paddingHorizontal: sp.md, paddingVertical: sp.xs + 2 }}
+                          onPress={async () => {
+                            const db = supabase as any;
+                            await Promise.all([
+                              db.from('family_members').delete().eq('group_id', id).eq('user_id', lr.userId),
+                              db.from('group_leave_requests').delete().eq('id', lr.id),
+                            ]);
+                            load();
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 12, color: C.white }}>Aprobar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{ backgroundColor: C.border, borderRadius: 8, paddingHorizontal: sp.md, paddingVertical: sp.xs + 2 }}
+                          onPress={async () => {
+                            await (supabase as any).from('group_leave_requests').delete().eq('id', lr.id);
+                            load();
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 12, color: C.text2 }}>Rechazar</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
             <View style={s.card}>
               {detail.members.map((m, i) => {
                 const canEdit = isAdmin && !m.isMe && !isFriends;
+                const hasPendingLeave = !isFriends && detail.leaveRequests.some(lr => lr.userId === m.userId);
                 return (
                   <View key={m.userId}>
                     {i > 0 && <View style={s.divider} />}
@@ -2730,6 +2821,11 @@ export default function GroupDetailScreen() {
                       <View style={{ flex: 1, gap: 3 }}>
                         <Text style={s.memberName} numberOfLines={1}>{m.isMe ? `Vos (${m.name})` : m.name}</Text>
                         {m.email ? <Text style={s.memberMeta} numberOfLines={1}>{m.email}</Text> : null}
+                        {hasPendingLeave && (
+                          <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 11, color: C.orange }}>
+                            Solicitud de salida pendiente
+                          </Text>
+                        )}
                       </View>
                       {!isFriends && (
                         <View style={[s.badge, { backgroundColor: C.accent }]}>

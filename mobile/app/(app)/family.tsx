@@ -124,7 +124,7 @@ async function fetchGroups(userId: string): Promise<Group[]> {
 
   const recentDate = sevenDaysAgo();
 
-  return (groupsRaw ?? []).map((g: any): Group => {
+  const groups = (groupsRaw ?? []).map((g: any): Group => {
     const myMembership = memberships.find((m: any) => m.group_id === g.id);
     const groupMembers: any[] = (membersRaw ?? []).filter((m: any) => m.group_id === g.id);
 
@@ -148,6 +148,12 @@ async function fetchGroups(userId: string): Promise<Group[]> {
       myRole:       mapRole(myMembership?.role ?? 'child'),
       totalMonth, myMonthTotal, hasActivity, members,
     };
+  });
+  // Grupos familiares primero
+  return groups.sort((a, b) => {
+    if (a.kind === 'familiar' && b.kind !== 'familiar') return -1;
+    if (a.kind !== 'familiar' && b.kind === 'familiar') return  1;
+    return 0;
   });
 }
 
@@ -207,7 +213,7 @@ function GroupCard({ group, onPress }: { group: Group; onPress: () => void }) {
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={s.gcName} numberOfLines={1}>{group.name}</Text>
             <Text style={s.gcMeta}>
-              {isFriends ? 'Amigos' : 'Familia'} · {group.myRole}
+              {isFriends ? 'Compartido' : 'Familiar'} · {group.myRole}
             </Text>
           </View>
           {group.hasActivity && <View style={s.activityDot} />}
@@ -267,9 +273,9 @@ function TypeSelectorStep({ onCreate }: { onCreate: (kind: CreateKind) => void }
         <View style={ts.cardIconMint}>
           <Ionicons name="people-outline" size={28} color={C.green} />
         </View>
-        <Text style={ts.cardTitleMint}>Amigos</Text>
+        <Text style={ts.cardTitleMint}>Compartido</Text>
         <Text style={ts.cardDescMint}>
-          Todos ven los gastos compartidos. Vos elegís qué subir al grupo.
+          Todos ven los gastos del grupo. Vos elegís qué subir al grupo.
         </Text>
         <View style={ts.badgeMint}>
           <Ionicons name="hand-left-outline" size={11} color={C.green} />
@@ -345,7 +351,7 @@ function NameInputStep({
           <Ionicons name={kind === 'amigos' ? 'people-outline' : 'home-outline'} size={22} color={C.green} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={ni.title}>{kind === 'amigos' ? 'Grupo de amigos' : 'Grupo familiar'}</Text>
+          <Text style={ni.title}>{kind === 'amigos' ? 'Grupo compartido' : 'Grupo familiar'}</Text>
           <Text style={ni.subtitle}>Dale un nombre</Text>
         </View>
       </View>
@@ -523,7 +529,7 @@ export default function FamilyScreen() {
             </View>
             <Text style={s.emptyTitle}>Sin grupos todavía</Text>
             <Text style={s.emptySub}>
-              Organizá gastos compartidos con tu familia o amigos. Cada uno registra los propios y todos ven el resumen.
+              Organizá gastos con tu familia o en grupos compartidos. Cada uno registra los propios y todos ven el resumen.
             </Text>
             <TouchableOpacity style={s.emptyBtnPrimary} onPress={openCreate} activeOpacity={0.85}>
               <Ionicons name="add" size={18} color={C.white} />

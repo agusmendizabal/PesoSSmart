@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Image,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, layout } from '@/theme';
 import { Text } from '@/components/ui';
@@ -25,7 +25,7 @@ import type { CategoryRowInput } from '@/lib/financialDiagnosis';
 import { fetchBudgetPlan, type BudgetPlan } from '@/lib/budgetPlan';
 import { BudgetRingIndicator } from '@/components/BudgetCard';
 import { GoalsPreview } from '@/components/GoalsPreview';
-import { ConnectIntegrationsBanner } from '@/components/ConnectIntegrationsBanner';
+import { HomeAlertBanners } from '@/components/HomeAlertBanners';
 import { scheduleBudgetAlert } from '@/lib/notifications';
 import { getGreeting } from '@/utils/format';
 import { useFirstVisit } from '@/hooks/useFirstVisit';
@@ -78,20 +78,6 @@ export default function HomeScreen() {
 
     if (user?.id) {
       (supabase as any)
-        .from('gmail_connections')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-        .then(({ data }: { data: { id: string } | null }) => setGmailConnected(!!data));
-
-      (supabase as any)
-        .from('mp_connections')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle()
-        .then(({ data }: { data: { id: string } | null }) => setMpConnected(!!data));
-
-      (supabase as any)
         .from('pending_transactions')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
@@ -99,6 +85,35 @@ export default function HomeScreen() {
         .then(({ count }: { count: number | null }) => setPendingCount(count ?? 0));
     }
   }, [user?.id]);
+
+  // Re-chequea conexiones cada vez que la pantalla vuelve al foco (ej: al volver de gmail-connect)
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id) return;
+      (supabase as any)
+        .from('gmail_connections')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }: { data: { id: string } | null }) => setGmailConnected(!!data));
+      (supabase as any)
+        .from('mp_connections')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }: { data: { id: string } | null }) => setMpConnected(!!data));
+    }, [user?.id])
+  );
+
+  // Muestra aviso si no hay gastos cargados en los últimos 3 días
+  const showExpensesWarning = useMemo(() => {
+    if (isLoading) return false;
+    const lastDate = expenses[0]?.date;
+    if (!lastDate) return true;
+    const cut = new Date();
+    cut.setDate(cut.getDate() - 3);
+    return lastDate < cut.toISOString().split('T')[0];
+  }, [expenses, isLoading]);
 
   // Notificaciones de presupuesto
   useEffect(() => {
@@ -171,6 +186,15 @@ export default function HomeScreen() {
           <Image source={require('../../assets/nomi-logo.jpeg')} style={styles.greetingLogo} />
           <Text variant="labelMd">{getGreeting(profile?.full_name ?? undefined)}</Text>
         </View>
+
+        {/* ── AVISOS ──────────────────────────────────────────────────────────── */}
+        <HomeAlertBanners
+          userId={user?.id}
+          showExpensesWarning={showExpensesWarning}
+          gmailConnected={gmailConnected}
+          mpConnected={mpConnected}
+          onMpConnected={() => setMpConnected(true)}
+        />
 
         {isLoading && expenses.length === 0 && <HomeSkeletonLoader />}
 
@@ -273,13 +297,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* ── 6. CONECTAR GMAIL / MERCADO PAGO ────────────────────────────────── */}
-        {!gmailConnected && !mpConnected && (
-          <ConnectIntegrationsBanner
-            userId={user?.id}
-            onConnected={() => setMpConnected(true)}
-          />
-        )}
       </ScrollView>
 
       {/* ── Tour primera visita ─────────────────────────────────────────────── */}

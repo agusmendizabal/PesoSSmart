@@ -6,7 +6,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text } from '@/components/ui';
-import QRCode from 'react-native-qrcode-svg';
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 
@@ -71,9 +70,9 @@ export default function GroupCodeScreen() {
 
       <View style={s.body}>
 
-        {/* QR icon */}
-        <View style={s.qrIconWrap}>
-          <Ionicons name="qr-code" size={42} color={C.purple} />
+        {/* Icono */}
+        <View style={s.iconWrap}>
+          <Ionicons name="key-outline" size={42} color={C.purple} />
         </View>
 
         <Text style={s.headline}>
@@ -92,13 +91,7 @@ export default function GroupCodeScreen() {
               {code}
             </Text>
           </View>
-          <Text style={s.codeSub}>Código de tu grupo</Text>
-
-          {!!code && (
-            <View style={s.qrArea}>
-              <QRCode value={code} size={154} color={C.purple} backgroundColor={C.bg} />
-            </View>
-          )}
+          <Text style={s.codeSub}>Código de 6 caracteres</Text>
         </View>
 
         <Text style={s.disclaimer}>
@@ -143,7 +136,7 @@ const s = StyleSheet.create({
     gap: sp.xl,
   },
 
-  qrIconWrap: {
+  iconWrap: {
     width: 88, height: 88, borderRadius: 24,
     backgroundColor: C.purpleLt,
     alignItems: 'center', justifyContent: 'center',
@@ -171,11 +164,6 @@ const s = StyleSheet.create({
     letterSpacing: 4, textAlign: 'center',
   },
   codeSub: { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.muted },
-
-  qrArea: {
-    padding: sp.lg, backgroundColor: C.bg, borderRadius: 16,
-    marginTop: sp.sm,
-  },
 
   disclaimer: {
     fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.muted,
