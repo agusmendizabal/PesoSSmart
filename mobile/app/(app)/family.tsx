@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, ScrollView, StyleSheet, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, RefreshControl,
+  TextInput, Alert, ActivityIndicator, RefreshControl, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -41,6 +41,7 @@ interface Member {
   initial:    string;
   monthTotal: number;
   isMe:       boolean;
+  avatarUrl?: string;
 }
 
 interface Group {
@@ -107,12 +108,12 @@ async function fetchGroups(userId: string): Promise<Group[]> {
   const allUserIds: string[] = Array.from(new Set<string>((membersRaw ?? []).map((m: any) => m.user_id as string)));
 
   const [{ data: profilesRaw }, { data: expensesRaw }] = await Promise.all([
-    db.from('profiles').select('id, full_name, email').in('id', allUserIds),
+    db.from('profiles').select('id, full_name, email, avatar_url').in('id', allUserIds),
     db.from('expenses').select('user_id, amount, date')
       .in('user_id', allUserIds).gte('date', currentMonthStart()).is('deleted_at', null),
   ]);
 
-  const profileMap: Record<string, { full_name?: string; email?: string }> = {};
+  const profileMap: Record<string, { full_name?: string; email?: string; avatar_url?: string }> = {};
   for (const p of profilesRaw ?? []) profileMap[p.id] = p;
 
   const totals: Record<string, number> = {};
@@ -135,6 +136,7 @@ async function fetchGroups(userId: string): Promise<Group[]> {
         name, initial: name.charAt(0).toUpperCase(),
         monthTotal: totals[m.user_id] ?? 0,
         isMe: m.user_id === userId,
+        avatarUrl: p?.avatar_url ?? undefined,
       };
     });
 
@@ -165,16 +167,24 @@ function AvatarStack({ members }: { members: Member[] }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
       {visible.map((m, i) => (
-        <View
-          key={i}
-          style={[
-            av.circle,
-            { backgroundColor: AVATAR_COLORS[hashIdx(m.name, AVATAR_COLORS.length)], marginLeft: i === 0 ? 0 : -8 },
-            m.isMe && av.isMe,
-          ]}
-        >
-          <Text style={av.initial}>{m.initial}</Text>
-        </View>
+        m.avatarUrl ? (
+          <Image
+            key={i}
+            source={{ uri: m.avatarUrl }}
+            style={[av.circle, { marginLeft: i === 0 ? 0 : -8 }]}
+          />
+        ) : (
+          <View
+            key={i}
+            style={[
+              av.circle,
+              { backgroundColor: AVATAR_COLORS[hashIdx(m.name, AVATAR_COLORS.length)], marginLeft: i === 0 ? 0 : -8 },
+              m.isMe && av.isMe,
+            ]}
+          >
+            <Text style={av.initial}>{m.initial}</Text>
+          </View>
+        )
       ))}
       {extra > 0 && (
         <View style={[av.circle, av.extra, { marginLeft: -8 }]}>

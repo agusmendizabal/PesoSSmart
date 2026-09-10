@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
-  Linking,
+  Image,
   ActivityIndicator,
 } from 'react-native';
-import * as LocalAuth from 'expo-local-authentication';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,15 +19,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { colors, spacing, layout } from '@/theme';
 import { Text, Card, Button, Input, FormSheetModal } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
-import { usePlanStore } from '@/store/planStore';
 import { useRoundUpStore } from '@/store/roundUpStore';
 import type { RoundTo, RoundDest } from '@/store/roundUpStore';
-import { PLANS } from '@/lib/plans';
 import { supabase } from '@/lib/supabase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMpConnect } from '@/hooks/useMpConnect';
-
-const BIOMETRIC_KEY = '@nomi/biometric_enabled';
 
 const editSchema = z.object({
   full_name: z.string().min(1, 'Ingresá tu nombre.').max(80),
@@ -66,37 +61,17 @@ function MenuItem({ icon, label, description, onPress, color = colors.text.secon
 
 export default function ProfileScreen() {
   const { profile, user, signOut, updateProfile, isLoading } = useAuthStore();
-  const {
-    effectivePlan,
-    msgCount,
-    msgLimit,
-    isTrialActive,
-    daysLeftInTrial,
-    planExpiresAt,
-    load: loadPlan,
-  } = usePlanStore();
 
   const roundUp = useRoundUpStore();
-
-  useEffect(() => {
-    if (user?.id) loadPlan(user.id);
-  }, [user?.id]);
 
   useEffect(() => {
     roundUp.load();
     roundUp.checkReset();
   }, []);
 
-  const trialActive   = isTrialActive();
-  const daysLeft      = daysLeftInTrial();
-  const plan          = PLANS[effectivePlan];
-  const renewalDate   = !trialActive && planExpiresAt
-    ? new Date(planExpiresAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
-    : null;
   const [showEditModal,    setShowEditModal]    = useState(false);
   const [showRoundUpModal, setShowRoundUpModal] = useState(false);
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [uploadingPhoto,   setUploadingPhoto]   = useState(false);
   const [gmailEmail,    setGmailEmail]    = useState<string | null>(null);
   const [mpEmail,       setMpEmail]       = useState<string | null>(null);
   const [mpSyncing,     setMpSyncing]     = useState(false);
@@ -133,28 +108,39 @@ export default function ProfileScreen() {
     loadMpStatus();
   }, [user?.id]);
 
-  // ── Biometría ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    LocalAuth.hasHardwareAsync().then(has => {
-      if (!has) return;
-      LocalAuth.isEnrolledAsync().then(enrolled => {
-        setBiometricAvailable(enrolled);
-      });
-    });
-    AsyncStorage.getItem(BIOMETRIC_KEY).then(v => setBiometricEnabled(v === 'true'));
-  }, []);
-
-  const toggleBiometric = useCallback(async (value: boolean) => {
-    if (value) {
-      const result = await LocalAuth.authenticateAsync({
-        promptMessage: 'Confirmá tu identidad para activar la seguridad biométrica',
-        fallbackLabel:  'Usar contraseña',
-      });
-      if (!result.success) return;
+  // ── Foto de perfil ─────────────────────────────────────────────────────────
+  const handlePickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permiso requerido', 'Necesitamos acceso a tu galería para cambiar la foto.');
+      return;
     }
-    setBiometricEnabled(value);
-    await AsyncStorage.setItem(BIOMETRIC_KEY, String(value));
-  }, []);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled) return;
+    setUploadingPhoto(true);
+    try {
+      const uri = result.assets[0].uri;
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const { error } = await supabase.storage
+        .from('avatars')
+        .upload(`${user!.id}.jpg`, blob, { contentType: 'image/jpeg', upsert: true });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(`${user!.id}.jpg`);
+      await updateProfile({ avatar_url: publicUrl });
+    } catch {
+      Alert.alert('Error', 'No se pudo actualizar la foto. Intentá de nuevo.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   // ── Eliminar cuenta ────────────────────────────────────────────────────────
   const handleDeleteAccount = () => {
@@ -362,44 +348,26 @@ export default function ProfileScreen() {
 
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <View style={styles.profileHeader}>
-          <Text variant="h4">Perfil</Text>
-          <TouchableOpacity onPress={openEditModal} style={styles.editBtn}>
-            <Ionicons name="settings-outline" size={22} color={colors.text.secondary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* ── Seguridad y acceso ──────────────────────────────────────────── */}
-        <View style={styles.section}>
-          <Text variant="label" color={colors.text.tertiary} style={styles.sectionTitle}>SEGURIDAD Y ACCESO</Text>
-          <Text variant="caption" color={colors.text.tertiary} style={{ marginBottom: spacing[3] }}>
-            Protegé tu cuenta y tus datos
-          </Text>
-          <Card style={styles.menuCard}>
-            <View style={styles.menuItem}>
-              <View style={[styles.menuIcon, { backgroundColor: biometricEnabled ? colors.primary + '15' : colors.bg.elevated }]}>
-                <Ionicons
-                  name="finger-print-outline"
-                  size={20}
-                  color={biometricEnabled ? colors.primary : colors.text.secondary}
-                />
+          <TouchableOpacity style={styles.avatarWrap} onPress={handlePickPhoto} activeOpacity={0.8}>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
+            ) : (
+              <View style={styles.avatarInitials}>
+                <Text variant="h3" color={colors.white}>{initials}</Text>
               </View>
-              <View style={styles.menuText}>
-                <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }}>
-                  Seguridad biométrica
-                </Text>
-                <Text variant="caption" color={colors.text.secondary}>
-                  Usá tu huella para ingresar
-                </Text>
-              </View>
-              <Switch
-                value={biometricEnabled}
-                onValueChange={biometricAvailable ? toggleBiometric : undefined}
-                trackColor={{ false: colors.border.default, true: colors.primary + '80' }}
-                thumbColor={biometricEnabled ? colors.primary : colors.text.tertiary}
-                disabled={!biometricAvailable}
-              />
+            )}
+            <View style={styles.cameraBadge}>
+              {uploadingPhoto
+                ? <ActivityIndicator size="small" color={colors.text.secondary} />
+                : <Ionicons name="camera-outline" size={14} color={colors.text.secondary} />}
             </View>
-          </Card>
+          </TouchableOpacity>
+          <Text variant="subtitle" style={{ marginTop: spacing[3] }}>
+            {profile?.full_name ?? 'Mi perfil'}
+          </Text>
+          <Text variant="caption" color={colors.text.tertiary}>
+            {profile?.email ?? user?.email ?? ''}
+          </Text>
         </View>
 
         {/* ── Mi cuenta ───────────────────────────────────────────────────── */}
@@ -413,30 +381,6 @@ export default function ProfileScreen() {
             <MenuItem icon="mail-outline" label="Correo y contraseña" onPress={() => Alert.alert('Correo', profile?.email ?? '')} />
             <View style={styles.menuDivider} />
             <MenuItem icon="notifications-outline" label="Notificaciones" onPress={() => Alert.alert('Próximamente', 'Gestión de notificaciones en camino.')} />
-            <View style={styles.menuDivider} />
-
-            {/* Plan row */}
-            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(app)/plans')}>
-              <View style={[styles.menuIcon, { backgroundColor: colors.primary + '12' }]}>
-                <Ionicons name="star-outline" size={20} color={colors.primary} />
-              </View>
-              <View style={styles.menuText}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
-                  <Text variant="bodySmall" color={colors.text.primary}>
-                    {trialActive ? 'Prueba Premium' : plan.name}
-                  </Text>
-                  {trialActive && (
-                    <View style={styles.trialBadge}>
-                      <Text style={styles.trialBadgeText}>
-                        Activo hasta {planExpiresAt ? new Date(planExpiresAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
-            </TouchableOpacity>
-
             <View style={styles.menuDivider} />
             <MenuItem icon="help-circle-outline" label="Centro de ayuda" description="Repasá cómo funciona cada pantalla" onPress={() => router.push('/(app)/help')} />
             <View style={styles.menuDivider} />
@@ -707,9 +651,13 @@ export default function ProfileScreen() {
       >
               {/* Avatar preview */}
               <View style={styles.modalAvatarRow}>
-                <View style={styles.modalAvatar}>
-                  <Text variant="h3" color={colors.white}>{initials}</Text>
-                </View>
+                <TouchableOpacity style={styles.modalAvatar} onPress={() => { setShowEditModal(false); handlePickPhoto(); }}>
+                  {profile?.avatar_url ? (
+                    <Image source={{ uri: profile.avatar_url }} style={styles.modalAvatarImg} />
+                  ) : (
+                    <Text variant="h3" color={colors.white}>{initials}</Text>
+                  )}
+                </TouchableOpacity>
               </View>
 
               {/* Email (solo lectura) */}
@@ -780,28 +728,37 @@ const styles = StyleSheet.create({
     gap: spacing[4],
   },
   profileHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing[4],
+    paddingVertical: spacing[6],
+    gap: spacing[2],
   },
-  avatar: {
-    width: 64,
-    height: 64,
+  avatarWrap: {
+    width: 88,
+    height: 88,
+    position: 'relative',
+  },
+  avatarImg: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+  },
+  avatarInitials: {
+    width: 88,
+    height: 88,
     backgroundColor: colors.primary,
-    borderRadius: 32,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarEditBadge: {
+  cameraBadge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 18,
-    height: 18,
+    width: 26,
+    height: 26,
     backgroundColor: colors.bg.elevated,
-    borderRadius: 9,
-    borderWidth: 1,
+    borderRadius: 13,
+    borderWidth: 1.5,
     borderColor: colors.border.default,
     alignItems: 'center',
     justifyContent: 'center',
@@ -867,6 +824,12 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  modalAvatarImg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   reconnectBanner: {
     flexDirection:     'row',
