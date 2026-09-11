@@ -41,15 +41,6 @@ export default function AppLayout() {
       }}
     >
       <Tabs.Screen
-        name="savings"
-        options={{
-          title: 'Ahorros',
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name="wallet" focused={focused} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="expenses"
         options={{
           title: 'Análisis',
@@ -76,24 +67,17 @@ export default function AppLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Perfil',
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon name="person" focused={focused} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen name="movimientos"    options={{ href: null }} />
-      <Tabs.Screen name="reports"        options={{ href: null }} />
-      <Tabs.Screen name="advisor"        options={{ href: null }} />
-      <Tabs.Screen name="group-detail"   options={{ href: null }} />
-      <Tabs.Screen name="group-code"     options={{ href: null }} />
-      <Tabs.Screen name="member-detail"  options={{ href: null }} />
-      <Tabs.Screen name="plans"          options={{ href: null }} />
-      <Tabs.Screen name="gmail-connect"  options={{ href: null }} />
-      <Tabs.Screen name="savings-plan"    options={{ href: null }} />
+      <Tabs.Screen name="savings"                options={{ href: null }} />
+      <Tabs.Screen name="profile"                options={{ href: null }} />
+      <Tabs.Screen name="movimientos"            options={{ href: null }} />
+      <Tabs.Screen name="reports"                options={{ href: null }} />
+      <Tabs.Screen name="advisor"                options={{ href: null }} />
+      <Tabs.Screen name="group-detail"           options={{ href: null }} />
+      <Tabs.Screen name="group-code"             options={{ href: null }} />
+      <Tabs.Screen name="member-detail"          options={{ href: null }} />
+      <Tabs.Screen name="plans"                  options={{ href: null }} />
+      <Tabs.Screen name="gmail-connect"          options={{ href: null }} />
+      <Tabs.Screen name="savings-plan"           options={{ href: null }} />
       <Tabs.Screen name="category-detail"        options={{ href: null }} />
       <Tabs.Screen name="savings-opportunities"  options={{ href: null }} />
       <Tabs.Screen name="savings-goal"           options={{ href: null }} />

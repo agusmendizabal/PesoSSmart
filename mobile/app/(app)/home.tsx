@@ -183,8 +183,26 @@ export default function HomeScreen() {
         }
       >
         <View style={styles.greetingRow}>
-          <Image source={require('../../assets/nomi-logo.jpeg')} style={styles.greetingLogo} />
-          <Text variant="labelMd">{getGreeting(profile?.full_name ?? undefined)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+            <Image source={require('../../assets/nomi-logo.jpeg')} style={styles.greetingLogo} />
+            <Text variant="labelMd">{getGreeting(profile?.full_name ?? undefined)}</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => router.push('/(app)/profile' as any)}
+            activeOpacity={0.8}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={styles.headerAvatar} />
+            ) : (
+              <View style={styles.headerAvatarFallback}>
+                <Text style={styles.headerAvatarInitial}>
+                  {(profile?.full_name ?? user?.email ?? '?')
+                    .split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* ── AVISOS ──────────────────────────────────────────────────────────── */}
@@ -372,7 +390,7 @@ const styles = StyleSheet.create({
   greetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing[2],
+    justifyContent: 'space-between',
     marginBottom: -spacing[2],
   },
   greetingLogo: {
@@ -380,6 +398,24 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     resizeMode: 'contain',
+  },
+  headerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  headerAvatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#27AE60',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarInitial: {
+    fontFamily: 'Montserrat_700Bold',
+    fontSize: 13,
+    color: '#FFFFFF',
   },
   donutCard: {
     backgroundColor: colors.bg.card,
