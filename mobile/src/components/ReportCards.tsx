@@ -487,9 +487,9 @@ export function ResumenCard({ total, necessary, disposable, investable, estimate
       )}
       <View style={resStyles.breakdown}>
         {[
-          { label: 'Necesario',    amount: necessary,  color: '#5B9EF9' },
-          { label: 'Prescindible', amount: disposable, color: '#FF7B7B' },
-          { label: 'Invertible',   amount: investable, color: '#4DC889' },
+          { label: 'Esencial',      amount: necessary,  color: '#5B9EF9' },
+          { label: 'Opcional',      amount: disposable, color: '#FF7B7B' },
+          { label: 'Para invertir', amount: investable, color: '#4DC889' },
         ].filter(i => i.amount > 0).map(({ label, amount, color }) => (
           <View key={label} style={resStyles.breakdownItem}>
             <Text variant="caption" color={colors.text.tertiary}>{label.toUpperCase()}</Text>

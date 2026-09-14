@@ -220,7 +220,7 @@ export default function HomeScreen() {
         {categoryRows.length > 0 ? (
           <TouchableOpacity
             activeOpacity={0.9}
-            onPress={() => router.push('/(app)/movimientos' as any)}
+            onPress={() => router.push({ pathname: '/(app)/expenses', params: { tab: 'categorias' } } as any)}
           >
             <View style={{ gap: spacing[4] }}>
               <ResumenCard
@@ -242,7 +242,7 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={styles.emptyCategoryCard}
             activeOpacity={0.85}
-            onPress={() => router.push('/(app)/movimientos' as any)}
+            onPress={() => router.push({ pathname: '/(app)/expenses', params: { tab: 'categorias' } } as any)}
           >
             <Ionicons name="pie-chart-outline" size={22} color={colors.text.tertiary} />
             <View style={{ flex: 1 }}>

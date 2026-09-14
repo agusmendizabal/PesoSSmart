@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Svg, { Path as SvgPath } from 'react-native-svg';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   View,
   ScrollView,
+  FlatList,
+  Modal,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -97,6 +99,7 @@ const msStyles = StyleSheet.create({
 
 export default function ExpensesScreen() {
   const router = useRouter();
+  const { tab: initialTab } = useLocalSearchParams<{ tab?: string }>();
   const { user } = useAuthStore();
   const {
     expenses,
@@ -117,7 +120,10 @@ export default function ExpensesScreen() {
 
   // ── Análisis ──
   const now = new Date();
-  const [reportTab,       setReportTab]       = useState<'resumen' | 'categorias' | 'oportunidades' | 'salud'>('resumen');
+  const validTabs = ['resumen', 'categorias', 'salud', 'oportunidades'] as const;
+  const [reportTab, setReportTab] = useState<typeof validTabs[number]>(
+    validTabs.includes(initialTab as any) ? (initialTab as typeof validTabs[number]) : 'resumen'
+  );
   const [reportRows,      setReportRows]      = useState<CategoryRow[]>([]);
   const [reportTotal,     setReportTotal]     = useState(0);
   const [history,         setHistory]         = useState<MonthSummary[]>([]);
@@ -125,7 +131,9 @@ export default function ExpensesScreen() {
   const [inflationRate,   setInflationRate]   = useState(0);
   const [fciRate,         setFciRate]         = useState(0.03);
   const [pastOppData,     setPastOppData]     = useState<{ monthKey: string; disposable: number; categories: Record<string, number> }[]>([]);
-  const [smartPlan,       setSmartPlan]       = useState<BudgetPlan | null>(null);
+  const [smartPlan,           setSmartPlan]           = useState<BudgetPlan | null>(null);
+  const [movimientosVisible,  setMovimientosVisible]  = useState(false);
+  const [scoreExpanded,       setScoreExpanded]       = useState(false);
 
   useEffect(() => {
     if (user?.id) fetchBudgetPlan(user.id).then(setSmartPlan);
@@ -207,10 +215,10 @@ export default function ExpensesScreen() {
 
   useEffect(() => { if (user?.id) loadSavings(user.id); }, [user?.id]);
 
-  const displayTotal      = isCurrentMonth ? totalThisMonth  : reportTotal;
-  const displayNecessary  = isCurrentMonth ? totalNecessary  : 0;
-  const displayDisposable = isCurrentMonth ? totalDisposable : 0;
-  const displayInvestable = isCurrentMonth ? totalInvestable : 0;
+  const displayTotal      = isCurrentMonth ? totalThisMonth : reportTotal;
+  const displayNecessary  = 0;
+  const displayDisposable = 0;
+  const displayInvestable = 0;
   const displayIncome     = isCurrentMonth ? estimatedIncome : null;
 
   const comparacion      = useMemo(() => buildComparacion(history, displayTotal, displayDisposable), [history, displayTotal, displayDisposable]);
@@ -246,6 +254,48 @@ export default function ExpensesScreen() {
         />
       </View>
 
+        {/* ── Modal: Ver tus movimientos ── */}
+        <Modal visible={movimientosVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMovimientosVisible(false)}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg.primary }} edges={['top']}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: layout.screenPadding, paddingVertical: spacing[4], borderBottomWidth: 1, borderBottomColor: colors.border.subtle }}>
+              <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 17, color: colors.text.primary }}>
+                Movimientos {MONTH_NAMES_SHORT[reportMonth - 1]}
+              </Text>
+              <TouchableOpacity onPress={() => setMovimientosVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close" size={22} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+            {expenses.length === 0 ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[3] }}>
+                <Ionicons name="receipt-outline" size={48} color={colors.text.tertiary} />
+                <Text variant="body" color={colors.text.secondary} align="center">Sin movimientos este mes</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={expenses as any[]}
+                keyExtractor={item => item.id}
+                contentContainerStyle={{ paddingHorizontal: layout.screenPadding, paddingTop: spacing[3], paddingBottom: spacing[10], gap: spacing[2] }}
+                renderItem={({ item }) => {
+                  const catName = item.category?.name_es ?? 'Sin categoría';
+                  const dateStr = new Date(item.date + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+                  return (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: colors.bg.card, paddingVertical: 12, paddingHorizontal: spacing[4], borderRadius: 12, borderWidth: 1, borderColor: colors.border.default }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.bg.elevated, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Text style={{ fontSize: 16 }}>{item.category?.icon ?? '💸'}</Text>
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: colors.text.primary }} numberOfLines={1}>{item.description}</Text>
+                        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 11, color: colors.text.tertiary }}>{catName} · {dateStr}</Text>
+                      </View>
+                      <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 13, color: colors.text.primary }}>{formatCurrency(item.amount)}</Text>
+                    </View>
+                  );
+                }}
+              />
+            )}
+          </SafeAreaView>
+        </Modal>
+
         <ScrollView
           style={styles.flatList}
           contentContainerStyle={styles.analysisList}
@@ -277,12 +327,17 @@ export default function ExpensesScreen() {
             const unclasCount = expenses.filter(e => e.category_id === null).length;
             if (unclasCount === 0) return null;
             return (
-              <View style={reportS.precisionNotice}>
-                <Ionicons name="information-circle-outline" size={14} color="#607D8B" />
+              <TouchableOpacity
+                style={reportS.precisionNotice}
+                onPress={() => setMovimientosVisible(true)}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="warning-outline" size={14} color={colors.yellow} />
                 <Text style={reportS.precisionText}>
-                  {unclasCount} gasto{unclasCount > 1 ? 's' : ''} sin clasificar no {unclasCount > 1 ? 'están incluidos' : 'está incluido'} en este análisis.
+                  {unclasCount} gasto{unclasCount > 1 ? 's' : ''} sin categoría afectan la precisión
                 </Text>
-              </View>
+                <Text style={reportS.precisionCta}>Agregar categoría →</Text>
+              </TouchableOpacity>
             );
           })()}
 
@@ -300,10 +355,21 @@ export default function ExpensesScreen() {
           ) : (
             <>
               {reportTab === 'resumen' && (() => {
-                const donutRows  = reportRows.length > 0 ? reportRows : catBreakdown;
-                const donutTotal = reportRows.length > 0 ? (reportTotal || displayTotal) : totalThisMonth;
+                const donutRows  = isCurrentMonth ? catBreakdown : (reportRows.length > 0 ? reportRows : catBreakdown);
+                const donutTotal = isCurrentMonth ? totalThisMonth : (reportTotal || totalThisMonth);
                 return (
                   <>
+                    {/* Ver movimientos chip */}
+                    <TouchableOpacity
+                      style={reportS.movimientosChip}
+                      onPress={() => setMovimientosVisible(true)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="list-outline" size={14} color={colors.primary} />
+                      <Text style={reportS.movimientosChipText}>Ver tus movimientos del mes</Text>
+                      <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+                    </TouchableOpacity>
+
                     {donutRows.length > 0 && donutTotal > 0 && (
                       <View style={reportS.donutCard}>
                         <Text variant="label" color={colors.text.tertiary} style={{ marginBottom: 16 }}>DISTRIBUCIÓN POR CATEGORÍA</Text>
@@ -346,22 +412,31 @@ export default function ExpensesScreen() {
                 );
               })()}
 
-              {reportTab === 'categorias' && (
-                <>
-                  <ResumenCard
-                    total={displayTotal} necessary={displayNecessary}
-                    disposable={displayDisposable} investable={displayInvestable}
-                    estimatedIncome={displayIncome}
-                  />
-                  {reportRows.length > 0 && (
-                    <View style={reportS.donutCard}>
-                      <Text variant="label" color={colors.text.tertiary} style={{ marginBottom: 16 }}>DISTRIBUCIÓN POR CATEGORÍA</Text>
-                      <CategoryDonut rows={reportRows} total={reportTotal || displayTotal} />
+              {reportTab === 'categorias' && (() => {
+                const catRows  = isCurrentMonth ? catBreakdown : (reportRows.length > 0 ? reportRows : catBreakdown);
+                const catTotal = isCurrentMonth ? totalThisMonth : (reportTotal || totalThisMonth);
+                return (
+                  <>
+                    {/* Total del mes — sin clasificación */}
+                    <View style={reportS.simpleTotalCard}>
+                      <Text variant="label" color={colors.text.tertiary}>TOTAL {MONTH_NAMES[reportMonth - 1].toUpperCase()}</Text>
+                      <Text style={reportS.simpleTotalAmount}>{formatCurrency(catTotal)}</Text>
+                      {displayIncome && displayIncome > 0 && catTotal > 0 && (
+                        <Text variant="bodySmall" color={colors.text.secondary}>
+                          {Math.round((catTotal / displayIncome) * 100)}% del ingreso estimado
+                        </Text>
+                      )}
                     </View>
-                  )}
-                  <CategoryBreakdown rows={reportRows} total={reportTotal || displayTotal} />
-                </>
-              )}
+                    {catRows.length > 0 && catTotal > 0 && (
+                      <View style={reportS.donutCard}>
+                        <Text variant="label" color={colors.text.tertiary} style={{ marginBottom: 16 }}>DISTRIBUCIÓN POR CATEGORÍA</Text>
+                        <CategoryDonut rows={catRows} total={catTotal} />
+                      </View>
+                    )}
+                    <CategoryBreakdown rows={catRows} total={catTotal} />
+                  </>
+                );
+              })()}
 
               {reportTab === 'salud' && (() => {
                 const diagRows = reportRows.map(r => ({
@@ -408,68 +483,68 @@ export default function ExpensesScreen() {
                   : null;
                 return (
                   <View style={{ gap: 12 }}>
-                    {/* Score card */}
-                    <View style={[styles.healthCard]}>
+                    {/* Score card — tappable para ver desglose */}
+                    <TouchableOpacity
+                      style={[styles.healthCard]}
+                      onPress={() => setScoreExpanded(prev => !prev)}
+                      activeOpacity={0.85}
+                    >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                         {/* Circular gauge */}
-                        <View style={{ width: 80, height: 80, alignItems: 'center', justifyContent: 'center' }}>
-                          <Svg width={80} height={80}>
+                        <View style={{ width: 88, height: 88, alignItems: 'center', justifyContent: 'center' }}>
+                          <Svg width={88} height={88}>
                             <SvgPath
-                              d="M 10 60 A 30 30 0 1 1 70 60"
+                              d="M 12 66 A 33 33 0 1 1 76 66"
                               stroke="#E5E7EB" strokeWidth={8} fill="none"
                               strokeLinecap="round"
                             />
                             <SvgPath
-                              d="M 10 60 A 30 30 0 1 1 70 60"
+                              d="M 12 66 A 33 33 0 1 1 76 66"
                               stroke={scoreColor} strokeWidth={8} fill="none"
                               strokeDasharray={`${arc} 201`}
                               strokeDashoffset={50} strokeLinecap="round"
                             />
                           </Svg>
                           <View style={{ position: 'absolute', alignItems: 'center' }}>
-                            <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 18, color: scoreColor, lineHeight: 22 }}>{score}</Text>
-                            <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 9, color: '#9B9790', lineHeight: 12 }}>/100</Text>
+                            <Text style={{ fontFamily: 'Montserrat_800ExtraBold', fontSize: 22, color: scoreColor, lineHeight: 26 }}>{score}</Text>
+                            <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 10, color: colors.text.tertiary, lineHeight: 13 }}>/100</Text>
                           </View>
                         </View>
                         {/* Info */}
                         <View style={{ flex: 1, gap: 6 }}>
-                          <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 16, color: '#1C1C1C' }}>Tu salud financiera</Text>
+                          <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 16, color: colors.text.primary }}>Tu salud financiera</Text>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: scoreColor + '18', alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 }}>
                             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: scoreColor }} />
                             <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 11, color: scoreColor }}>{scoreLabel}</Text>
                           </View>
                           {prevPct !== null && (
-                            <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63', lineHeight: 16 }}>
+                            <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: colors.text.secondary, lineHeight: 16 }}>
                               {prevPct > 0 ? `Gastaste ${prevPct}% más que el mes pasado.` : prevPct < 0 ? `Gastaste ${Math.abs(prevPct)}% menos que el mes pasado.` : 'Igual que el mes pasado.'}
                             </Text>
                           )}
                         </View>
                         {prevPct !== null && (
-                          <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 16, color: prevPct > 0 ? '#EF4444' : '#27AE60' }}>
+                          <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 16, color: prevPct > 0 ? colors.red : colors.neon }}>
                             {prevPct > 0 ? '+' : ''}{prevPct}%
                           </Text>
                         )}
                       </View>
-                      {score < 70 && (
-                        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63', lineHeight: 18, borderTopWidth: 1, borderTopColor: '#F5F1E9', paddingTop: 10, marginTop: 4 }}>
-                          Hay oportunidades de mejora. Revisá tus prescindibles.
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: 10, marginTop: 4 }}>
+                        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: colors.text.secondary, flex: 1, lineHeight: 18 }}>
+                          {score < 70 ? 'Hay oportunidades de mejora en tu gasto.' : '¡Vas por buen camino! Mantenés el control.'}
                         </Text>
-                      )}
-                      {score >= 70 && (
-                        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#6D6A63', lineHeight: 18, borderTopWidth: 1, borderTopColor: '#F5F1E9', paddingTop: 10, marginTop: 4 }}>
-                          ¡Vas por buen camino! Seguí manteniendo tus gastos bajo control.
-                        </Text>
-                      )}
-                    </View>
-                    {/* Componentes del score */}
-                    {diag && diag.components.length > 0 && (
+                        <Ionicons name={scoreExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.text.tertiary} style={{ marginLeft: 8 }} />
+                      </View>
+                    </TouchableOpacity>
+                    {/* Componentes del score — expandible */}
+                    {diag && diag.components.length > 0 && scoreExpanded && (
                       <View style={styles.healthCard}>
-                        <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#1C1C1C', marginBottom: 8 }}>Desglose del puntaje</Text>
+                        <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 13, color: colors.text.primary, marginBottom: 8 }}>Desglose del puntaje</Text>
                         {diag.components.map(c => (
                           <View key={c.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 }}>
                             <View style={{ flex: 1 }}>
-                              <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 12, color: '#1C1C1C' }}>{c.label}</Text>
-                              <View style={{ height: 4, backgroundColor: '#F5F1E9', borderRadius: 2, marginTop: 4 }}>
+                              <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 12, color: colors.text.primary }}>{c.label}</Text>
+                              <View style={{ height: 4, backgroundColor: colors.border.subtle, borderRadius: 2, marginTop: 4 }}>
                                 <View style={{ height: 4, width: `${Math.min(c.score, 100)}%` as any, backgroundColor: c.color, borderRadius: 2 }} />
                               </View>
                             </View>
@@ -481,11 +556,11 @@ export default function ExpensesScreen() {
                     {/* Acciones sugeridas */}
                     {diag && diag.actions.length > 0 && (
                       <View style={styles.healthCard}>
-                        <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#1C1C1C', marginBottom: 8 }}>Qué podés mejorar</Text>
+                        <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 13, color: colors.text.primary, marginBottom: 8 }}>Qué podés mejorar</Text>
                         {diag.actions.slice(0, 3).map((a, i) => (
                           <View key={i} style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
                             <Text style={{ fontSize: 14 }}>{a.icon}</Text>
-                            <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#1C1C1C', flex: 1, lineHeight: 18 }}>{a.text}</Text>
+                            <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 12, color: colors.text.primary, flex: 1, lineHeight: 18 }}>{a.text}</Text>
                           </View>
                         ))}
                       </View>
@@ -1014,11 +1089,11 @@ const styles = StyleSheet.create({
     marginBottom:      -1,
   },
   healthCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.bg.card,
     borderRadius:    16,
     padding:         16,
     borderWidth:     1,
-    borderColor:     '#F5F1E9',
+    borderColor:     colors.border.default,
     shadowColor:     '#000',
     shadowOffset:    { width: 0, height: 1 },
     shadowOpacity:   0.05,
@@ -1042,12 +1117,17 @@ const styles = StyleSheet.create({
 const reportS = StyleSheet.create({
   precisionNotice: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: '#F5F1E9', borderRadius: 8,
+    backgroundColor: colors.yellow + '15',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.yellow + '35',
     paddingHorizontal: spacing[3], paddingVertical: spacing[2],
-    marginHorizontal: layout.screenPadding, marginBottom: spacing[2],
   },
   precisionText: {
-    fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6D6A63', flex: 1,
+    fontFamily: 'Montserrat_400Regular', fontSize: 11, color: colors.text.secondary, flex: 1,
+  },
+  precisionCta: {
+    fontFamily: 'Montserrat_600SemiBold', fontSize: 11, color: colors.yellow, flexShrink: 0,
   },
   heroCard: {
     backgroundColor: colors.bg.card,
@@ -1088,6 +1168,37 @@ const reportS = StyleSheet.create({
     shadowOpacity:   0.06,
     shadowRadius:    8,
     elevation:       3,
+  },
+  movimientosChip: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               spacing[2],
+    alignSelf:         'flex-start',
+    paddingHorizontal: spacing[4],
+    paddingVertical:   spacing[2],
+    borderWidth:       1,
+    borderColor:       colors.primary + '55',
+    borderRadius:      20,
+    backgroundColor:   colors.primary + '10',
+  },
+  movimientosChipText: {
+    fontFamily: 'Montserrat_600SemiBold',
+    fontSize:   13,
+    color:      colors.primary,
+  },
+  simpleTotalCard: {
+    backgroundColor: colors.bg.card,
+    borderWidth:     1,
+    borderColor:     colors.border.default,
+    borderRadius:    16,
+    padding:         spacing[5],
+    gap:             spacing[1],
+  },
+  simpleTotalAmount: {
+    fontFamily: 'Montserrat_700Bold',
+    fontSize:   32,
+    lineHeight: 38,
+    color:      colors.text.primary,
   },
 });
 
