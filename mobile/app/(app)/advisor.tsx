@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import * as FileSystem from 'expo-file-system';
 import { colors, spacing, layout, textVariants } from '@/theme';
 import { Text } from '@/components/ui';
@@ -219,7 +219,7 @@ export default function AdvisorScreen() {
   const [isTranscribing, setIsTranscribing] = useState(false);
 
   const flatListRef   = useRef<FlatList>(null);
-  const recordingRef  = useRef<Audio.Recording | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const isFirstMsg    = useRef(true); // para generar título del thread
 
   useEffect(() => { if (user?.id) loadPlan(user.id); }, [user?.id]);
@@ -602,9 +602,8 @@ export default function AdvisorScreen() {
       setIsRecording(false);
       setIsTranscribing(true);
       try {
-        await recordingRef.current?.stopAndUnloadAsync();
-        const uri = recordingRef.current?.getURI();
-        recordingRef.current = null;
+        await audioRecorder.stop();
+        const uri = audioRecorder.uri;
         if (!uri) return;
         const base64 = await FileSystem.readAsStringAsync(uri, {
           encoding: FileSystem.EncodingType.Base64,
@@ -617,20 +616,18 @@ export default function AdvisorScreen() {
       finally  { setIsTranscribing(false); }
     } else {
       try {
-        const { status } = await Audio.requestPermissionsAsync();
-        if (status !== 'granted') {
+        const { granted } = await requestRecordingPermissionsAsync();
+        if (!granted) {
           Alert.alert('Permiso denegado', 'Necesitamos acceso al micrófono.');
           return;
         }
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-        const { recording } = await Audio.Recording.createAsync(
-          Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        );
-        recordingRef.current = recording;
+        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+        await audioRecorder.prepareToRecordAsync();
+        audioRecorder.record();
         setIsRecording(true);
       } catch (e) { console.error('[voice]', e); }
     }
-  }, [isRecording]);
+  }, [isRecording, audioRecorder]);
 
   // ── Renders ──────────────────────────────────────────────────────────────
 

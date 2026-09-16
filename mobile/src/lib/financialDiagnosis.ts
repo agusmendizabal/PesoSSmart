@@ -114,19 +114,18 @@ export function computeFinancialDiagnosis(input: DiagnosisInput): FinancialDiagn
   const classified = totalNecessary + totalDisposable + totalInvestable;
   const components: HealthComponent[] = [];
 
-  // ── 1. Control de gasto vs ingreso (35 pts) ───────────────────────────────
+  // ── 1. Control de gasto vs ingreso (40 pts) ───────────────────────────────
   if (estimatedIncome && estimatedIncome > 0 && totalThisMonth > 0) {
-    // Project to end of month to avoid false positives on day 3
     const daysInMonth = 30;
     const adj = dayOfMonth < 8 ? totalThisMonth * (daysInMonth / dayOfMonth) : totalThisMonth;
     const pct = adj / estimatedIncome;
     let score: number;
     let explanation: string;
     if (pct < 0.7) {
-      score = 35;
-      explanation = `Gastás el ${Math.round(pct * 100)}% del ingreso. Excelente margen.`;
+      score = 40;
+      explanation = `Gastás el ${Math.round(pct * 100)}% del ingreso. Excelente margen de ahorro.`;
     } else if (pct < 0.8) {
-      score = 28;
+      score = 30;
       explanation = `Gastás el ${Math.round(pct * 100)}% del ingreso. Buen nivel.`;
     } else if (pct < 0.9) {
       score = 18;
@@ -139,60 +138,39 @@ export function computeFinancialDiagnosis(input: DiagnosisInput): FinancialDiagn
       explanation = `Gastás más de lo que ganás (${Math.round(pct * 100)}%).`;
     }
     components.push({
-      key: 'spending', label: 'Control de gasto', score, maxScore: 35, explanation,
-      color: score >= 28 ? colors.neon : score >= 18 ? '#FFD740' : colors.red,
+      key: 'spending', label: 'Control de gasto', score, maxScore: 40, explanation,
+      color: score >= 30 ? colors.neon : score >= 18 ? '#FFD740' : colors.red,
     });
   }
 
-  // ── 2. Ratio prescindibles (25 pts) ───────────────────────────────────────
-  if (classified > 0) {
-    const dispPct = totalDisposable / classified;
+  // ── 2. Distribución por categorías (20 pts) ───────────────────────────────
+  // Mide si el gasto está bien distribuido o concentrado en pocas categorías.
+  // Concentración alta en restaurantes/entretenimiento = señal de alerta.
+  if (rows.length > 0 && totalThisMonth > 0) {
+    const topCatPct = rows[0].pct; // rows ya están ordenados desc por amount
+    const catCount  = rows.length;
     let score: number;
     let explanation: string;
-    if (dispPct < 0.15) {
-      score = 25;
-      explanation = `Solo el ${Math.round(dispPct * 100)}% de lo clasificado es prescindible. Muy eficiente.`;
-    } else if (dispPct < 0.25) {
-      score = 18;
-      explanation = `El ${Math.round(dispPct * 100)}% es prescindible. Dentro del rango recomendado.`;
-    } else if (dispPct < 0.35) {
-      score = 10;
-      explanation = `El ${Math.round(dispPct * 100)}% es prescindible. Por encima del ideal (20%).`;
+    if (topCatPct < 0.35 && catCount >= 4) {
+      score = 20;
+      explanation = `Tus gastos están bien distribuidos en ${catCount} categorías. Ninguna domina.`;
+    } else if (topCatPct < 0.5 && catCount >= 3) {
+      score = 14;
+      explanation = `"${rows[0].name}" representa el ${Math.round(topCatPct * 100)}% del total. Razonable.`;
+    } else if (topCatPct < 0.65) {
+      score = 8;
+      explanation = `"${rows[0].name}" concentra el ${Math.round(topCatPct * 100)}% del gasto. Revisá si es necesario.`;
     } else {
       score = 3;
-      explanation = `El ${Math.round(dispPct * 100)}% es prescindible. Alto potencial de optimización.`;
+      explanation = `El ${Math.round(topCatPct * 100)}% del gasto va a "${rows[0].name}". Muy concentrado.`;
     }
     components.push({
-      key: 'disposable', label: 'Gastos prescindibles', score, maxScore: 25, explanation,
-      color: score >= 18 ? colors.neon : score >= 10 ? '#FFD740' : colors.red,
+      key: 'distribution', label: 'Distribución de gastos', score, maxScore: 20, explanation,
+      color: score >= 14 ? colors.neon : score >= 8 ? '#FFD740' : colors.red,
     });
   }
 
-  // ── 3. Cobertura de clasificación (15 pts) ────────────────────────────────
-  if (totalThisMonth > 0) {
-    const coverage = classified / totalThisMonth;
-    let score: number;
-    let explanation: string;
-    if (coverage >= 0.9) {
-      score = 15;
-      explanation = `${Math.round(coverage * 100)}% de tus gastos están clasificados. Excelente orden.`;
-    } else if (coverage >= 0.7) {
-      score = 10;
-      explanation = `${Math.round(coverage * 100)}% clasificado. Podés mejorar la cobertura.`;
-    } else if (coverage >= 0.4) {
-      score = 5;
-      explanation = `Solo el ${Math.round(coverage * 100)}% clasificado. Clasificar más mejora el análisis.`;
-    } else {
-      score = 0;
-      explanation = `Menos del 40% clasificado. Sin datos suficientes para un análisis completo.`;
-    }
-    components.push({
-      key: 'classification', label: 'Gastos clasificados', score, maxScore: 15, explanation,
-      color: score >= 10 ? colors.primary : score >= 5 ? '#FFD740' : colors.red,
-    });
-  }
-
-  // ── 4. Tendencia histórica (15 pts) ───────────────────────────────────────
+  // ── 3. Tendencia histórica (25 pts) ───────────────────────────────────────
   if (history.length >= 2) {
     const sorted     = [...history].sort((a, b) => a.monthKey.localeCompare(b.monthKey));
     const recentAmt  = sorted[sorted.length - 1].total;
@@ -202,44 +180,44 @@ export function computeFinancialDiagnosis(input: DiagnosisInput): FinancialDiagn
     let score: number;
     let explanation: string;
     if (realChange < -5) {
-      score = 15;
+      score = 25;
       explanation = `Bajaste el gasto real ${Math.round(-realChange)}% vs tu promedio (descontando inflación).`;
     } else if (realChange < 5) {
-      score = 10;
+      score = 18;
       explanation = `Tu gasto real es estable respecto a tu promedio histórico.`;
     } else if (realChange < 15) {
-      score = 5;
+      score = 8;
       explanation = `Tu gasto real creció ${Math.round(realChange)}% por encima de la inflación.`;
     } else {
       score = 0;
       explanation = `Tu gasto real creció ${Math.round(realChange)}% sobre la inflación. Tendencia preocupante.`;
     }
     components.push({
-      key: 'trend', label: 'Tendencia histórica', score, maxScore: 15, explanation,
-      color: score >= 10 ? colors.neon : score >= 5 ? '#FFD740' : colors.red,
+      key: 'trend', label: 'Tendencia histórica', score, maxScore: 25, explanation,
+      color: score >= 18 ? colors.neon : score >= 8 ? '#FFD740' : colors.red,
     });
   }
 
-  // ── 5. Margen de ahorro (10 pts) ──────────────────────────────────────────
+  // ── 4. Margen de ahorro (15 pts) ──────────────────────────────────────────
   if (estimatedIncome && estimatedIncome > 0) {
     const savingsPct = (estimatedIncome - totalThisMonth) / estimatedIncome;
     let score: number;
     let explanation: string;
     if (savingsPct > 0.2) {
-      score = 10;
+      score = 15;
       explanation = `Guardás el ${Math.round(savingsPct * 100)}% del ingreso. Superás el mínimo recomendado.`;
     } else if (savingsPct > 0.1) {
-      score = 7;
+      score = 10;
       explanation = `Guardás el ${Math.round(savingsPct * 100)}% del ingreso. Apuntá al 20%.`;
     } else if (savingsPct > 0) {
-      score = 3;
+      score = 4;
       explanation = `Solo el ${Math.round(savingsPct * 100)}% queda disponible para ahorrar.`;
     } else {
       score = 0;
       explanation = `Sin margen de ahorro este mes.`;
     }
     components.push({
-      key: 'savings', label: 'Margen de ahorro', score, maxScore: 10, explanation,
+      key: 'savings', label: 'Margen de ahorro', score, maxScore: 15, explanation,
       color: score >= 7 ? colors.neon : score >= 3 ? '#FFD740' : colors.red,
     });
   }
@@ -287,27 +265,6 @@ export function computeFinancialDiagnosis(input: DiagnosisInput): FinancialDiagn
     }
   }
 
-  // Prescindibles
-  if (classified > 0 && totalDisposable >= 0) {
-    const dispPct = Math.round((totalDisposable / classified) * 100);
-    if (totalDisposable > 0 && dispPct > 30) {
-      insights.push({
-        id: 'disposable_high', type: 'warning',
-        icon: 'wallet-outline',
-        title: `${dispPct}% de lo clasificado es prescindible`,
-        body: `Tus gastos no esenciales suman ${formatCurrency(totalDisposable)}. Reducirlos un tercio liberaría ${formatCurrency(Math.round(totalDisposable / 3))} mensuales — suficiente para arrancar un fondo de inversión.`,
-        metric: formatCurrency(totalDisposable),
-      });
-    } else if (totalDisposable > 0 && dispPct <= 15) {
-      insights.push({
-        id: 'disposable_controlled', type: 'positive',
-        icon: 'checkmark-circle-outline',
-        title: `Prescindibles bajo control: ${dispPct}%`,
-        body: `Solo el ${dispPct}% de tus gastos clasificados son prescindibles (${formatCurrency(totalDisposable)}). Es un nivel muy eficiente. Mantenerlo es un hábito que se traduce en ahorro real.`,
-        metric: `${dispPct}%`,
-      });
-    }
-  }
 
   // Categoría dominante
   if (rows.length > 0) {
@@ -510,21 +467,6 @@ export function computeFinancialDiagnosis(input: DiagnosisInput): FinancialDiagn
     }
   }
 
-  // Gastos sin clasificar
-  if (totalThisMonth > 0) {
-    const unclassified = totalThisMonth - classified;
-    const unclPct      = unclassified / totalThisMonth;
-    if (unclPct > 0.4 && unclassified > 10000) {
-      insights.push({
-        id: 'unclassified_high', type: 'warning',
-        icon: 'help-circle-outline',
-        title: `${Math.round(unclPct * 100)}% de gastos sin clasificar`,
-        body: `Hay ${formatCurrency(unclassified)} en gastos sin clasificación. Sin esos datos, el análisis es incompleto y el puntaje de salud es menos preciso.`,
-        metric: formatCurrency(unclassified),
-      });
-    }
-  }
-
   // ── Acciones concretas ────────────────────────────────────────────────────
   const actions: { text: string; impact: 'high' | 'medium' | 'low' }[] = [];
 
@@ -534,23 +476,20 @@ export function computeFinancialDiagnosis(input: DiagnosisInput): FinancialDiagn
       impact: 'high',
     });
   }
-  if (classified > 0 && totalDisposable / classified > 0.25) {
-    actions.push({
-      text: `Recortá un 20% de prescindibles (${formatCurrency(Math.round(totalDisposable * 0.2))}) para liberar ahorro`,
-      impact: 'high',
-    });
-  }
   if (estimatedIncome && (estimatedIncome - totalThisMonth) >= 20000 && fciRate > 0) {
     actions.push({
       text: `Invertí el sobrante (${formatCurrency(Math.max(0, estimatedIncome - totalThisMonth))}) en un FCI Money Market`,
       impact: 'medium',
     });
   }
-  if (totalThisMonth > 0 && classified / totalThisMonth < 0.7) {
-    actions.push({
-      text: `Clasificá los gastos sin categoría para mejorar la precisión del análisis`,
-      impact: 'medium',
-    });
+  if (totalThisMonth > 0 && rows.length > 0) {
+    const categorizedTotal = rows.reduce((s, r) => s + r.amount, 0);
+    if (categorizedTotal / totalThisMonth < 0.7) {
+      actions.push({
+        text: `Agregá categoría a tus gastos sin clasificar para tener un análisis más preciso`,
+        impact: 'medium',
+      });
+    }
   }
   if (history.length < 2) {
     actions.push({

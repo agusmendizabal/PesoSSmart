@@ -15,7 +15,6 @@ import { Text, Card } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import { useExpensesStore } from '@/store/expensesStore';
 import { useSavingsStore } from '@/store/savingsStore';
-import { usePlanStore } from '@/store/planStore';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/utils/format';
 import { InflationThermometer } from '@/components/InflationThermometer';
@@ -33,6 +32,7 @@ import {
   HistoryComparisonCard,
   AdvisorCTA,
   AINarrativeCard,
+  ResumenCard,
 } from '@/components/ReportCards';
 
 import {
@@ -265,28 +265,36 @@ function ActionsCard({ actions }: { actions: FinancialDiagnosis['actions'] }) {
 
 // ─── RatesCard ────────────────────────────────────────────────────────────────
 
-const RATE_META: Record<string, { label: string; icon: string }> = {
-  fci_mm:           { label: 'FCI Money Market',    icon: 'trending-up-outline' },
-  pf_30d:           { label: 'Plazo Fijo 30d',       icon: 'time-outline' },
-  caucion_1d:       { label: 'Caución bursátil 1d',  icon: 'swap-horizontal-outline' },
-  cuenta_remunerada:{ label: 'Cuenta remunerada',    icon: 'wallet-outline' },
-  lecap_monthly:    { label: 'Lecap (mensual)',       icon: 'document-text-outline' },
+const RATE_META: Record<string, { label: string; ticker: string; icon: string }> = {
+  fci_mm:            { label: 'FCI Money Market', ticker: 'FCI MM',  icon: 'trending-up-outline'      },
+  pf_30d:            { label: 'Plazo Fijo 30d',   ticker: 'PF 30D',  icon: 'time-outline'             },
+  pf_uva:            { label: 'PF UVA',            ticker: 'PF UVA',  icon: 'shield-outline'           },
+  caucion_1d:        { label: 'Caución bursátil',  ticker: 'CAUC',    icon: 'swap-horizontal-outline'  },
+  cuenta_remunerada: { label: 'Cta. remunerada',   ticker: 'C.REM',   icon: 'wallet-outline'           },
+  lecap_monthly:     { label: 'Lecap',             ticker: 'LECAP',   icon: 'document-text-outline'    },
 };
 
-function RatesCard({ rates, inflationRate }: { rates: Record<string, number>; inflationRate: number }) {
+function RatesCard({ rates, inflationRate, updatedAt }: {
+  rates: Record<string, number>; inflationRate: number; updatedAt: string | null;
+}) {
   const entries = Object.entries(RATE_META)
     .map(([key, meta]) => ({ key, ...meta, rate: rates[key] }))
     .filter(e => e.rate != null)
     .sort((a, b) => b.rate - a.rate);
   if (entries.length === 0) return null;
+
+  const updatedLabel = updatedAt
+    ? new Date(updatedAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+    : null;
+
   return (
     <Card style={[cardStyles.card, { gap: spacing[3] }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text variant="label" color={colors.text.tertiary}>TASAS DEL MOMENTO</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.red }} />
           <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 10, color: colors.text.tertiary }}>
-            Inflación {inflationRate.toFixed(1)}%
+            IPC {inflationRate.toFixed(1)}%
           </Text>
         </View>
       </View>
@@ -296,19 +304,29 @@ function RatesCard({ rates, inflationRate }: { rates: Record<string, number>; in
         return (
           <View key={e.key} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: colors.border.subtle }}>
             <Ionicons name={e.icon as any} size={16} color={rateColor} />
-            <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 12, color: colors.text.primary, flex: 1 }}>{e.label}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 12, color: colors.text.primary }}>{e.label}</Text>
+              <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 9, color: colors.text.tertiary, letterSpacing: 0.5 }}>{e.ticker}</Text>
+            </View>
             <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 14, color: rateColor }}>{e.rate.toFixed(1)}%</Text>
             <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 10, color: colors.text.tertiary }}>/mes</Text>
             {beatsInflation
               ? <Ionicons name="checkmark-circle" size={14} color={colors.neon} />
-              : <Ionicons name="close-circle" size={14} color={colors.red} />
+              : <Ionicons name="close-circle"     size={14} color={colors.red} />
             }
           </View>
         );
       })}
-      <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 10, color: colors.text.tertiary, marginTop: 2 }}>
-        ✓ = supera la inflación mensual · × = por debajo
-      </Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 9, color: colors.text.tertiary }}>
+          ✓ supera IPC · × por debajo
+        </Text>
+        {updatedLabel && (
+          <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 9, color: colors.text.tertiary }}>
+            Actualizado: {updatedLabel}
+          </Text>
+        )}
+      </View>
     </Card>
   );
 }
@@ -367,7 +385,6 @@ export default function ReportsScreen() {
   const { user, profile } = useAuthStore();
   const { totalThisMonth, totalNecessary, totalDisposable, totalInvestable, estimatedIncome } = useExpensesStore();
   const { investments, fetchAll: loadSavings } = useSavingsStore();
-  const { effectivePlan, isTrialActive } = usePlanStore();
 
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -379,7 +396,12 @@ export default function ReportsScreen() {
   const [inflationRate, setInflationRate] = useState(0);
   const [fciRate,       setFciRate]       = useState(0);
   const [allRates,      setAllRates]      = useState<Record<string, number>>({});
+  const [ratesUpdatedAt, setRatesUpdatedAt] = useState<string | null>(null);
   const [pastOppData,   setPastOppData]   = useState<{ monthKey: string; disposable: number; categories: Record<string, number> }[]>([]);
+  // Totales por clasificación para meses históricos (el store solo tiene el mes actual)
+  const [historicalNecessary,  setHistoricalNecessary]  = useState(0);
+  const [historicalDisposable, setHistoricalDisposable] = useState(0);
+  const [historicalInvestable, setHistoricalInvestable] = useState(0);
 
   // AI narrative state
 
@@ -448,6 +470,18 @@ export default function ReportsScreen() {
       setTotal(sum);
       setRows(result);
 
+      // Totales por clasificación para meses históricos
+      let classNecessary = 0, classDisposable = 0, classInvestable = 0;
+      for (const exp of mainRes.data ?? []) {
+        const cl = (exp as any).classification;
+        if (cl === 'necessary')  classNecessary  += (exp as any).amount;
+        if (cl === 'disposable') classDisposable += (exp as any).amount;
+        if (cl === 'investable') classInvestable += (exp as any).amount;
+      }
+      setHistoricalNecessary(classNecessary);
+      setHistoricalDisposable(classDisposable);
+      setHistoricalInvestable(classInvestable);
+
       const histMap: Record<string, MonthSummary> = {};
       type HistRow = { amount: number; date: string; classification: string | null };
       for (const exp of (histRes.data ?? []) as HistRow[]) {
@@ -485,16 +519,21 @@ export default function ReportsScreen() {
     if (user?.id) loadSavings(user.id);
     (supabase as any)
       .from('market_rates')
-      .select('instrument, rate_monthly')
-      .then(({ data }: { data: { instrument: string; rate_monthly: number }[] | null }) => {
+      .select('instrument, rate_monthly, updated_at, source')
+      .then(({ data }: { data: { instrument: string; rate_monthly: number; updated_at: string | null; source: string }[] | null }) => {
         if (!data) return;
         const ratesMap: Record<string, number> = {};
+        let latestUpdatedAt: string | null = null;
         for (const row of data) {
           ratesMap[row.instrument] = Number(row.rate_monthly);
           if (row.instrument === 'inflation') setInflationRate(Number(row.rate_monthly));
           if (row.instrument === 'fci_mm')    setFciRate(Number(row.rate_monthly));
+          if (row.updated_at && (!latestUpdatedAt || row.updated_at > latestUpdatedAt)) {
+            latestUpdatedAt = row.updated_at;
+          }
         }
         setAllRates(ratesMap);
+        setRatesUpdatedAt(latestUpdatedAt);
       });
   }, [user?.id]);
 
@@ -502,9 +541,9 @@ export default function ReportsScreen() {
   const nextMonth = () => { if (isCurrentMonth) return; if (month === 12) { setMonth(1); setYear(y => y + 1); } else setMonth(m => m + 1); };
 
   const displayTotal      = isCurrentMonth ? totalThisMonth  : total;
-  const displayNecessary  = isCurrentMonth ? totalNecessary  : 0;
-  const displayDisposable = isCurrentMonth ? totalDisposable : 0;
-  const displayInvestable = isCurrentMonth ? totalInvestable : 0;
+  const displayNecessary  = isCurrentMonth ? totalNecessary  : historicalNecessary;
+  const displayDisposable = isCurrentMonth ? totalDisposable : historicalDisposable;
+  const displayInvestable = isCurrentMonth ? totalInvestable : historicalInvestable;
   const displayIncome     = isCurrentMonth ? estimatedIncome : null;
 
   // ── Diagnóstico financiero (cálculo puro, instantáneo) ─────────────────────
@@ -537,15 +576,6 @@ export default function ReportsScreen() {
   // ── Export PDF ─────────────────────────────────────────────────────────────
   const [exporting, setExporting] = useState(false);
   const handleExportPdf = useCallback(async () => {
-    const isPro = effectivePlan === 'pro' || effectivePlan === 'premium';
-    if (!isPro || isTrialActive()) {
-      Alert.alert(
-        '⚡ Función Pro',
-        'El reporte en PDF es exclusivo de Nomi Pro.',
-        [{ text: 'Ahora no', style: 'cancel' }, { text: '⚡ Ver planes', onPress: () => router.push('/(app)/plans' as any) }],
-      );
-      return;
-    }
     setExporting(true);
     try {
       const totalInvested = investments.reduce((s, inv) => s + inv.amount, 0);
@@ -571,7 +601,7 @@ export default function ReportsScreen() {
     } finally {
       setExporting(false);
     }
-  }, [effectivePlan, isTrialActive, investments, month, year, profile, displayTotal, displayNecessary, displayDisposable, displayInvestable, displayIncome, inflationRate, fciRate, rows, diagnosis]);
+  }, [investments, month, year, profile, displayTotal, displayNecessary, displayDisposable, displayInvestable, displayIncome, inflationRate, fciRate, rows, diagnosis]);
 
   // Advisor CTA context
   const ahorroSugerencias = useMemo(() => buildAhorroSugerencias({
@@ -654,18 +684,27 @@ export default function ReportsScreen() {
         {/* ── Contenido ── */}
         {!isLoading && displayTotal > 0 && diagnosis && (
           <>
-            {/* Narrativa IA */}
-            <AINarrativeCard
-              narrative={aiNarrative}
-              keyFinding={aiKeyFinding}
-              nextStep={aiNextStep}
-              isLoading={aiLoading && !aiNarrative}
+            {/* 1. Resumen hero — lo primero que ve el usuario */}
+            <ResumenCard
+              total={displayTotal}
+              necessary={displayNecessary}
+              disposable={displayDisposable}
+              investable={displayInvestable}
+              estimatedIncome={displayIncome}
             />
 
-            {/* Score de salud */}
+            {/* 2. Distribución por categoría */}
+            <CategoryBreakdown rows={rows} total={total || displayTotal} />
+
+            {/* 3. Comparación histórica */}
+            {history.length > 0 && (
+              <HistoryComparisonCard history={history} comparacion={comparacion} currentTotal={displayTotal} />
+            )}
+
+            {/* 4. Score de salud */}
             <HealthScoreCard diagnosis={diagnosis} />
 
-            {/* Insights */}
+            {/* 5. Insights */}
             {diagnosis.insights.length > 0 && (
               <View style={{ gap: spacing[2] }}>
                 <Text variant="label" color={colors.text.tertiary} style={{ paddingHorizontal: 2 }}>
@@ -675,28 +714,28 @@ export default function ReportsScreen() {
               </View>
             )}
 
-            {/* Acciones */}
+            {/* 6. Acciones concretas */}
             <ActionsCard actions={diagnosis.actions} />
 
-            {/* Tasas del momento */}
+            {/* 7. Narrativa IA — síntesis para quien quiere profundizar */}
+            <AINarrativeCard
+              narrative={aiNarrative}
+              keyFinding={aiKeyFinding}
+              nextStep={aiNextStep}
+              isLoading={aiLoading && !aiNarrative}
+            />
+
+            {/* 8. Tasas del momento con tickers */}
             {Object.keys(allRates).some(k => RATE_META[k]) && (
-              <RatesCard rates={allRates} inflationRate={inflationRate} />
+              <RatesCard rates={allRates} inflationRate={inflationRate} updatedAt={ratesUpdatedAt} />
             )}
 
-            {/* Inflación por rubro */}
+            {/* 9. Inflación por rubro */}
             {Object.keys(allRates).some(k => k.startsWith('inflation_') && k !== 'inflation') && (
               <CategoryInflationCard rates={allRates} generalInflation={inflationRate} />
             )}
 
-            {/* Categorías */}
-            <CategoryBreakdown rows={rows} total={total || displayTotal} />
-
-            {/* Comparación histórica */}
-            {history.length > 0 && (
-              <HistoryComparisonCard history={history} comparacion={comparacion} currentTotal={displayTotal} />
-            )}
-
-            {/* Termómetro de inflación */}
+            {/* 10. Termómetro de inflación personal */}
             <InflationThermometer userId={user!.id} year={year} month={month} />
 
             {/* Patrimonio vs inflación (si hay inversiones) */}

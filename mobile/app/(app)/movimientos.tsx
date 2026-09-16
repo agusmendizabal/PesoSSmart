@@ -792,7 +792,7 @@ function SinClasifInbox({ expenses, pendingTxs, categories, userId, onClassify, 
           )}
           {unclassified.length > 0 && pendingTxs.length > 0 && (
             <View style={scModalS.sectionHeader}>
-              <Text style={scModalS.sectionTitle}>Gastos manuales sin clasificar ({unclassified.length})</Text>
+              <Text style={scModalS.sectionTitle}>Gastos manuales sin categoría ({unclassified.length})</Text>
             </View>
           )}
         </View>
@@ -821,7 +821,7 @@ function SinClasifInbox({ expenses, pendingTxs, categories, userId, onClassify, 
             </View>
             <View style={scModalS.clasificarRow}>
               <Ionicons name="pricetag-outline" size={14} color="#27AE60" />
-              <Text style={scModalS.clasificarText}>Clasificar</Text>
+              <Text style={scModalS.clasificarText}>Agregar categoría</Text>
               <View style={{ flex: 1 }} />
               <Text style={{ fontSize: 11, color: '#27AE60', opacity: 0.55 }}>✦</Text>
             </View>
@@ -1374,8 +1374,6 @@ export default function ExpensesScreen() {
     }
   };
 
-  const classificationFilter = filter.classification;
-
   const displayTotal      = isCurrentMonth ? totalThisMonth  : reportTotal;
   const displayNecessary  = isCurrentMonth ? totalNecessary  : 0;
   const displayDisposable = isCurrentMonth ? totalDisposable : 0;
@@ -1402,122 +1400,19 @@ export default function ExpensesScreen() {
     return Object.values(map).map(r => ({ ...r, pct: total > 0 ? r.amount / total : 0 })).sort((a, b) => b.amount - a.amount);
   }, [expenses]);
 
-  // Category breakdown for active classification filter
-  const catBreakdownFiltered = useMemo<CategoryRow[]>(() => {
-    if (!classificationFilter) return catBreakdown;
-    const map: Record<string, CategoryRow> = {};
-    let total = 0; let idx = 0;
-    for (const e of expenses as any[]) {
-      if (e.classification !== classificationFilter) continue;
-      const catId   = e.category_id ?? 'none';
-      const catName = e.category?.name_es ?? 'Sin categoría';
-      if (!map[catId]) map[catId] = { id: catId, name: catName, color: getCategoryColor(catName, idx++), amount: 0, pct: 0 };
-      map[catId].amount += e.amount;
-      total += e.amount;
-    }
-    return Object.values(map).map(r => ({ ...r, pct: total > 0 ? r.amount / total : 0 })).sort((a, b) => b.amount - a.amount);
-  }, [expenses, classificationFilter, catBreakdown]);
-
   const listHeader = (
     <>
-      {/* Filtros de clasificación */}
-      <View style={styles.filters}>
-        {[
-          { key: null, label: 'Todos' },
-          { key: 'necessary', label: 'Necesarios' },
-          { key: 'disposable', label: 'Prescindibles' },
-          { key: 'investable', label: 'Invertibles' },
-        ].map((f) => (
-          <TouchableOpacity
-            key={f.key ?? 'all'}
-            style={[
-              styles.filterChip,
-              classificationFilter === f.key && styles.filterChipActive,
-            ]}
-            onPress={() => setFilter({ classification: f.key })}
-          >
-            <Text
-              variant="label"
-              style={{ fontSize: 9, letterSpacing: 0 }}
-              color={classificationFilter === f.key ? colors.primary : colors.text.secondary}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {f.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Resumen del mes — diseño premium */}
+      {/* Resumen del mes — categorías */}
       {(() => {
         const selectedMonth = filter.month ?? new Date().getMonth() + 1;
         const monthName     = MONTH_NAMES[selectedMonth - 1].toLowerCase();
         const prevMonthName = MONTH_NAMES[selectedMonth - 2 < 0 ? 11 : selectedMonth - 2].toLowerCase();
         const vsPrev        = comparacion?.vsPrev;
         const varPct        = vsPrev?.changePct ?? null;
-
-        // ── Filtro activo: resumen de la clasificación con categorías ──────────
-        if (classificationFilter) {
-          const clsLabel = classificationFilter === 'necessary' ? 'necesarios'
-            : classificationFilter === 'disposable' ? 'prescindibles'
-            : 'invertibles';
-          const clsTotal = classificationFilter === 'necessary' ? totalNecessary
-            : classificationFilter === 'disposable' ? totalDisposable
-            : totalInvestable;
-          const topCatRows = catBreakdownFiltered.slice(0, 3);
-
-          return (
-            <View style={smS.card}>
-              <View style={smS.body}>
-                <View style={smS.left}>
-                  <Text style={smS.title}>Resumen de {clsLabel}</Text>
-                  <Text style={smS.amount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-                    {formatCurrency(clsTotal)}
-                  </Text>
-                  {varPct !== null && (
-                    <View style={smS.varRow}>
-                      <Text style={[smS.varIcon, { color: varPct >= 0 ? '#FF7B7B' : '#4DC889' }]}>
-                        {varPct >= 0 ? '▲' : '▼'}
-                      </Text>
-                      <Text style={[smS.varText, { color: varPct >= 0 ? '#FF7B7B' : '#4DC889' }]}>
-                        {Math.abs(varPct)}% vs {prevMonthName}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={smS.metricList}>
-                    {topCatRows.map((cat) => (
-                      <View key={cat.id} style={smS.metricRow}>
-                        <View style={[smS.dot, { backgroundColor: cat.color }]} />
-                        <Text style={smS.metricLabel} numberOfLines={1}>{cat.name}</Text>
-                        <Text style={smS.metricAmount}>{formatCurrency(cat.amount)}</Text>
-                        <Text style={[smS.metricPct, { color: cat.color }]}>{Math.round(cat.pct * 100)}%</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-                <View style={smS.right}>
-                  {clsTotal > 0
-                    ? <CategoryDonut rows={catBreakdownFiltered} total={clsTotal} compact />
-                    : <View style={smS.donutEmpty} />
-                  }
-                </View>
-              </View>
-            </View>
-          );
-        }
-
-        // ── Sin filtro: donut de clasificaciones (Necesario/Prescindible/Invertible)
-        const classifiedTotal = totalNecessary + totalDisposable + totalInvestable;
-        const clsRows: CategoryRow[] = [
-          { id: 'necessary',  name: 'Necesario',    color: '#5B9EF9', amount: totalNecessary,  pct: classifiedTotal > 0 ? totalNecessary  / classifiedTotal : 0 },
-          { id: 'disposable', name: 'Prescindible', color: '#FF7B7B', amount: totalDisposable, pct: classifiedTotal > 0 ? totalDisposable / classifiedTotal : 0 },
-          { id: 'investable', name: 'Invertible',   color: '#4DC889', amount: totalInvestable, pct: classifiedTotal > 0 ? totalInvestable / classifiedTotal : 0 },
-        ].filter(r => r.amount > 0);
+        const topCatRows    = catBreakdown.slice(0, 3);
         return (
           <View style={smS.card}>
             <View style={smS.body}>
-              {/* Izquierda — 60% */}
               <View style={smS.left}>
                 <Text style={smS.title}>Resumen de {monthName}</Text>
                 <Text style={smS.amount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
@@ -1534,20 +1429,19 @@ export default function ExpensesScreen() {
                   </View>
                 )}
                 <View style={smS.metricList}>
-                  {clsRows.map((r) => (
-                    <View key={r.id} style={smS.metricRow}>
-                      <View style={[smS.dot, { backgroundColor: r.color }]} />
-                      <Text style={smS.metricLabel} numberOfLines={1}>{r.name}</Text>
-                      <Text style={smS.metricAmount}>{formatCurrency(r.amount)}</Text>
-                      <Text style={[smS.metricPct, { color: r.color }]}>{Math.round(r.pct * 100)}%</Text>
+                  {topCatRows.map((cat) => (
+                    <View key={cat.id} style={smS.metricRow}>
+                      <View style={[smS.dot, { backgroundColor: cat.color }]} />
+                      <Text style={smS.metricLabel} numberOfLines={1}>{cat.name}</Text>
+                      <Text style={smS.metricAmount}>{formatCurrency(cat.amount)}</Text>
+                      <Text style={[smS.metricPct, { color: cat.color }]}>{Math.round(cat.pct * 100)}%</Text>
                     </View>
                   ))}
                 </View>
               </View>
-              {/* Derecha — donut de clasificaciones */}
               <View style={smS.right}>
-                {classifiedTotal > 0
-                  ? <CategoryDonut rows={clsRows} total={classifiedTotal} compact />
+                {catBreakdown.length > 0
+                  ? <CategoryDonut rows={catBreakdown} total={totalThisMonth} compact />
                   : <View style={smS.donutEmpty} />
                 }
               </View>
@@ -1598,7 +1492,7 @@ export default function ExpensesScreen() {
             >
               <View style={{ flex: 1, gap: 3 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={sinClasifBannerS.title}>Por clasificar</Text>
+                  <Text style={sinClasifBannerS.title}>Sin categoría</Text>
                   <View style={sinClasifBannerS.countBadge}>
                     <Text style={sinClasifBannerS.countText}>{totalPending}</Text>
                   </View>
@@ -1931,10 +1825,10 @@ export default function ExpensesScreen() {
               />
       </FormSheetModal>
 
-      {/* Modal clasificar gasto — diseño premium */}
+      {/* Modal editar gasto — diseño premium */}
       <FormSheetModal
         visible={!!editingExpense}
-        title="Clasificar gasto"
+        title="Editar gasto"
         onClose={() => { setEditingExpense(null); setEditExpenseValues(null); setCategorySearch(''); }}
         presentationStyle="formSheet"
         backgroundColor="#FFFFFF"
@@ -2004,31 +1898,6 @@ export default function ExpensesScreen() {
                           Contá a quién se lo transferiste o para qué fue, así después sabés de dónde salió este gasto.
                         </Text>
                       )}
-                    </View>
-
-                    {/* Tipo de gasto */}
-                    <View style={{ gap: 12 }}>
-                      <Text style={clsModal.sectionTitle}>Tipo de gasto</Text>
-                      <View style={clsModal.typeRow}>
-                        {([
-                          { key: 'necessary',  label: 'Necesario',   icon: 'shield-checkmark-outline', color: '#27AE60', bg: '#D1F7E3', border: '#27AE60' },
-                          { key: 'disposable', label: 'Prescindible', icon: 'cart-outline',             color: '#DC2626', bg: '#FEF2F2', border: '#EF4444' },
-                          { key: 'investable', label: 'Invertible',  icon: 'trending-up-outline',      color: '#27AE60', bg: '#D1F7E3', border: '#27AE60' },
-                        ] as const).map(opt => {
-                          const active = editExpenseValues.classification === opt.key;
-                          return (
-                            <TouchableOpacity
-                              key={opt.key}
-                              style={[clsModal.typeBtn, active ? { backgroundColor: opt.bg, borderColor: opt.border } : clsModal.typeBtnInactive]}
-                              onPress={() => setEditExpenseValues(p => p ? { ...p, classification: opt.key as ExpenseClassification } : p)}
-                              activeOpacity={0.8}
-                            >
-                              <Ionicons name={opt.icon} size={20} color={active ? opt.color : '#9B9790'} />
-                              <Text style={[clsModal.typeBtnLabel, { color: active ? opt.color : '#9B9790' }]}>{opt.label}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
                     </View>
 
                     {/* Mejores coincidencias */}
@@ -2122,7 +1991,7 @@ export default function ExpensesScreen() {
                       : (
                         <>
                           <Ionicons name="checkmark" size={18} color="#fff" />
-                          <Text style={clsModal.ctaBtnText}>Clasificar gasto</Text>
+                          <Text style={clsModal.ctaBtnText}>Guardar cambios</Text>
                         </>
                       )
                     }
@@ -2148,7 +2017,7 @@ export default function ExpensesScreen() {
         onClose={() => { setShowShareModal(false); setShareExpense(null); }}
       />
 
-      {/* Modal: inbox de gastos sin clasificar */}
+      {/* Modal: inbox de gastos sin categoría */}
       <Modal
         visible={showSinClasifModal}
         animationType="slide"
@@ -2164,16 +2033,16 @@ export default function ExpensesScreen() {
             </TouchableOpacity>
           </View>
           <View style={scModalS.titleBlock}>
-            <Text style={scModalS.titleLarge}>Por clasificar</Text>
+            <Text style={scModalS.titleLarge}>Sin categoría</Text>
             <View style={scModalS.titleUnderline} />
             <View style={scModalS.countBadge}>
               <View style={scModalS.countDot} />
               <Text style={scModalS.countText}>
-                {expenses.filter(e => e.category_id === null).length + pendingTxs.length} SIN CLASIFICAR
+                {expenses.filter(e => e.category_id === null).length + pendingTxs.length} SIN CATEGORÍA
               </Text>
             </View>
             <Text style={scModalS.descText}>
-              Tus gastos aún no tienen categoría.{'\n'}Clasificalos para tener todo bajo control.
+              Tus gastos aún no tienen categoría.{'\n'}Agregales una categoría para tener todo bajo control.
             </Text>
           </View>
 
@@ -2202,7 +2071,7 @@ export default function ExpensesScreen() {
         features={[
           { icon: 'add-circle-outline', color: colors.neon, title: 'Cargá gastos fácil y rápido', body: 'Tocá el botón "+" para registrar un gasto manual, o usá la cámara para procesar tickets y resúmenes.' },
           { icon: 'mail-outline', color: colors.primary, title: 'Gmail detecta automático', body: 'Conectando tu Gmail, escaneamos tus resúmenes y billeteras para detectar gastos sin que tengas que cargarlos.' },
-          { icon: 'pricetag-outline', color: colors.yellow, title: 'Categorizá y clasificá', body: 'Cada gasto puede ser Necesario, Prescindible o Invertible — eso alimenta tu salud financiera y tus reportes.' },
+          { icon: 'pricetag-outline', color: colors.yellow, title: 'Categorizá tus gastos', body: 'Asigná una categoría a cada gasto para ver cómo distribuís tu plata y mejorar tu salud financiera.' },
         ]}
         onDismiss={markVisited}
       />
@@ -2248,7 +2117,7 @@ function ExpenseItem({ expense, onPress }: { expense: Expense; onPress: () => vo
       />
       <View style={styles.expenseLeft}>
         <Text style={styles.expenseName} numberOfLines={1}>
-          {isUnclassified ? 'Sin clasificar' : (expense.category?.name_es ?? expense.description)}
+          {isUnclassified ? 'Sin categoría' : (expense.category?.name_es ?? expense.description)}
         </Text>
         <Text style={styles.expenseMetaText} numberOfLines={1}>
           {expense.description}
@@ -2260,7 +2129,7 @@ function ExpenseItem({ expense, onPress }: { expense: Expense; onPress: () => vo
         </Text>
         {isUnclassified ? (
           <View style={sinClasifS.badge}>
-            <Text style={sinClasifS.label}>SIN CLASIFICAR</Text>
+            <Text style={sinClasifS.label}>SIN CATEGORÍA</Text>
           </View>
         ) : expense.classification ? (
           <Badge classification={expense.classification} label={expense.classification} small animated />
@@ -3040,7 +2909,7 @@ const smS = StyleSheet.create({
   },
 });
 
-// ─── Clasificar gasto modal styles (light theme) ─────────────────────────────
+// ─── Editar gasto modal styles (light theme) ─────────────────────────────────
 
 const clsModal = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingBottom: 24, gap: 22 },

@@ -1,11 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, ScrollView, StyleSheet, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, RefreshControl,
+  TextInput, Alert, ActivityIndicator, RefreshControl, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, FormSheetModal, FormSheetButton } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
@@ -41,6 +41,7 @@ interface Member {
   initial:    string;
   monthTotal: number;
   isMe:       boolean;
+  avatarUrl?: string;
 }
 
 interface Group {
@@ -107,12 +108,12 @@ async function fetchGroups(userId: string): Promise<Group[]> {
   const allUserIds: string[] = Array.from(new Set<string>((membersRaw ?? []).map((m: any) => m.user_id as string)));
 
   const [{ data: profilesRaw }, { data: expensesRaw }] = await Promise.all([
-    db.from('profiles').select('id, full_name, email').in('id', allUserIds),
+    db.from('profiles').select('id, full_name, email, avatar_url').in('id', allUserIds),
     db.from('expenses').select('user_id, amount, date')
       .in('user_id', allUserIds).gte('date', currentMonthStart()).is('deleted_at', null),
   ]);
 
-  const profileMap: Record<string, { full_name?: string; email?: string }> = {};
+  const profileMap: Record<string, { full_name?: string; email?: string; avatar_url?: string }> = {};
   for (const p of profilesRaw ?? []) profileMap[p.id] = p;
 
   const totals: Record<string, number> = {};
@@ -124,7 +125,7 @@ async function fetchGroups(userId: string): Promise<Group[]> {
 
   const recentDate = sevenDaysAgo();
 
-  return (groupsRaw ?? []).map((g: any): Group => {
+  const groups = (groupsRaw ?? []).map((g: any): Group => {
     const myMembership = memberships.find((m: any) => m.group_id === g.id);
     const groupMembers: any[] = (membersRaw ?? []).filter((m: any) => m.group_id === g.id);
 
@@ -135,6 +136,7 @@ async function fetchGroups(userId: string): Promise<Group[]> {
         name, initial: name.charAt(0).toUpperCase(),
         monthTotal: totals[m.user_id] ?? 0,
         isMe: m.user_id === userId,
+        avatarUrl: p?.avatar_url ?? undefined,
       };
     });
 
@@ -149,6 +151,12 @@ async function fetchGroups(userId: string): Promise<Group[]> {
       totalMonth, myMonthTotal, hasActivity, members,
     };
   });
+  // Grupos familiares primero
+  return groups.sort((a, b) => {
+    if (a.kind === 'familiar' && b.kind !== 'familiar') return -1;
+    if (a.kind !== 'familiar' && b.kind === 'familiar') return  1;
+    return 0;
+  });
 }
 
 // ─── AvatarStack ──────────────────────────────────────────────────────────────
@@ -159,16 +167,24 @@ function AvatarStack({ members }: { members: Member[] }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
       {visible.map((m, i) => (
-        <View
-          key={i}
-          style={[
-            av.circle,
-            { backgroundColor: AVATAR_COLORS[hashIdx(m.name, AVATAR_COLORS.length)], marginLeft: i === 0 ? 0 : -8 },
-            m.isMe && av.isMe,
-          ]}
-        >
-          <Text style={av.initial}>{m.initial}</Text>
-        </View>
+        m.avatarUrl ? (
+          <Image
+            key={i}
+            source={{ uri: m.avatarUrl }}
+            style={[av.circle, { marginLeft: i === 0 ? 0 : -8 }]}
+          />
+        ) : (
+          <View
+            key={i}
+            style={[
+              av.circle,
+              { backgroundColor: AVATAR_COLORS[hashIdx(m.name, AVATAR_COLORS.length)], marginLeft: i === 0 ? 0 : -8 },
+              m.isMe && av.isMe,
+            ]}
+          >
+            <Text style={av.initial}>{m.initial}</Text>
+          </View>
+        )
       ))}
       {extra > 0 && (
         <View style={[av.circle, av.extra, { marginLeft: -8 }]}>
@@ -207,7 +223,7 @@ function GroupCard({ group, onPress }: { group: Group; onPress: () => void }) {
           <View style={{ flex: 1, gap: 2 }}>
             <Text style={s.gcName} numberOfLines={1}>{group.name}</Text>
             <Text style={s.gcMeta}>
-              {isFriends ? 'Amigos' : 'Familia'} · {group.myRole}
+              {isFriends ? 'Compartido' : 'Familiar'} · {group.myRole}
             </Text>
           </View>
           {group.hasActivity && <View style={s.activityDot} />}
@@ -267,9 +283,9 @@ function TypeSelectorStep({ onCreate }: { onCreate: (kind: CreateKind) => void }
         <View style={ts.cardIconMint}>
           <Ionicons name="people-outline" size={28} color={C.green} />
         </View>
-        <Text style={ts.cardTitleMint}>Amigos</Text>
+        <Text style={ts.cardTitleMint}>Compartido</Text>
         <Text style={ts.cardDescMint}>
-          Todos ven los gastos compartidos. Vos elegís qué subir al grupo.
+          Todos ven los gastos del grupo. Vos elegís qué subir al grupo.
         </Text>
         <View style={ts.badgeMint}>
           <Ionicons name="hand-left-outline" size={11} color={C.green} />
@@ -345,7 +361,7 @@ function NameInputStep({
           <Ionicons name={kind === 'amigos' ? 'people-outline' : 'home-outline'} size={22} color={C.green} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={ni.title}>{kind === 'amigos' ? 'Grupo de amigos' : 'Grupo familiar'}</Text>
+          <Text style={ni.title}>{kind === 'amigos' ? 'Grupo compartido' : 'Grupo familiar'}</Text>
           <Text style={ni.subtitle}>Dale un nombre</Text>
         </View>
       </View>
@@ -523,7 +539,7 @@ export default function FamilyScreen() {
             </View>
             <Text style={s.emptyTitle}>Sin grupos todavía</Text>
             <Text style={s.emptySub}>
-              Organizá gastos compartidos con tu familia o amigos. Cada uno registra los propios y todos ven el resumen.
+              Organizá gastos con tu familia o en grupos compartidos. Cada uno registra los propios y todos ven el resumen.
             </Text>
             <TouchableOpacity style={s.emptyBtnPrimary} onPress={openCreate} activeOpacity={0.85}>
               <Ionicons name="add" size={18} color={C.white} />

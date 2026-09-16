@@ -1,6 +1,8 @@
-// indec-sync — sincroniza IPC general INDEC desde datos.gob.ar
+// indec-sync — sincroniza IPC general + categorías INDEC desde datos.gob.ar
 // Se ejecuta mensualmente vía pg_cron (día 16 a las 12:00 UTC)
-// Las categorías (inflation_food, etc.) se actualizan con el SQL mensual manual.
+// Actualiza: inflation, inflation_core, inflation_food, inflation_clothing,
+//   inflation_housing, inflation_health, inflation_transport, inflation_comms,
+//   inflation_recreation, inflation_education, inflation_restaurants
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -82,6 +84,44 @@ serve(async (req) => {
     }
   } catch (e) {
     log.push(`Error IPC núcleo: ${e}`);
+  }
+
+  // ── IPC por categoría (INDEC, misma fuente datos.gob.ar) ─────────────────────
+  // Variación mensual calculada igual que IPC general: (índice[0] / índice[1] - 1) × 100
+  const CAT_SERIES = [
+    { id: '148.3_IALIMYBEB_DICI_M_26', instrument: 'inflation_food',        label: 'IPC Alimentos y bebidas' },
+    { id: '148.3_IINDUMEN_DICI_M_26',  instrument: 'inflation_clothing',    label: 'IPC Indumentaria' },
+    { id: '148.3_IVIVIENDA_DICI_M_26', instrument: 'inflation_housing',     label: 'IPC Vivienda y servicios' },
+    { id: '148.3_ISALUD_DICI_M_26',    instrument: 'inflation_health',      label: 'IPC Salud' },
+    { id: '148.3_ITRANSPO_DICI_M_26',  instrument: 'inflation_transport',   label: 'IPC Transporte' },
+    { id: '148.3_ICOMUNIC_DICI_M_26',  instrument: 'inflation_comms',       label: 'IPC Comunicación' },
+    { id: '148.3_IRECREAD_DICI_M_26',  instrument: 'inflation_recreation',  label: 'IPC Recreación y cultura' },
+    { id: '148.3_IEDUCAC_DICI_M_26',   instrument: 'inflation_education',   label: 'IPC Educación' },
+    { id: '148.3_IRESTAU_DICI_M_26',   instrument: 'inflation_restaurants', label: 'IPC Restaurantes y hoteles' },
+  ];
+
+  for (const cat of CAT_SERIES) {
+    try {
+      const res = await fetchWithTimeout(
+        `https://apis.datos.gob.ar/series/api/series/?ids=${cat.id}&limit=2&sort=desc&format=json`,
+        10000,
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const data: [string, number][] = json?.data ?? [];
+        if (data.length >= 2) {
+          const monthly = +((data[0][1] / data[1][1] - 1) * 100).toFixed(2);
+          updates.push({ instrument: cat.instrument, rate_monthly: monthly, label: cat.label });
+          log.push(`${cat.label}: ${monthly}% (período ${data[0][0]})`);
+        } else {
+          log.push(`${cat.label}: menos de 2 puntos, omitido`);
+        }
+      } else {
+        log.push(`${cat.label}: HTTP ${res.status}`);
+      }
+    } catch (e) {
+      log.push(`Error ${cat.label}: ${e}`);
+    }
   }
 
   if (updates.length === 0) {

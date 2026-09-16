@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, ScrollView, StyleSheet, TouchableOpacity,
   ActivityIndicator, Alert, Modal, TextInput,
-  KeyboardAvoidingView, Platform, Linking, Dimensions,
+  KeyboardAvoidingView, Platform, Linking, Dimensions, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -50,7 +50,7 @@ function hashIdx(str: string, len: number): number {
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-type FriendsTab = 'inicio' | 'gastos' | 'resumen' | 'ranking';
+type FriendsTab = 'inicio' | 'gastos' | 'resumen';
 type FamilyTab  = 'resumen' | 'gastos';
 type Tab        = FriendsTab | FamilyTab;
 type MemberRole = 'Admin' | 'Miembro';
@@ -85,6 +85,7 @@ interface MemberDetail {
   expenseCount:  number;
   pendingCount:  number;
   topCategory:   string;
+  avatarUrl?:   string;
 }
 
 interface GroupExpense {
@@ -123,18 +124,27 @@ interface DebtEntry {
   iOweThem:     boolean;
 }
 
+interface LeaveRequest {
+  id:          string;
+  userId:      string;
+  userName:    string;
+  userInitial: string;
+  userColor:   string;
+}
+
 interface GroupDetail {
-  id:           string;
-  name:         string;
-  kind:         GroupKind;
-  inviteCode:   string;
-  groupColor:   string;
-  myRole:       MemberRole;
-  members:      MemberDetail[];
-  totalMonth:   number;
-  myMonthTotal: number;
-  expenses:     GroupExpense[];
-  debts:        DebtEntry[];
+  id:             string;
+  name:           string;
+  kind:           GroupKind;
+  inviteCode:     string;
+  groupColor:     string;
+  myRole:         MemberRole;
+  members:        MemberDetail[];
+  totalMonth:     number;
+  myMonthTotal:   number;
+  expenses:       GroupExpense[];
+  debts:          DebtEntry[];
+  leaveRequests:  LeaveRequest[];
 }
 
 interface FetchResult extends GroupDetail {
@@ -261,27 +271,6 @@ function oldestDebtDate(
   return oldest;
 }
 
-type RankingEntry = { member: MemberDetail; settledCount: number; points: number };
-
-function computeRanking(
-  rawSplits: FetchResult['rawSplits'],
-  rawExpenses: { id: string; paid_by: string }[],
-  members: MemberDetail[],
-): RankingEntry[] {
-  const paidByMap: Record<string, string> = {};
-  for (const e of rawExpenses) paidByMap[e.id] = e.paid_by;
-  const settled: Record<string, number> = {};
-  for (const m of members) settled[m.userId] = 0;
-  for (const split of rawSplits) {
-    const payer = paidByMap[split.group_expense_id];
-    if (split.settled && split.user_id !== payer) {
-      settled[split.user_id] = (settled[split.user_id] ?? 0) + 1;
-    }
-  }
-  return members
-    .map(m => ({ member: m, settledCount: settled[m.userId] ?? 0, points: (settled[m.userId] ?? 0) * 10 }))
-    .sort((a, b) => b.points - a.points || b.settledCount - a.settledCount);
-}
 
 type ActivityEvent = {
   id: string;
@@ -501,6 +490,7 @@ async function fetchGroupDetail(groupId: string, userId: string): Promise<FetchR
       expenseCount,
       pendingCount,
       topCategory: topCat?.name ?? '',
+      avatarUrl:   info.avatar_url ?? undefined,
     };
   });
 
@@ -559,10 +549,28 @@ async function fetchGroupDetail(groupId: string, userId: string): Promise<FetchR
   const totalMonth   = members.reduce((s, m) => s + m.monthTotal, 0);
   const myMonthTotal = members.find(m => m.isMe)?.monthTotal ?? 0;
 
+  let leaveRequests: LeaveRequest[] = [];
+  if (!isFriends) {
+    const { data: lrRaw } = await db
+      .from('group_leave_requests')
+      .select('id, user_id')
+      .eq('group_id', groupId);
+    leaveRequests = (lrRaw ?? []).map((lr: any) => {
+      const m = members.find(m => m.userId === lr.user_id);
+      return {
+        id: lr.id,
+        userId: lr.user_id,
+        userName: m?.name ?? 'Miembro',
+        userInitial: m?.initial ?? '?',
+        userColor: m?.color ?? C.muted,
+      };
+    });
+  }
+
   return {
     id: group.id, name: group.name, kind, inviteCode: group.invite_code,
     groupColor, myRole, members, totalMonth, myMonthTotal, expenses, debts,
-    rawExpenses, rawSplits,
+    leaveRequests, rawExpenses, rawSplits,
   };
 }
 
@@ -621,7 +629,15 @@ async function runDebtMatchingFor(
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
-function Avatar({ name, color, size = 44 }: { name: string; color: string; size?: number }) {
+function Avatar({ name, color, size = 44, imageUrl }: { name: string; color: string; size?: number; imageUrl?: string }) {
+  if (imageUrl) {
+    return (
+      <Image
+        source={{ uri: imageUrl }}
+        style={{ width: size, height: size, borderRadius: size / 2 }}
+      />
+    );
+  }
   return (
     <View style={[s.avatarBase, { width: size, height: size, borderRadius: size / 2, backgroundColor: color + '22' }]}>
       <Text style={[s.avatarInitial, { color, fontSize: size * 0.38 }]}>{name.charAt(0).toUpperCase()}</Text>
@@ -705,7 +721,7 @@ function MemberEditModal({
   return (
     <FormSheetModal visible={visible} title="Editar miembro" onClose={onClose} presentationStyle="formSheet">
       <View style={{ alignItems: 'center', gap: sp.sm }}>
-        <Avatar name={member.name} color={member.color} size={72} />
+        <Avatar name={member.name} color={member.color} size={72} imageUrl={member.avatarUrl} />
         <Text style={s.editName}>{member.name}</Text>
         {member.email ? <Text style={s.editEmail}>{member.email}</Text> : null}
       </View>
@@ -1047,7 +1063,7 @@ function AddExpenseModal({
                     <View key={m.userId}>
                       {i > 0 && <View style={s.divider} />}
                       <TouchableOpacity style={s.payerRow} onPress={() => setPaidById(m.userId)} activeOpacity={0.8}>
-                        <Avatar name={m.name} color={m.color} size={36} />
+                        <Avatar name={m.name} color={m.color} size={36} imageUrl={m.avatarUrl} />
                         <Text style={s.payerName}>{m.isMe ? `${m.name} (vos)` : m.name}</Text>
                         {paidById === m.userId && <Ionicons name="checkmark-circle" size={22} color={C.green} />}
                       </TouchableOpacity>
@@ -1113,7 +1129,7 @@ function AddExpenseModal({
                   <Text style={s.sectionLabel}>MONTOS POR PERSONA</Text>
                   {includedMembers.map(m => (
                     <View key={m.userId} style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
-                      <Avatar name={m.name} color={m.color} size={34} />
+                      <Avatar name={m.name} color={m.color} size={34} imageUrl={m.avatarUrl} />
                       <Text style={[s.payerName, { flex: 1 }]}>{m.isMe ? 'Vos' : m.name.split(' ')[0]}</Text>
                       <TextInput
                         style={[s.textInput, { width: 130, textAlign: 'right', paddingVertical: sp.sm }]}
@@ -1321,7 +1337,7 @@ function ExpenseDetailModal({
                     <View key={split.user_id}>
                       {i > 0 && <View style={s.divider} />}
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg }}>
-                        <Avatar name={member?.name ?? '?'} color={member?.color ?? C.muted} size={40} />
+                        <Avatar name={member?.name ?? '?'} color={member?.color ?? C.muted} size={40} imageUrl={member?.avatarUrl} />
                         <View style={{ flex: 1 }}>
                           <Text style={s.memberName}>{member?.isMe ? 'Vos' : (member?.name ?? 'Miembro')}</Text>
                           <Text style={s.expMeta}>{formatCurrency(split.amount)}</Text>
@@ -1467,7 +1483,7 @@ function MemberProfileSheet({
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {/* Hero */}
           <View style={{ backgroundColor: C.white, alignItems: 'center', paddingVertical: sp.xxl, gap: sp.md }}>
-            <Avatar name={member.name} color={member.color} size={80} />
+            <Avatar name={member.name} color={member.color} size={80} imageUrl={member.avatarUrl} />
             <View style={[s.badge, { backgroundColor: badgeBg }]}>
               <Text style={[s.badgeText, { color: badgeColor, fontSize: 12 }]}>{badgeLabel}</Text>
             </View>
@@ -1914,8 +1930,6 @@ function FriendsMainTab({
   const owedAmt  = owedToMe.reduce((s, d) => s + d.amount, 0);
   const iOweAmt  = myDebts.reduce((s, d) => s + d.amount, 0);
 
-  const ranking = computeRanking(detail.rawSplits, detail.rawExpenses, detail.members);
-  const myRank  = ranking.findIndex(r => r.member.isMe) + 1;
   const allSettled = detail.debts.length === 0;
 
   // Settle requests pending my confirmation (I'm the creditor)
@@ -1959,19 +1973,56 @@ function FriendsMainTab({
 
   const insight = (() => {
     if (allSettled && detail.expenses.length > 0)
-      return { emoji: '🔥', title: '¡Todos al día!', sub: 'El grupo no tiene deudas pendientes.' };
-    if (myRank === 1 && ranking[0]?.settledCount > 0)
-      return { emoji: '🏆', title: '¡El más cumplidor!', sub: 'Sos quien más pagó a tiempo en el grupo.' };
-    if (myRank === 2)
-      return { emoji: '🏆', title: '¡Buen trabajo!', sub: 'Sos el 2° más cumplidor del grupo este mes.' };
-    if (owedAmt > 0)
-      return { emoji: '💸', title: 'Te deben plata', sub: `${formatCurrency(owedAmt)} en total de ${owedToMe.length} persona${owedToMe.length > 1 ? 's' : ''}.` };
-    if (iOweAmt > 0)
-      return { emoji: '👋', title: 'Tenés deudas pendientes', sub: `Debés ${formatCurrency(iOweAmt)} en el grupo.` };
+      return { emoji: '✅', title: '¡Todos al día!', sub: 'No hay deudas pendientes en el grupo.' };
+    if (owedAmt > 0 && iOweAmt === 0)
+      return { emoji: '💸', title: 'Te deben plata', sub: `${formatCurrency(owedAmt)} de ${owedToMe.length} persona${owedToMe.length > 1 ? 's' : ''}.` };
+    if (iOweAmt > 0 && owedAmt === 0)
+      return { emoji: '👋', title: 'Tenés deudas pendientes', sub: `Debés ${formatCurrency(iOweAmt)} en total.` };
+    if (owedAmt > 0 && iOweAmt > 0)
+      return { emoji: '⚖️', title: 'Deudas cruzadas', sub: `Te deben ${formatCurrency(owedAmt)} y vos debés ${formatCurrency(iOweAmt)}.` };
     return { emoji: '👥', title: 'El grupo está activo', sub: `${detail.members.length} miembros compartiendo gastos.` };
   })();
 
-  const otherMembers = detail.members.filter(m => !m.isMe);
+  const [settlingDebt, setSettlingDebt] = useState<string | null>(null);
+
+  const handleSettleDebt = async (debt: DebtEntry) => {
+    const key = debt.fromUserId + debt.toUserId;
+    setSettlingDebt(key);
+    try {
+      const creditorExpenseIds = detail.rawExpenses
+        .filter(e => e.paid_by === debt.toUserId)
+        .map(e => e.id);
+      if (creditorExpenseIds.length === 0) { onRefresh(); return; }
+      const { error } = await (supabase as any)
+        .from('group_expense_splits')
+        .update({ settled: true, settled_at: new Date().toISOString(), settle_requested_at: null })
+        .eq('user_id', debt.fromUserId)
+        .in('group_expense_id', creditorExpenseIds)
+        .eq('settled', false);
+      if (error) throw error;
+      hapticSuccess();
+      onRefresh();
+    } catch {
+      Alert.alert('Error', 'No se pudo saldar la deuda. Intentá de nuevo.');
+    } finally { setSettlingDebt(null); }
+  };
+
+  const handleSettleAll = () => {
+    const myInvolvedDebts = detail.debts.filter(d => d.fromUserId === myUserId || d.toUserId === myUserId);
+    if (myInvolvedDebts.length === 0) return;
+    Alert.alert(
+      'Saldar todas las deudas',
+      '¿Confirmás que todas las deudas en las que participás fueron saldadas?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', onPress: async () => {
+          for (const debt of myInvolvedDebts) {
+            await handleSettleDebt(debt);
+          }
+        }},
+      ]
+    );
+  };
 
   return (
     <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
@@ -1984,18 +2035,18 @@ function FriendsMainTab({
         <View style={s.scDivider} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
           <View style={{ flex: 1, gap: 4, marginRight: 8 }}>
-            <Text style={s.summaryLabel}>Te deben</Text>
+            <Text style={s.summaryLabel}>Me deben</Text>
             <Text style={[s.scBalAmt, { color: C.green }]} numberOfLines={1}>{formatCurrency(owedAmt)}</Text>
           </View>
           <View style={{ width: 1, backgroundColor: C.border }} />
           <View style={{ flex: 1, gap: 4, alignItems: 'flex-end', marginLeft: 8 }}>
-            <Text style={s.summaryLabel}>Debés</Text>
-            <Text style={[s.scBalAmt, { color: C.red }]} numberOfLines={1}>{formatCurrency(iOweAmt)}</Text>
+            <Text style={s.summaryLabel}>Debo</Text>
+            <Text style={[s.scBalAmt, { color: iOweAmt > 0 ? C.red : C.muted }]} numberOfLines={1}>{formatCurrency(iOweAmt)}</Text>
           </View>
         </View>
       </View>
 
-      {/* Insight / Gamificación */}
+      {/* Insight */}
       <View style={s.insightCard}>
         <Text style={{ fontSize: 28 }}>{insight.emoji}</Text>
         <View style={{ flex: 1, gap: 3 }}>
@@ -2051,57 +2102,76 @@ function FriendsMainTab({
         );
       })()}
 
-      {/* Balances del grupo */}
+      {/* ── Cuentas del grupo ─────────────────────────────────────────────── */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={s.sectionTitle}>Balances del grupo</Text>
-        <TouchableOpacity activeOpacity={0.7}>
-          <Text style={s.linkText}>Ver todo</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={s.card}>
-        {otherMembers.map((member, i) => {
-          const debt     = detail.debts.find(d => d.fromUserId === member.userId && d.toUserId === myUserId);
-          const iOweThem = detail.debts.find(d => d.fromUserId === myUserId && d.toUserId === member.userId);
-          let sub: string;
-          let variant: BadgeVariant;
-
-          if (debt) {
-            const debtDate = oldestDebtDate(detail.rawSplits, detail.rawExpenses, detail.expenses, member.userId, myUserId);
-            const days = debtDate ? daysAgo(debtDate) : 0;
-            sub = `Te debe ${formatCurrency(debt.amount)}`;
-            variant = days >= 7 ? 'overdue' : 'pending';
-          } else if (iOweThem) {
-            sub = `Vos le debés ${formatCurrency(iOweThem.amount)}`;
-            variant = 'pending';
-          } else {
-            sub = 'Ya saldó';
-            variant = 'paid';
-          }
-
-          return (
-            <View key={member.userId}>
-              {i > 0 && <View style={s.divider} />}
-              <TouchableOpacity
-                style={s.balanceRow}
-                onPress={() => { hapticLight(); onMemberPress(member); }}
-                activeOpacity={0.7}>
-                <Avatar name={member.name} color={member.color} size={44} />
-                <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={s.memberName}>{member.name}</Text>
-                  <Text style={[s.memberMeta, { color: debt ? C.green : iOweThem ? C.red : C.muted }]}>{sub}</Text>
-                </View>
-                <StatusBadge variant={variant} />
-              </TouchableOpacity>
-            </View>
-          );
-        })}
-        {otherMembers.length === 0 && (
-          <View style={{ padding: sp.xl, alignItems: 'center', gap: sp.sm }}>
-            <Text style={s.emptyTitle}>Sin otros miembros</Text>
-          </View>
+        <Text style={s.sectionTitle}>Cuentas pendientes</Text>
+        {detail.debts.length > 0 && (
+          <TouchableOpacity onPress={handleSettleAll} activeOpacity={0.7}>
+            <Text style={[s.linkText, { color: C.green }]}>Saldar todo</Text>
+          </TouchableOpacity>
         )}
       </View>
+
+      {detail.debts.length === 0 ? (
+        <View style={[s.card, { alignItems: 'center', paddingVertical: sp.xxl, gap: sp.md }]}>
+          <Text style={{ fontSize: 36 }}>✅</Text>
+          <Text style={s.emptyTitle}>¡Sin deudas!</Text>
+          <Text style={s.emptySub}>Todos los gastos del grupo están saldados.</Text>
+        </View>
+      ) : (
+        <View style={s.card}>
+          {detail.debts.map((debt, i) => {
+            const fromMember = detail.members.find(m => m.userId === debt.fromUserId);
+            const toMember   = detail.members.find(m => m.userId === debt.toUserId);
+            const isMyDebt   = debt.fromUserId === myUserId;
+            const owedToMe   = debt.toUserId === myUserId;
+            const canSettle  = isMyDebt || owedToMe;
+            const debtKey    = debt.fromUserId + debt.toUserId;
+            const isSettling = settlingDebt === debtKey;
+            return (
+              <View key={debtKey}>
+                {i > 0 && <View style={s.divider} />}
+                <View style={[gt.debtRow, isMyDebt && { backgroundColor: '#FFF5F5' }, owedToMe && { backgroundColor: '#F0FBF4' }]}>
+                  {/* De quién */}
+                  <View style={gt.debtParty}>
+                    <Avatar name={fromMember?.name ?? debt.fromName} color={fromMember?.color ?? C.muted} size={36} imageUrl={fromMember?.avatarUrl} />
+                    <Text style={[gt.debtPartyName, isMyDebt && { color: C.red, fontFamily: 'Montserrat_700Bold' }]} numberOfLines={1}>
+                      {debt.fromUserId === myUserId ? 'Vos' : fromMember?.name.split(' ')[0] ?? debt.fromName}
+                    </Text>
+                  </View>
+                  {/* Flecha + monto */}
+                  <View style={gt.debtCenter}>
+                    <Ionicons name="arrow-forward" size={14} color={isMyDebt ? C.red : C.green} />
+                    <Text style={[gt.debtAmt, { color: isMyDebt ? C.red : C.green }]}>
+                      {formatCurrency(debt.amount)}
+                    </Text>
+                  </View>
+                  {/* A quién */}
+                  <View style={[gt.debtParty, { alignItems: 'flex-end' }]}>
+                    <Avatar name={toMember?.name ?? debt.toName} color={toMember?.color ?? C.muted} size={36} imageUrl={toMember?.avatarUrl} />
+                    <Text style={[gt.debtPartyName, owedToMe && { color: C.green, fontFamily: 'Montserrat_700Bold' }]} numberOfLines={1}>
+                      {debt.toUserId === myUserId ? 'Vos' : toMember?.name.split(' ')[0] ?? debt.toName}
+                    </Text>
+                  </View>
+                  {/* Botón saldar */}
+                  {canSettle && (
+                    <TouchableOpacity
+                      style={[gt.settleBtn, isMyDebt ? { backgroundColor: C.red + '15', borderColor: C.red + '40' } : { backgroundColor: C.accent, borderColor: C.green + '40' }]}
+                      onPress={() => handleSettleDebt(debt)}
+                      disabled={isSettling}
+                      activeOpacity={0.8}
+                    >
+                      {isSettling
+                        ? <ActivityIndicator size="small" color={isMyDebt ? C.red : C.green} />
+                        : <Text style={[gt.settleBtnText, { color: isMyDebt ? C.red : C.green }]}>Saldar</Text>}
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       {/* Recordar a todos */}
       {detail.debts.some(d => d.toUserId === myUserId) && (
@@ -2129,6 +2199,27 @@ function FriendsGastosTab({
   rawSplits: FetchResult['rawSplits']; myUserId: string; onRefresh: () => void;
 }) {
   const [selectedExpense, setSelectedExpense] = useState<GroupExpense | null>(null);
+  const [renamingExpense, setRenamingExpense] = useState<GroupExpense | null>(null);
+  const [renameText, setRenameText] = useState('');
+  const [renaming, setRenaming] = useState(false);
+
+  const handleRename = async () => {
+    if (!renamingExpense || !renameText.trim()) return;
+    setRenaming(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('group_expenses')
+        .update({ description: renameText.trim() })
+        .eq('id', renamingExpense.id);
+      if (error) throw error;
+      hapticSuccess();
+      setRenamingExpense(null);
+      onRefresh();
+    } catch {
+      Alert.alert('Error', 'No se pudo renombrar el gasto.');
+    } finally { setRenaming(false); }
+  };
+
   const byDate: { date: string; label: string; items: GroupExpense[] }[] = [];
   for (const e of detail.expenses) {
     const last = byDate[byDate.length - 1];
@@ -2158,22 +2249,68 @@ function FriendsGastosTab({
               {group.items.map((e, i) => (
                 <View key={e.id}>
                   {i > 0 && <View style={s.divider} />}
-                  <TouchableOpacity onPress={() => { hapticLight(); setSelectedExpense(e); }} activeOpacity={0.75}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg }}>
+                    <TouchableOpacity style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp.md }}
+                      onPress={() => { hapticLight(); setSelectedExpense(e); }} activeOpacity={0.75}>
                       <CategoryIcon description={e.description} size={40} />
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={s.expName} numberOfLines={1}>{e.description}</Text>
                         <Text style={s.expMeta}>{dateLabel(e.date)} · Pagó {e.paidByName}</Text>
                       </View>
                       <Text style={s.expAmt}>{formatCurrency(e.amount)}</Text>
-                    </View>
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => { hapticLight(); setRenamingExpense(e); setRenameText(e.description); }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      activeOpacity={0.6}
+                    >
+                      <Ionicons name="pencil-outline" size={16} color={C.muted} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))}
             </View>
           </View>
         ))}
       </ScrollView>
+
+      {/* Modal renombrar gasto */}
+      <Modal
+        visible={renamingExpense !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRenamingExpense(null)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <TouchableOpacity style={gt.overlay} activeOpacity={1} onPress={() => setRenamingExpense(null)} />
+          <View style={gt.renameSheet}>
+            <Text style={gt.renameTitle}>Renombrar gasto</Text>
+            <TextInput
+              style={gt.renameInput}
+              value={renameText}
+              onChangeText={setRenameText}
+              autoFocus
+              placeholder="Nombre del gasto"
+              placeholderTextColor={C.muted}
+              returnKeyType="done"
+              onSubmitEditing={handleRename}
+            />
+            <View style={{ flexDirection: 'row', gap: sp.md }}>
+              <TouchableOpacity style={[gt.renameBtn, { backgroundColor: C.surface, flex: 1 }]}
+                onPress={() => setRenamingExpense(null)} activeOpacity={0.8}>
+                <Text style={[gt.renameBtnText, { color: C.text2 }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[gt.renameBtn, { backgroundColor: C.green, flex: 1 }]}
+                onPress={handleRename} activeOpacity={0.8} disabled={renaming}>
+                {renaming
+                  ? <ActivityIndicator size="small" color={C.white} />
+                  : <Text style={[gt.renameBtnText, { color: C.white }]}>Guardar</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       <ExpenseDetailModal
         visible={selectedExpense !== null} expense={selectedExpense}
         splits={rawSplits} members={detail.members} myUserId={myUserId}
@@ -2253,124 +2390,236 @@ function GroupAnalyticsTab({ detail }: { detail: FetchResult }) {
   );
 }
 
-// ─── Tab: Ranking ─────────────────────────────────────────────────────────────
-
-function RankingTab({ detail }: { detail: FetchResult }) {
-  const ranking = computeRanking(detail.rawSplits, detail.rawExpenses, detail.members);
-  const improved = ranking.filter(r => r.settledCount > 0).length;
-  const medals = ['🥇', '🥈', '🥉'];
-  return (
-    <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={s.sectionTitle}>Ranking de cumplidores 🏆</Text>
-        <Text style={s.mutedSmall}>Este mes</Text>
-      </View>
-      <View style={s.card}>
-        {ranking.map((entry, i) => (
-          <View key={entry.member.userId}>
-            {i > 0 && <View style={s.divider} />}
-            <View style={[s.rankRow, entry.member.isMe && { backgroundColor: C.accent }]}>
-              <Text style={s.rankNumber}>{medals[i] ?? `${i + 1}`}</Text>
-              <Avatar name={entry.member.name} color={entry.member.color} size={40} />
-              <View style={{ flex: 1, gap: 3 }}>
-                <Text style={[s.memberName, entry.member.isMe && { color: C.green }]}>
-                  {entry.member.isMe ? 'Vos' : entry.member.name.split(' ')[0]}
-                </Text>
-                <Text style={s.memberMeta}>{entry.settledCount} {entry.settledCount === 1 ? 'pago' : 'pagos'} a tiempo</Text>
-              </View>
-              <View style={[s.badge, { backgroundColor: entry.points > 0 ? C.accent : C.bg }]}>
-                <Text style={[s.badgeText, { color: entry.points > 0 ? C.green : C.muted }]}>+{entry.points} pts</Text>
-              </View>
-            </View>
-          </View>
-        ))}
-      </View>
-      {improved > 0 && (
-        <View style={s.insightCard}>
-          <Text style={{ fontSize: 24 }}>⭐</Text>
-          <View style={{ flex: 1, gap: 3 }}>
-            <Text style={s.insightTitle}>¡Sigan así!</Text>
-            <Text style={s.insightSub}>{improved} miembro{improved > 1 ? 's' : ''} pagó a tiempo este mes.</Text>
-          </View>
-        </View>
-      )}
-    </ScrollView>
-  );
-}
-
 // ─── Tab: Family Resumen ──────────────────────────────────────────────────────
 
 function FamilyResumenTab({ detail, isAdmin, onInvite, groupId }: {
   detail: GroupDetail; isAdmin: boolean;
   onInvite: () => void; groupId: string;
 }) {
-  const membersList  = detail.members.filter(m => m.role === 'Miembro');
-  const membersTotal = membersList.reduce((s, m) => s + m.monthTotal, 0);
+  const [selectedMember, setSelectedMember] = useState<MemberDetail | null>(null);
 
-  const handleMemberPress = (m: MemberDetail) => {
-    if (!isAdmin) return;
-    router.push({
-      pathname: '/(app)/member-detail',
-      params: { userId: m.userId, groupId, memberName: m.name },
-    } as any);
-  };
+  const sorted     = [...detail.members].sort((a, b) => b.monthTotal - a.monthTotal);
+  const grandTotal = detail.totalMonth;
+  const maxAmt     = sorted.reduce((m, x) => Math.max(m, x.monthTotal), 0);
+
+  const memberExpenses = selectedMember
+    ? detail.expenses.filter(e => e.paidById === selectedMember.userId)
+    : [];
 
   return (
     <ScrollView contentContainerStyle={s.tabContent} showsVerticalScrollIndicator={false}>
-      {isAdmin && (
-        <View style={s.insightCard}>
-          <Text style={{ fontSize: 24 }}>🛡️</Text>
-          <View style={{ flex: 1, gap: 3 }}>
-            <Text style={s.insightTitle}>Sos el admin</Text>
-            <Text style={s.insightSub}>Podés ver los gastos de los miembros. Tus gastos no se comparten automáticamente.</Text>
+
+      {/* ── Tarjeta total del grupo ──────────────────────────────────────── */}
+      <View style={fr.totalCard}>
+        <View style={fr.totalTop}>
+          <Text style={fr.totalMonthLabel}>{monthLabel().toUpperCase()}</Text>
+          <View style={fr.pill}>
+            <Text style={fr.pillText}>{detail.members.length} integrante{detail.members.length !== 1 ? 's' : ''}</Text>
           </View>
         </View>
-      )}
-      <View style={s.summaryCard}>
-        <Text style={s.scMonthLabel}>Resumen del mes</Text>
-        <Text style={s.scTotal}>{formatCurrency(membersTotal)}</Text>
-        <Text style={s.scTotalLabel}>Total del grupo · {membersList.length} miembros</Text>
+        <Text style={fr.totalAmt} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
+          {formatCurrency(grandTotal)}
+        </Text>
+        <Text style={fr.totalSub}>Total familiar este mes</Text>
       </View>
-      <Text style={s.sectionTitle}>Gastos por miembro</Text>
-      {membersList.length === 0 ? (
-        <View style={s.emptyBox}>
-          <Text style={{ fontSize: 48 }}>👥</Text>
-          <Text style={s.emptyTitle}>Sin miembros todavía</Text>
-          <Text style={s.emptySub}>Invitá personas para ver sus gastos acá.</Text>
+
+      {/* ── Distribución por integrante ──────────────────────────────────── */}
+      <View style={s.card}>
+        <View style={{ paddingHorizontal: sp.lg, paddingTop: sp.lg, paddingBottom: sp.sm }}>
+          <Text style={s.sectionTitle}>Distribución por integrante</Text>
         </View>
-      ) : (
-        <View style={s.card}>
-          {membersList.map((m, i) => (
+
+        {sorted.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: sp.xxl, gap: sp.md }}>
+            <Text style={{ fontSize: 40 }}>👥</Text>
+            <Text style={s.emptyTitle}>Sin integrantes todavía</Text>
+            <Text style={s.emptySub}>Invitá personas para ver sus gastos acá.</Text>
+          </View>
+        ) : sorted.map((m, i) => {
+          const pct    = grandTotal > 0 ? m.monthTotal / grandTotal : 0;
+          const barPct = maxAmt    > 0 ? (m.monthTotal / maxAmt) * 100 : 0;
+          const canTap = isAdmin || m.isMe;
+          return (
             <View key={m.userId}>
               {i > 0 && <View style={s.divider} />}
-              <TouchableOpacity style={s.balanceRow} onPress={() => handleMemberPress(m)} activeOpacity={isAdmin ? 0.7 : 1} disabled={!isAdmin}>
-                <Avatar name={m.name} color={m.color} size={44} />
-                <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={s.memberName} numberOfLines={1}>{m.isMe ? `Vos (${m.name})` : m.name}</Text>
-                  <Text style={s.memberMeta}>{formatCurrency(m.monthTotal)} · {m.expenseCount} gastos</Text>
-                  {m.pendingCount > 0 && (
-                    <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 11, color: C.orange }}>{m.pendingCount} sin clasificar</Text>
-                  )}
+              <TouchableOpacity
+                style={fr.memberRow}
+                onPress={() => { if (canTap) setSelectedMember(m); }}
+                activeOpacity={canTap ? 0.75 : 1}
+                disabled={!canTap}
+              >
+                <Avatar name={m.name} color={m.color} size={42} imageUrl={m.avatarUrl} />
+                <View style={{ flex: 1, gap: 6 }}>
+                  {/* Nombre + monto */}
+                  <View style={fr.memberRowTop}>
+                    <Text style={fr.memberName} numberOfLines={1}>
+                      {m.isMe ? `Vos (${m.name})` : m.name}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.sm }}>
+                      {grandTotal > 0 && (
+                        <View style={fr.pctBadge}>
+                          <Text style={fr.pctText}>{Math.round(pct * 100)}%</Text>
+                        </View>
+                      )}
+                      <Text style={fr.amtText}>{formatCurrency(m.monthTotal)}</Text>
+                    </View>
+                  </View>
+                  {/* Barra de progreso */}
+                  <View style={fr.barBg}>
+                    <View style={[fr.barFill, {
+                      width: (`${m.monthTotal > 0 ? Math.max(barPct, 5) : 0}%`) as any,
+                      backgroundColor: m.color,
+                    }]} />
+                  </View>
+                  {/* Sub-info */}
+                  <Text style={fr.memberSub}>
+                    {m.expenseCount > 0
+                      ? `${m.expenseCount} gasto${m.expenseCount !== 1 ? 's' : ''}${m.pendingCount > 0 ? ` · ${m.pendingCount} sin clasificar` : ''}`
+                      : 'Sin gastos este mes'}
+                  </Text>
                 </View>
-                {isAdmin && <Ionicons name="chevron-forward" size={16} color={C.muted} />}
+                {canTap && (
+                  <Ionicons name="chevron-forward" size={14} color={C.muted} />
+                )}
               </TouchableOpacity>
             </View>
-          ))}
-        </View>
-      )}
-      <View style={{ flexDirection: 'row', gap: sp.md, backgroundColor: '#D1F7E3', borderRadius: 14, padding: sp.lg }}>
-        <Ionicons name="information-circle-outline" size={18} color={C.green} style={{ marginTop: 1 }} />
-        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#1C1C1C', flex: 1, lineHeight: 20 }}>
-          Los miembros no cargan nada manualmente. Sus gastos se asocian automáticamente.
+          );
+        })}
+      </View>
+
+      {/* Info */}
+      <View style={fr.infoPill}>
+        <Ionicons name="information-circle-outline" size={15} color={C.green} />
+        <Text style={fr.infoText}>
+          Los gastos se registran individualmente. El admin ve el resumen y el detalle de cada integrante.
         </Text>
       </View>
+
       <TouchableOpacity style={s.purpleBtn} onPress={onInvite} activeOpacity={0.85}>
         <Ionicons name="add" size={20} color={C.white} />
-        <Text style={s.purpleBtnText}>Agregar miembro</Text>
+        <Text style={s.purpleBtnText}>Agregar integrante</Text>
       </TouchableOpacity>
+
+      {/* ── Modal: Detalle de integrante ─────────────────────────────────── */}
+      <Modal
+        visible={selectedMember !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedMember(null)}
+      >
+        <View style={fr.overlay}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setSelectedMember(null)} />
+          <View style={fr.sheet}>
+            <View style={fr.handle} />
+            {selectedMember && (
+              <>
+                {/* Header del integrante */}
+                <View style={fr.sheetHeader}>
+                  <Avatar name={selectedMember.name} color={selectedMember.color} size={52} imageUrl={selectedMember.avatarUrl} />
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={fr.sheetName} numberOfLines={1}>
+                      {selectedMember.isMe ? `Vos (${selectedMember.name})` : selectedMember.name}
+                    </Text>
+                    <Text style={fr.sheetMeta}>
+                      {formatCurrency(selectedMember.monthTotal)} · {selectedMember.expenseCount} gasto{selectedMember.expenseCount !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setSelectedMember(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close" size={22} color={C.muted} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Lista de gastos agrupados por fecha */}
+                {memberExpenses.length === 0 ? (
+                  <View style={{ alignItems: 'center', paddingVertical: 40, gap: sp.md }}>
+                    <Text style={{ fontSize: 44 }}>🧾</Text>
+                    <Text style={[s.emptyTitle, { textAlign: 'center' }]}>Sin gastos este mes</Text>
+                  </View>
+                ) : (
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    style={{ maxHeight: 420 }}
+                    contentContainerStyle={{ gap: sp.md, paddingBottom: sp.xxl }}
+                  >
+                    {(() => {
+                      const byDate: { date: string; label: string; items: GroupExpense[] }[] = [];
+                      for (const e of memberExpenses) {
+                        const last = byDate[byDate.length - 1];
+                        if (last && last.date === e.date) last.items.push(e);
+                        else byDate.push({ date: e.date, label: dateLabel(e.date), items: [e] });
+                      }
+                      return byDate.map(group => (
+                        <View key={group.date} style={{ gap: sp.sm }}>
+                          <Text style={s.sectionLabel}>{group.label.toUpperCase()}</Text>
+                          <View style={s.card}>
+                            {group.items.map((e, i) => (
+                              <View key={e.id}>
+                                {i > 0 && <View style={s.divider} />}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg }}>
+                                  <CategoryIcon description={e.description} size={38} />
+                                  <View style={{ flex: 1, gap: 2 }}>
+                                    <Text style={s.expName} numberOfLines={1}>{e.description}</Text>
+                                  </View>
+                                  <Text style={s.expAmt}>{formatCurrency(e.amount)}</Text>
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      ));
+                    })()}
+                  </ScrollView>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }
+
+const fr = StyleSheet.create({
+  // Tarjeta total
+  totalCard: {
+    backgroundColor: C.green, borderRadius: 22, padding: sp.xl, gap: sp.sm,
+    shadowColor: C.green, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
+  },
+  totalTop:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  totalMonthLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: 'rgba(255,255,255,0.72)', letterSpacing: 1.2 },
+  pill:            { backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 20, paddingHorizontal: sp.md, paddingVertical: 4 },
+  pillText:        { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: '#fff' },
+  totalAmt:        { fontFamily: 'Montserrat_800ExtraBold', fontSize: 38, color: '#fff', letterSpacing: -1, lineHeight: 46 },
+  totalSub:        { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.72)' },
+
+  // Filas de miembro
+  memberRow:    { flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg },
+  memberRowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  memberName:   { fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: C.text, flex: 1, marginRight: sp.sm },
+  amtText:      { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.text },
+  memberSub:    { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: C.muted },
+  pctBadge:     { backgroundColor: C.surface, borderRadius: 20, paddingHorizontal: sp.sm, paddingVertical: 2 },
+  pctText:      { fontFamily: 'Montserrat_600SemiBold', fontSize: 11, color: C.muted },
+
+  // Barra de progreso
+  barBg:   { height: 7, backgroundColor: C.border, borderRadius: 4, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 4 },
+
+  // Info pill
+  infoPill: { flexDirection: 'row', alignItems: 'flex-start', gap: sp.sm, backgroundColor: C.accent, borderRadius: 14, padding: sp.lg },
+  infoText: { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.text, flex: 1, lineHeight: 19 },
+
+  // Modal
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.38)', justifyContent: 'flex-end' },
+  sheet:   { backgroundColor: C.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: sp.xl, paddingBottom: 36, gap: sp.lg },
+  handle:  { width: 38, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center', marginBottom: sp.xs },
+
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
+  sheetName:   { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: C.text, letterSpacing: -0.2 },
+  sheetMeta:   { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.muted },
+});
 
 // ─── Tab: Family Gastos ───────────────────────────────────────────────────────
 
@@ -2429,7 +2678,7 @@ function MiembrosTab({ detail, isAdmin, isFriends, onEdit, onInvite }: {
             <View key={m.userId}>
               {i > 0 && <View style={s.divider} />}
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md, padding: sp.lg }}>
-                <Avatar name={m.name} color={m.color} size={44} />
+                <Avatar name={m.name} color={m.color} size={44} imageUrl={m.avatarUrl} />
                 <View style={{ flex: 1, gap: 3 }}>
                   <Text style={s.memberName} numberOfLines={1}>{m.isMe ? `Vos (${m.name})` : m.name}</Text>
                   {m.email ? <Text style={s.memberMeta} numberOfLines={1}>{m.email}</Text> : null}
@@ -2525,7 +2774,6 @@ export default function GroupDetailScreen() {
     { key: 'inicio',  label: 'Inicio'  },
     { key: 'gastos',  label: 'Gastos'  },
     { key: 'resumen', label: 'Resumen' },
-    { key: 'ranking', label: 'Ranking' },
   ];
   const familyTabs: { key: Tab; label: string }[] = [
     { key: 'resumen', label: 'Resumen' },
@@ -2653,7 +2901,24 @@ export default function GroupDetailScreen() {
           onPress={() => Alert.alert('Opciones', '', [
             { text: 'Salir del grupo', style: 'destructive', onPress: async () => {
               if (!id || !user?.id) return;
-              await (supabase as any).from('family_members').delete().eq('group_id', id).eq('user_id', user.id);
+              const db = supabase as any;
+              // Grupos familiares: miembro no-admin pide permiso al admin
+              if (!isFriends && !isAdmin) {
+                const { data: existing } = await db
+                  .from('group_leave_requests').select('id')
+                  .eq('group_id', id).eq('user_id', user.id).maybeSingle();
+                if (existing) {
+                  Alert.alert('Solicitud pendiente', 'Ya enviaste una solicitud para salir. El admin debe aprobarla.');
+                  return;
+                }
+                const { error } = await db
+                  .from('group_leave_requests').insert({ group_id: id, user_id: user.id });
+                if (error) { Alert.alert('Error', 'No pudimos enviar tu solicitud. Intentá de nuevo.'); return; }
+                Alert.alert('Solicitud enviada', 'El admin del grupo debe aprobar tu salida.');
+                return;
+              }
+              // Amigos o admin: salida directa
+              await db.from('family_members').delete().eq('group_id', id).eq('user_id', user.id);
               router.replace('/(app)/family' as any);
             }},
             { text: 'Cancelar', style: 'cancel' },
@@ -2702,7 +2967,6 @@ export default function GroupDetailScreen() {
                   rawSplits={detail.rawSplits} myUserId={user!.id} onRefresh={load} />
               )}
               {activeTab === 'resumen' && <GroupAnalyticsTab detail={detail} />}
-              {activeTab === 'ranking' && <RankingTab detail={detail} />}
             </>
           ) : (
             <>
@@ -2719,9 +2983,56 @@ export default function GroupDetailScreen() {
           )}
           {/* Modal miembros */}
           <FormSheetModal visible={showMembers} title="Miembros" onClose={() => setShowMembers(false)} presentationStyle="formSheet">
+
+            {/* Solicitudes de salida (solo admin, grupos familiares) */}
+            {isAdmin && !isFriends && detail.leaveRequests.length > 0 && (
+              <View style={[s.card, { borderWidth: 1.5, borderColor: C.orange + '60', backgroundColor: C.orangeLt, marginBottom: sp.md }]}>
+                <View style={{ padding: sp.lg, gap: sp.sm }}>
+                  <Text style={[s.sectionLabel, { color: C.orange }]}>SOLICITUDES DE SALIDA</Text>
+                  {detail.leaveRequests.map((lr, i) => (
+                    <View key={lr.id}>
+                      {i > 0 && <View style={[s.divider, { marginHorizontal: 0, marginVertical: sp.sm }]} />}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: sp.md }}>
+                        <Avatar name={lr.userName} color={lr.userColor} size={38} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.memberName}>{lr.userName}</Text>
+                          <Text style={[s.memberMeta, { color: C.orange }]}>Quiere salir del grupo</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={{ backgroundColor: C.red, borderRadius: 8, paddingHorizontal: sp.md, paddingVertical: sp.xs + 2 }}
+                          onPress={async () => {
+                            const db = supabase as any;
+                            await Promise.all([
+                              db.from('family_members').delete().eq('group_id', id).eq('user_id', lr.userId),
+                              db.from('group_leave_requests').delete().eq('id', lr.id),
+                            ]);
+                            load();
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 12, color: C.white }}>Aprobar</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={{ backgroundColor: C.border, borderRadius: 8, paddingHorizontal: sp.md, paddingVertical: sp.xs + 2 }}
+                          onPress={async () => {
+                            await (supabase as any).from('group_leave_requests').delete().eq('id', lr.id);
+                            load();
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 12, color: C.text2 }}>Rechazar</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
             <View style={s.card}>
               {detail.members.map((m, i) => {
                 const canEdit = isAdmin && !m.isMe && !isFriends;
+                const hasPendingLeave = !isFriends && detail.leaveRequests.some(lr => lr.userId === m.userId);
                 return (
                   <View key={m.userId}>
                     {i > 0 && <View style={s.divider} />}
@@ -2730,6 +3041,11 @@ export default function GroupDetailScreen() {
                       <View style={{ flex: 1, gap: 3 }}>
                         <Text style={s.memberName} numberOfLines={1}>{m.isMe ? `Vos (${m.name})` : m.name}</Text>
                         {m.email ? <Text style={s.memberMeta} numberOfLines={1}>{m.email}</Text> : null}
+                        {hasPendingLeave && (
+                          <Text style={{ fontFamily: 'Montserrat_500Medium', fontSize: 11, color: C.orange }}>
+                            Solicitud de salida pendiente
+                          </Text>
+                        )}
                       </View>
                       {!isFriends && (
                         <View style={[s.badge, { backgroundColor: C.accent }]}>
@@ -2770,6 +3086,47 @@ export default function GroupDetailScreen() {
     </SafeAreaView>
   );
 }
+
+// ─── Estilos grupos compartidos ───────────────────────────────────────────────
+
+const gt = StyleSheet.create({
+  // Deuda row
+  debtRow: {
+    flexDirection: 'row', alignItems: 'center', gap: sp.sm,
+    paddingHorizontal: sp.lg, paddingVertical: sp.md,
+    borderRadius: 0,
+  },
+  debtParty: { alignItems: 'center', gap: 4, width: 56 },
+  debtPartyName: {
+    fontFamily: 'Montserrat_500Medium', fontSize: 11, color: C.text2,
+    textAlign: 'center', width: 56,
+  },
+  debtCenter: { flex: 1, alignItems: 'center', gap: 2 },
+  debtAmt: { fontFamily: 'Montserrat_700Bold', fontSize: 15, letterSpacing: -0.3 },
+  settleBtn: {
+    borderRadius: 8, paddingHorizontal: sp.sm, paddingVertical: 6,
+    borderWidth: 1, minWidth: 60, alignItems: 'center',
+  },
+  settleBtnText: { fontFamily: 'Montserrat_700Bold', fontSize: 12 },
+  // Rename modal
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  renameSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: C.white, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: sp.xxl, gap: sp.lg,
+  },
+  renameTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 17, color: C.text, textAlign: 'center' },
+  renameInput: {
+    fontFamily: 'Montserrat_500Medium', fontSize: 15, color: C.text,
+    borderWidth: 1.5, borderColor: C.border, borderRadius: 12,
+    paddingHorizontal: sp.lg, paddingVertical: sp.md, backgroundColor: C.bg,
+  },
+  renameBtn: { borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  renameBtnText: { fontFamily: 'Montserrat_700Bold', fontSize: 14 },
+});
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
