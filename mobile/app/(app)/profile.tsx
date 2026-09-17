@@ -73,6 +73,9 @@ export default function ProfileScreen() {
   const [showRoundUpModal, setShowRoundUpModal] = useState(false);
   const [uploadingPhoto,   setUploadingPhoto]   = useState(false);
   const [gmailEmail,    setGmailEmail]    = useState<string | null>(null);
+  const [gmailSyncing,  setGmailSyncing]  = useState(false);
+  const [outlookEmail,  setOutlookEmail]  = useState<string | null>(null);
+  const [outlookSyncing, setOutlookSyncing] = useState(false);
   const [mpEmail,       setMpEmail]       = useState<string | null>(null);
   const [mpSyncing,     setMpSyncing]     = useState(false);
   const [mpLastSync,    setMpLastSync]    = useState<Date | null>(null);
@@ -94,7 +97,7 @@ export default function ProfileScreen() {
     }
   };
 
-  // Cargar estado de Gmail y MP al entrar
+  // Cargar estado de Gmail, Outlook y MP al entrar
   useEffect(() => {
     if (!user?.id) return;
     (supabase as any)
@@ -104,6 +107,14 @@ export default function ProfileScreen() {
       .maybeSingle()
       .then(({ data }: { data: { gmail_email: string } | null }) => {
         if (data) setGmailEmail(data.gmail_email);
+      });
+    (supabase as any)
+      .from('outlook_connections')
+      .select('outlook_email')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }: { data: { outlook_email: string } | null }) => {
+        if (data) setOutlookEmail(data.outlook_email);
       });
     loadMpStatus();
   }, [user?.id]);
@@ -190,6 +201,74 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const syncGmailNow = async () => {
+    setGmailSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/gmail-poll`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      const found = data.new_found ?? 0;
+      Alert.alert(
+        'Sincronización completa',
+        found > 0
+          ? `Se agregaron ${found} gasto${found !== 1 ? 's' : ''} nuevos desde Gmail.`
+          : 'No se encontraron gastos nuevos en Gmail.',
+      );
+    } catch {
+      Alert.alert('Error', 'No se pudo sincronizar. Intentá de nuevo.');
+    } finally {
+      setGmailSyncing(false);
+    }
+  };
+
+  const disconnectOutlook = () => {
+    Alert.alert('Desconectar Outlook', '¿Querés dejar de detectar gastos desde tu Outlook o Hotmail?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Desconectar',
+        style: 'destructive',
+        onPress: async () => {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/outlook-auth`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+          }
+          setOutlookEmail(null);
+        },
+      },
+    ]);
+  };
+
+  const syncOutlookNow = async () => {
+    setOutlookSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/outlook-poll`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      const found = data.new_found ?? 0;
+      Alert.alert(
+        'Sincronización completa',
+        found > 0
+          ? `Se agregaron ${found} gasto${found !== 1 ? 's' : ''} nuevos desde Outlook.`
+          : 'No se encontraron gastos nuevos en Outlook.',
+      );
+    } catch {
+      Alert.alert('Error', 'No se pudo sincronizar. Intentá de nuevo.');
+    } finally {
+      setOutlookSyncing(false);
+    }
   };
 
   const { connecting: mpConnecting, connect: connectMpFlow } = useMpConnect(user?.id);
@@ -405,6 +484,19 @@ export default function ProfileScreen() {
                 </View>
                 <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
               </TouchableOpacity>
+              <View style={{ height: 1, backgroundColor: colors.border.subtle }} />
+              <TouchableOpacity style={styles.menuItem} onPress={syncGmailNow} disabled={gmailSyncing}>
+                <View style={[styles.menuIcon, { width: 36, height: 36, borderRadius: 18, backgroundColor: '#D1F7E3', alignItems: 'center', justifyContent: 'center' }]}>
+                  {gmailSyncing
+                    ? <ActivityIndicator size="small" color={colors.primary} />
+                    : <Ionicons name="sync-outline" size={20} color={colors.primary} />}
+                </View>
+                <View style={styles.menuText}>
+                  <Text variant="bodySmall" color={colors.text.primary}>{gmailSyncing ? 'Sincronizando…' : 'Sincronizar ahora'}</Text>
+                  <Text variant="caption" color={colors.text.secondary}>Se sincroniza automáticamente cada hora</Text>
+                </View>
+                {!gmailSyncing && <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />}
+              </TouchableOpacity>
             </Card>
           </View>
         ) : (
@@ -416,6 +508,50 @@ export default function ProfileScreen() {
                 label="Conectar Gmail"
                 description="Detectá gastos automáticamente desde tu email"
                 onPress={() => router.push('/(app)/gmail-connect' as any)}
+              />
+            </Card>
+          </View>
+        )}
+
+        {/* ── Conectar Outlook ─────────────────────────────────────────── */}
+        {outlookEmail ? (
+          <View style={styles.section}>
+            <Text variant="label" color={colors.text.tertiary} style={styles.sectionTitle}>OUTLOOK / HOTMAIL</Text>
+            <Card style={styles.menuCard}>
+              <TouchableOpacity style={styles.menuItem} onPress={disconnectOutlook}>
+                <View style={[styles.menuIcon, { width: 36, height: 36, borderRadius: 18, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Ionicons name="mail-outline" size={20} color="#0078D4" />
+                </View>
+                <View style={styles.menuText}>
+                  <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }}>Outlook conectado</Text>
+                  <Text variant="caption" style={{ color: '#0078D4' }}>{outlookEmail}</Text>
+                </View>
+                <Ionicons name="checkmark-circle" size={20} color="#0078D4" />
+              </TouchableOpacity>
+              <View style={{ height: 1, backgroundColor: colors.border.subtle }} />
+              <TouchableOpacity style={styles.menuItem} onPress={syncOutlookNow} disabled={outlookSyncing}>
+                <View style={[styles.menuIcon, { width: 36, height: 36, borderRadius: 18, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center' }]}>
+                  {outlookSyncing
+                    ? <ActivityIndicator size="small" color="#0078D4" />
+                    : <Ionicons name="sync-outline" size={20} color="#0078D4" />}
+                </View>
+                <View style={styles.menuText}>
+                  <Text variant="bodySmall" color={colors.text.primary}>{outlookSyncing ? 'Sincronizando…' : 'Sincronizar ahora'}</Text>
+                  <Text variant="caption" color={colors.text.secondary}>Se sincroniza automáticamente cada hora</Text>
+                </View>
+                {!outlookSyncing && <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />}
+              </TouchableOpacity>
+            </Card>
+          </View>
+        ) : (
+          <View style={styles.section}>
+            <Text variant="label" color={colors.text.tertiary} style={styles.sectionTitle}>OUTLOOK / HOTMAIL</Text>
+            <Card style={styles.menuCard}>
+              <MenuItem
+                icon="mail-outline"
+                label="Conectar Outlook"
+                description="Detectá gastos desde Outlook o Hotmail"
+                onPress={() => router.push('/(app)/outlook-connect' as any)}
               />
             </Card>
           </View>

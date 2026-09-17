@@ -52,10 +52,11 @@ export default function HomeScreen() {
   const streakStore  = useStreakStore();
   const roundUpStore = useRoundUpStore();
 
-  const [gmailConnected, setGmailConnected] = useState(false);
-  const [mpConnected,    setMpConnected]    = useState(false);
-  const [pendingCount,   setPendingCount]   = useState(0);
-  const [budgetPlan,     setBudgetPlan]     = useState<BudgetPlan | null>(null);
+  const [gmailConnected,  setGmailConnected]  = useState(false);
+  const [mpConnected,     setMpConnected]     = useState(false);
+  const [pendingCount,    setPendingCount]    = useState(0);
+  const [budgetPlan,      setBudgetPlan]      = useState<BudgetPlan | null>(null);
+  const [monthlyIncome,   setMonthlyIncome]   = useState<number | null>(null);
 
   const { isFirstVisit, markVisited } = useFirstVisit('home');
 
@@ -82,7 +83,24 @@ export default function HomeScreen() {
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('status', 'pending')
+        .neq('direction', 'incoming')
         .then(({ count }: { count: number | null }) => setPendingCount(count ?? 0));
+
+      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      const monthEnd   = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-31`;
+      (supabase as any)
+        .from('pending_transactions')
+        .select('amount')
+        .eq('user_id', user.id)
+        .eq('status', 'confirmed')
+        .eq('direction', 'incoming')
+        .gte('transaction_date', monthStart)
+        .lte('transaction_date', monthEnd)
+        .then(({ data }: { data: { amount: number }[] | null }) => {
+          if (data && data.length > 0) {
+            setMonthlyIncome(data.reduce((sum, r) => sum + r.amount, 0));
+          }
+        });
     }
   }, [user?.id]);
 
@@ -214,6 +232,37 @@ export default function HomeScreen() {
           onMpConnected={() => setMpConnected(true)}
         />
 
+        {/* ── BALANCE DEL MES ─────────────────────────────────────────────────── */}
+        {monthlyIncome !== null && (
+          <View style={[
+            styles.balanceCard,
+            { borderColor: (monthlyIncome - totalThisMonth) >= 0 ? '#27AE60' : '#E74C3C' },
+          ]}>
+            <View style={{ flex: 1 }}>
+              <Text variant="caption" color={colors.text.secondary}>Balance del mes</Text>
+              <Text style={[
+                styles.balanceAmount,
+                { color: (monthlyIncome - totalThisMonth) >= 0 ? '#27AE60' : '#E74C3C' },
+              ]}>
+                {(monthlyIncome - totalThisMonth) >= 0 ? '+' : ''}
+                {(monthlyIncome - totalThisMonth).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })}
+              </Text>
+            </View>
+            <View style={{ alignItems: 'flex-end', gap: 2 }}>
+              <Text variant="caption" color={colors.text.secondary}>
+                Ingresos: <Text variant="caption" style={{ color: '#27AE60' }}>
+                  {monthlyIncome.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })}
+                </Text>
+              </Text>
+              <Text variant="caption" color={colors.text.secondary}>
+                Gastos: <Text variant="caption" style={{ color: '#E74C3C' }}>
+                  {totalThisMonth.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })}
+                </Text>
+              </Text>
+            </View>
+          </View>
+        )}
+
         {isLoading && expenses.length === 0 && <HomeSkeletonLoader />}
 
         {/* ── 1. RESUMEN POR CATEGORÍA DEL MES ────────────────────────────────── */}
@@ -301,7 +350,7 @@ export default function HomeScreen() {
         {pendingCount > 0 && (
           <TouchableOpacity
             style={styles.pendingBanner}
-            onPress={() => router.push('/(app)/movimientos' as any)}
+            onPress={() => router.push('/(app)/expenses' as any)}
             activeOpacity={0.85}
           >
             <Ionicons name="alert-circle-outline" size={20} color={colors.yellow} />
@@ -459,6 +508,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border.default,
     paddingVertical: spacing[4],
+  },
+
+  balanceCard: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    backgroundColor: colors.bg.card,
+    borderRadius:    16,
+    borderWidth:     1.5,
+    padding:         spacing[4],
+    gap:             spacing[3],
+  },
+  balanceAmount: {
+    fontFamily: 'Montserrat_700Bold',
+    fontSize:   20,
+    marginTop:  2,
   },
 
   pendingBanner: {

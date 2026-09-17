@@ -18,31 +18,32 @@ import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabase';
 
 const WORKS_WITH = [
-  'Gmail',
+  'Outlook y Hotmail',
   'Correos de facturas y recibos',
   'Confirmaciones de pago',
   'Extractos bancarios',
 ];
 
-export default function GmailConnectAppScreen() {
-  const { user } = useAuthStore();
+export default function OutlookConnectScreen() {
+  const { user }       = useAuthStore();
   const [isLoading,    setIsLoading]    = useState(false);
   const [backfillDone, setBackfillDone] = useState(false);
 
   useEffect(() => {
     const handleURL = ({ url }: { url: string }) => {
-      if (!url.includes('gmail-connected')) return;
+      if (!url.includes('outlook-connected')) return;
       const match    = url.match(/email=([^&]+)/);
       const hasError = url.includes('error=');
       if (match) {
+        const email = decodeURIComponent(match[1]);
         setBackfillDone(true);
         Alert.alert(
-          'Gmail conectado',
-          `Tu cuenta ${decodeURIComponent(match[1])} quedó vinculada. Estamos importando tus gastos históricos.`,
+          'Outlook conectado',
+          `Tu cuenta ${email} quedó vinculada. Estamos importando tus gastos históricos.`,
           [{ text: 'Listo', onPress: () => router.back() }],
         );
       } else if (hasError) {
-        Alert.alert('Error', 'No se pudo conectar Gmail. Intentá de nuevo.');
+        Alert.alert('Error', 'No se pudo conectar Outlook. Intentá de nuevo.');
       }
       setIsLoading(false);
     };
@@ -61,17 +62,13 @@ export default function GmailConnectAppScreen() {
         return;
       }
 
-      const res  = await fetch(`${supabaseUrl}/functions/v1/gmail-auth?action=url`, {
+      const res  = await fetch(`${supabaseUrl}/functions/v1/outlook-auth?action=url`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
       const json = await res.json();
 
       if (!res.ok) {
-        if (res.status === 401) {
-          Alert.alert('Error de autenticación', 'Tu sesión no es válida. Cerrá sesión y volvé a ingresar.');
-        } else {
-          Alert.alert('Error', `No se pudo contactar el servidor (${res.status}). Intentá de nuevo.`);
-        }
+        Alert.alert('Error', `No se pudo contactar el servidor (${res.status}). Intentá de nuevo.`);
         return;
       }
       if (!json.url) {
@@ -79,26 +76,27 @@ export default function GmailConnectAppScreen() {
         return;
       }
 
-      const result = await WebBrowser.openAuthSessionAsync(json.url, 'nomi://gmail-connected');
+      const result = await WebBrowser.openAuthSessionAsync(json.url, 'nomi://outlook-connected');
 
       if (result.type === 'success' && result.url) {
         const match    = result.url.match(/email=([^&]+)/);
         const hasError = result.url.includes('error=');
         if (match) {
+          const email = decodeURIComponent(match[1]);
           setBackfillDone(true);
           Alert.alert(
-            'Gmail conectado',
-            `Tu cuenta ${decodeURIComponent(match[1])} quedó vinculada. Estamos importando tus gastos históricos.`,
+            'Outlook conectado',
+            `Tu cuenta ${email} quedó vinculada. Estamos importando tus gastos históricos.`,
             [{ text: 'Listo', onPress: () => router.back() }],
           );
         } else if (hasError) {
           const errMatch = result.url.match(/error=([^&]+)/);
           const errMsg   = errMatch ? decodeURIComponent(errMatch[1]) : 'Error desconocido';
-          Alert.alert('Error', `No se pudo conectar Gmail: ${errMsg}. Intentá de nuevo.`);
+          Alert.alert('Error', `No se pudo conectar Outlook: ${errMsg}. Intentá de nuevo.`);
         }
       }
     } catch {
-      Alert.alert('Error', 'No se pudo iniciar la conexión con Gmail. Verificá tu conexión a internet.');
+      Alert.alert('Error', 'No se pudo iniciar la conexión con Outlook. Verificá tu conexión a internet.');
     } finally {
       setIsLoading(false);
     }
@@ -106,26 +104,20 @@ export default function GmailConnectAppScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={22} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text variant="h4">Conexión Gmail</Text>
+        <Text variant="h4">Conexión Outlook</Text>
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Gmail icon */}
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.iconWrap}>
-          <Ionicons name="mail" size={36} color="#EA4335" />
+          <Ionicons name="mail" size={36} color="#0078D4" />
         </View>
 
-        {/* Title & subtitle */}
-        <Text style={styles.title}>Conectá tu Gmail</Text>
+        <Text style={styles.title}>Conectá tu Outlook o Hotmail</Text>
         <Text style={styles.subtitle}>
           Detectamos automáticamente tus gastos a partir de los emails de tu banco o tarjeta.
         </Text>
@@ -140,7 +132,6 @@ export default function GmailConnectAppScreen() {
           </View>
         )}
 
-        {/* Connect button */}
         <TouchableOpacity
           style={[styles.connectBtn, isLoading && { opacity: 0.6 }]}
           onPress={handleConnect}
@@ -153,19 +144,18 @@ export default function GmailConnectAppScreen() {
             <Ionicons name="mail-outline" size={18} color="#FFFFFF" />
           )}
           <Text style={styles.connectBtnText}>
-            {isLoading ? 'Conectando...' : 'Conectar con Google'}
+            {isLoading ? 'Conectando...' : 'Conectar con Microsoft'}
           </Text>
         </TouchableOpacity>
 
-        {/* Privacy card */}
         <View style={styles.privacyCard}>
           <View style={styles.privacyHeader}>
-            <Ionicons name="lock-closed-outline" size={14} color="#1565C0" />
+            <Ionicons name="lock-closed-outline" size={14} color="#0078D4" />
             <Text style={styles.privacyTitle}>Funciona con:</Text>
           </View>
           {WORKS_WITH.map((item, i) => (
             <View key={i} style={styles.privacyRow}>
-              <Ionicons name="checkmark-circle-outline" size={14} color="#1565C0" />
+              <Ionicons name="checkmark-circle-outline" size={14} color="#0078D4" />
               <Text style={styles.privacyItem}>{item}</Text>
             </View>
           ))}
@@ -179,11 +169,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg.primary },
 
   header: {
-    flexDirection:    'row',
-    alignItems:       'center',
-    justifyContent:   'space-between',
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
     paddingHorizontal: layout.screenPadding,
-    paddingVertical:  spacing[4],
+    paddingVertical:   spacing[4],
     borderBottomWidth: 1,
     borderBottomColor: colors.border.subtle,
   },
@@ -202,7 +192,7 @@ const styles = StyleSheet.create({
 
   iconWrap: {
     width: 80, height: 80, borderRadius: 40,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#DBEAFE',
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -243,14 +233,14 @@ const styles = StyleSheet.create({
   },
 
   connectBtn: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            spacing[2],
-    width:          '100%',
-    height:         48,
-    backgroundColor: '#27AE60',
-    borderRadius:   12,
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'center',
+    gap:             spacing[2],
+    width:           '100%',
+    height:          48,
+    backgroundColor: '#0078D4',
+    borderRadius:    12,
   },
   connectBtnText: {
     fontFamily: 'Montserrat_700Bold',
@@ -260,7 +250,7 @@ const styles = StyleSheet.create({
 
   privacyCard: {
     width:           '100%',
-    backgroundColor: '#D1F7E3',
+    backgroundColor: '#DBEAFE',
     borderRadius:    12,
     padding:         spacing[4],
     gap:             spacing[2],
@@ -272,7 +262,7 @@ const styles = StyleSheet.create({
   privacyTitle: {
     fontFamily: 'Montserrat_600SemiBold',
     fontSize:   13,
-    color:      '#27AE60',
+    color:      '#0078D4',
   },
   privacyRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
@@ -280,7 +270,7 @@ const styles = StyleSheet.create({
   privacyItem: {
     fontFamily: 'Montserrat_400Regular',
     fontSize:   13,
-    color:      '#27AE60',
+    color:      '#0078D4',
     flex:       1,
   },
 });

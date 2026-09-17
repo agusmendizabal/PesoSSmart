@@ -4,6 +4,66 @@
 
 ---
 
+## ✅ FASE 1 — COMPLETADA (código + migraciones)
+
+**Fecha:** Sep 2026
+
+Todo el código de Fase 1 está implementado. Las 3 migraciones SQL ya fueron corridas en producción.
+
+### Pasos pendientes de deploy (NO correr el código, ya está — solo deploy):
+
+**Paso 2 — Configurar app en Azure (para Outlook):**
+- Entrar a portal.azure.com → Azure Active Directory → App registrations
+- Crear nueva app (o usar existente con ID `c44b4083-3bb0-49c1-b47d-974e53cbdf3c`)
+- En Authentication → Supported account types → cambiar a **"Accounts in any organizational directory (Multitenant) and personal Microsoft accounts"**
+- En Authentication → Redirect URIs → agregar: `https://gqflukmlaonkgxfdbedq.supabase.co/functions/v1/outlook-auth`
+- En Certificates & secrets → crear nuevo client secret
+- Anotar el Application (client) ID y el client secret
+
+**Paso 3 — Setear secrets en Supabase:**
+```bash
+cd mobile
+npx supabase secrets set MICROSOFT_CLIENT_ID=<client-id-de-azure>
+npx supabase secrets set MICROSOFT_CLIENT_SECRET=<client-secret-de-azure>
+```
+
+**Paso 4 — Deployar edge functions:**
+```bash
+cd mobile
+npx supabase functions deploy gmail-poll
+npx supabase functions deploy outlook-auth --no-verify-jwt
+npx supabase functions deploy outlook-poll
+npx supabase functions deploy outlook-cron-dispatcher --no-verify-jwt
+npx supabase functions deploy auto-confirm-transactions --no-verify-jwt
+```
+
+**Paso 5 — Verificar Vault (secret para crons):**
+- En Supabase Dashboard → Database → Vault → confirmar que existe el secret `internal_fn_secret`
+- Si no existe, correr en SQL Editor:
+  ```sql
+  SELECT vault.create_secret('<valor-de-INTERNAL_FN_SECRET>', 'internal_fn_secret');
+  ```
+
+> **Nota Outlook:** La conexión de Outlook solo funciona con cuentas `@outlook.com`, `@hotmail.com` o `@live.com`. No soporta Gmail. Es una feature opcional — si el usuario no conecta Outlook, no rompe nada.
+
+### Qué se implementó en Fase 1:
+- `045_gmail_cron.sql` — columnas `token_expired` + `is_backfill_done` en `gmail_connections`, cron horario ✅ corrida
+- `046_outlook_connections.sql` — tabla `outlook_connections`, cron horario :30 ✅ corrida
+- `047_auto_confirm.sql` — columna `high_confidence` en `pending_transactions`, cron cada 6h ✅ corrida
+- `gmail-cron-dispatcher` — dispatcher que llama gmail-poll para cada usuario activo
+- `outlook-cron-dispatcher` — idem para Outlook
+- `gmail-poll` — reescrito: dual auth (JWT + cron), backfill 6 meses, PDF parsing, high_confidence
+- `outlook-auth` — flujo OAuth Microsoft completo (CSRF, token exchange, encrypt)
+- `outlook-poll` — misma pipeline que gmail-poll para Microsoft Graph API
+- `auto-confirm-transactions` — confirma high_confidence > 24h sin actividad del usuario
+- `outlook-connect.tsx` — pantalla nueva con branding azul (#0078D4) y banner de backfill
+- `gmail-connect.tsx` — agrega banner de backfill post-conexión
+- `profile.tsx` — Gmail "Sincronizar ahora" + sección Outlook completa (conectado/desconectado)
+- `home.tsx` — card "Balance del mes" (ingresos confirmados − gastos), visible solo si hay ingresos
+- `PendingTransactions.tsx` — sección de ingresos separada, badge "Clasificado automáticamente"
+
+---
+
 ## FASE 0 — Pulido de UI (TestFlight beta, PRIORIDAD ACTUAL)
 
 Antes de atacar las mejoras de producto, se necesita que la UI esté pulida para que los usuarios beta tengan una buena experiencia. Esta fase es corta y cubre detalles visuales, flujos rotos, y small bugs de interacción. Se trabaja primero en esta fase y luego se avanza a las fases siguientes.

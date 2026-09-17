@@ -11,14 +11,8 @@ import {
   Modal,
   Animated,
   LayoutAnimation,
-  Platform,
-  UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/theme';
 import { Text } from '@/components/ui';
@@ -44,6 +38,9 @@ interface PendingTransaction {
   description: string | null;
   transaction_date: string | null;
   source: string | null;
+  hint_count?: number;
+  direction?: 'incoming' | 'outgoing' | null;
+  high_confidence?: boolean;
 }
 
 interface ConfirmedExpense {
@@ -88,6 +85,19 @@ function isPossibleDuplicate(tx: PendingTransaction, confirmed: ConfirmedExpense
   });
 }
 
+// ─── Normalización de comercio (debe coincidir con gmail-poll) ────────────────
+
+function normalizeMerchantClient(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\b(s\.?a\.?l?|s\.?r\.?l\.?|s\.?a\.?s\.?)\b/gi, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // ─── EmptyState ───────────────────────────────────────────────────────────────
 
 function AnimatedEmptyState() {
@@ -118,9 +128,11 @@ function SourceBadge({ source }: { source: string | null }) {
   if (!source) return null;
   const label = source === 'mercadopago' ? 'Mercado Pago'
     : source === 'gmail' ? 'Gmail'
+    : source === 'outlook' ? 'Outlook'
     : source;
   const color = source === 'mercadopago' ? '#009EE3'
     : source === 'gmail' ? '#EA4335'
+    : source === 'outlook' ? '#0078D4'
     : '#9B9790';
   return (
     <View style={[sbS.pill, { backgroundColor: color + '1A' }]}>
@@ -457,11 +469,13 @@ export function PendingTransactions({
   const cardRefs        = useRef<Record<string, AnimatedTxCardHandle | null>>({});
 
   const filtered    = transactions.filter(tx => !dismissedIds.has(tx.id));
-  const visible     = showAll ? filtered : filtered.slice(0, INITIAL_VISIBLE);
-  const hiddenCount = filtered.length - INITIAL_VISIBLE;
-  const activeTx    = filtered.find(tx => tx.id === activeTxId) ?? null;
+  const incomeItems  = filtered.filter(tx => tx.direction === 'incoming');
+  const expenseItems = filtered.filter(tx => tx.direction !== 'incoming');
+  const visible     = showAll ? expenseItems : expenseItems.slice(0, INITIAL_VISIBLE);
+  const hiddenCount = expenseItems.length - INITIAL_VISIBLE;
+  const activeTx    = expenseItems.find(tx => tx.id === activeTxId) ?? null;
 
-  const withSuggestion = filtered.filter(
+  const withSuggestion = expenseItems.filter(
     tx => tx.suggested_category && categories.some(c => c.name === tx.suggested_category)
   );
 
@@ -476,6 +490,31 @@ export function PendingTransactions({
   };
 
   if (filtered.length === 0 && !isPolling) return <AnimatedEmptyState />;
+
+  // ── Confirmar ingreso ─────────────────────────────────────────────────────
+
+  const confirmIncomeTx = async (txId: string) => {
+    if (updatingId !== null) return;
+    setUpdatingId(txId);
+    try {
+      await supabase.from('pending_transactions').update({ status: 'confirmed' }).eq('id', txId);
+      showToast('✓ Ingreso confirmado');
+      const cardRef = cardRefs.current[txId];
+      if (cardRef) {
+        cardRef.animateOut('right', () => {
+          setDismissedIds(prev => new Set([...prev, txId]));
+          onConfirmed();
+        });
+      } else {
+        setDismissedIds(prev => new Set([...prev, txId]));
+        onConfirmed();
+      }
+    } catch {
+      Alert.alert('Error', 'No se pudo confirmar el ingreso.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   // ── Clasificar ────────────────────────────────────────────────────────────
 
@@ -515,6 +554,26 @@ export function PendingTransactions({
       }
 
       await supabase.from('pending_transactions').update({ status: 'confirmed' }).eq('id', tx.id);
+
+      // Aprender de la clasificación manual — incrementar hint para este comercio
+      const merchantKey = normalizeMerchantClient(tx.merchant ?? description ?? '');
+      if (merchantKey) {
+        const { data: existingHint } = await supabase
+          .from('merchant_category_hints')
+          .select('count')
+          .eq('user_id', userId)
+          .eq('merchant_normalized', merchantKey)
+          .maybeSingle();
+        await supabase.from('merchant_category_hints').upsert({
+          user_id:             userId,
+          merchant_normalized: merchantKey,
+          merchant_display:    tx.merchant ?? description ?? merchantKey,
+          category:            cat.name,
+          classification,
+          count:               (existingHint?.count ?? 0) + 1,
+          last_seen:           new Date().toISOString().split('T')[0],
+        }, { onConflict: 'user_id,merchant_normalized' });
+      }
 
       showToast('✓ Gasto clasificado');
       const cardRef = cardRefs.current[tx.id];
@@ -643,6 +702,66 @@ export function PendingTransactions({
   return (
     <View style={st.container}>
 
+      {/* ── Sección ingresos ──────────────────────────────────────────────── */}
+      {incomeItems.length > 0 && (
+        <View style={{ gap: spacing[2] }}>
+          <View style={st.sectionHeader}>
+            <Text style={st.sectionTitle}>Ingresos detectados ({incomeItems.length})</Text>
+          </View>
+          {incomeItems.map((tx, index) => {
+            const dateLabel = formatDateLabel(tx.transaction_date);
+            const isLoading = updatingId === tx.id;
+            return (
+              <AnimatedTxCard key={tx.id} tx={tx} index={index} ref={(ref) => { cardRefs.current[tx.id] = ref; }}>
+                <View style={[st.card, st.incomeCard]}>
+                  <View style={st.cardBody}>
+                    <View style={st.cardMain}>
+                      <View style={[st.iconCircle, { backgroundColor: '#D1F7E3' }]}>
+                        <Ionicons name="arrow-down-outline" size={24} color="#27AE60" />
+                      </View>
+                      <View style={st.cardInfo}>
+                        <Text style={[st.merchantName, { color: '#27AE60' }]} numberOfLines={1}>
+                          {tx.merchant ?? tx.description ?? 'Transferencia recibida'}
+                        </Text>
+                        <View style={st.metaRow}>
+                          <SourceBadge source={tx.source} />
+                          {dateLabel && <Text style={st.dateLabel}>{dateLabel}</Text>}
+                        </View>
+                      </View>
+                      <View style={st.cardRight}>
+                        {isLoading
+                          ? <ActivityIndicator size="small" color="#27AE60" />
+                          : <Text style={[st.amount, { color: '#27AE60' }]}>+${tx.amount.toLocaleString('es-AR')}</Text>
+                        }
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                      <TouchableOpacity
+                        style={[st.incomeBtnConfirm, isLoading && { opacity: 0.5 }]}
+                        onPress={() => confirmIncomeTx(tx.id)}
+                        disabled={isLoading}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                        <Text style={st.incomeBtnConfirmText}>Confirmar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[st.incomeBtnReject, isLoading && { opacity: 0.5 }]}
+                        onPress={() => rejectTx(tx.id)}
+                        disabled={isLoading}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={st.incomeBtnRejectText}>No es mío</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </AnimatedTxCard>
+            );
+          })}
+        </View>
+      )}
+
       {/* Bulk action card — premium AI module */}
       {withSuggestion.length >= 2 && (
         <TouchableOpacity
@@ -680,14 +799,16 @@ export function PendingTransactions({
         </TouchableOpacity>
       )}
 
-      {/* Section header */}
-      <View style={st.sectionHeader}>
-        <Text style={st.sectionTitle}>Gastos sin clasificar ({filtered.length})</Text>
-        <TouchableOpacity style={st.ordenarBtn} activeOpacity={0.7}>
-          <Text style={st.ordenarText}>Ordenar</Text>
-          <Ionicons name="options-outline" size={14} color={G} />
-        </TouchableOpacity>
-      </View>
+      {/* Section header (only shown when there are expense items) */}
+      {expenseItems.length > 0 && (
+        <View style={st.sectionHeader}>
+          <Text style={st.sectionTitle}>Gastos sin clasificar ({expenseItems.length})</Text>
+          <TouchableOpacity style={st.ordenarBtn} activeOpacity={0.7}>
+            <Text style={st.ordenarText}>Ordenar</Text>
+            <Ionicons name="options-outline" size={14} color={G} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Cards */}
       {visible.map((tx, index) => {
@@ -695,6 +816,7 @@ export function PendingTransactions({
         const suggestedCat = categories.find(c => c.name === tx.suggested_category);
         const isLoading    = updatingId === tx.id;
         const isDuplicate  = isPossibleDuplicate(tx, confirmedExpenses);
+        const isAutoClass  = tx.high_confidence === true;
 
         return (
           <AnimatedTxCard key={tx.id} tx={tx} index={index} ref={(ref) => { cardRefs.current[tx.id] = ref; }}>
@@ -727,14 +849,30 @@ export function PendingTransactions({
                       <SourceBadge source={tx.source} />
                       {dateLabel && <Text style={st.dateLabel}>{dateLabel}</Text>}
                     </View>
-                    {suggestedCat && (
-                      <View style={st.suggestPill}>
-                        <Ionicons name="sparkles-outline" size={10} color={G} />
-                        <Text style={st.suggestText}>
-                          Sugerido: <Text style={st.suggestBold}>{suggestedCat.name_es}</Text>
-                        </Text>
-                      </View>
-                    )}
+                    {suggestedCat && (() => {
+                      const hc = tx.hint_count ?? 0;
+                      const confColor = hc >= 3 ? G : hc === 2 ? '#F59E0B' : '#E65100';
+                      const confIcon  = hc >= 3 ? 'checkmark-circle-outline' : hc === 2 ? 'ellipse-outline' : 'warning-outline';
+                      const confLabel = hc >= 3
+                        ? `Alta confianza · ${hc} clasificaciones`
+                        : hc === 2 ? 'Confianza media · 2 veces'
+                        : 'Baja confianza · solo 1 vez';
+                      return (
+                        <View style={{ gap: 4 }}>
+                          <View style={st.suggestPill}>
+                            <Ionicons name="sparkles-outline" size={10} color={G} />
+                            <Text style={st.suggestText}>
+                              Sugerido: <Text style={st.suggestBold}>{suggestedCat.name_es}</Text>
+                            </Text>
+                          </View>
+                          <View style={[st.confidencePill, { borderColor: confColor + '40', backgroundColor: confColor + '12' }]}>
+                            <Ionicons name={confIcon as any} size={9} color={confColor} />
+                            <Text style={[st.confidenceText, { color: confColor }]}>{confLabel}</Text>
+                          </View>
+                        </View>
+                      );
+                    })()
+                    }
                   </View>
                   <View style={st.cardRight}>
                     {isLoading
@@ -745,12 +883,21 @@ export function PendingTransactions({
                   </View>
                 </View>
 
-                <View style={st.clasificarRow}>
-                  <Ionicons name="pricetag-outline" size={14} color={G} />
-                  <Text style={st.clasificarText}>Clasificar</Text>
-                  <View style={{ flex: 1 }} />
-                  <Text style={st.clasificarSparkle}>✦</Text>
-                </View>
+                {isAutoClass ? (
+                  <View style={st.autoClassRow}>
+                    <Ionicons name="checkmark-circle-outline" size={14} color="#27AE60" />
+                    <Text style={st.autoClassText}>Clasificado automáticamente</Text>
+                    <View style={{ flex: 1 }} />
+                    <Text style={st.autoClassEdit}>Editar</Text>
+                  </View>
+                ) : (
+                  <View style={st.clasificarRow}>
+                    <Ionicons name="pricetag-outline" size={14} color={G} />
+                    <Text style={st.clasificarText}>Clasificar</Text>
+                    <View style={{ flex: 1 }} />
+                    <Text style={st.clasificarSparkle}>✦</Text>
+                  </View>
+                )}
               </View>
             </TouchableOpacity>
           </AnimatedTxCard>
@@ -851,9 +998,11 @@ const st = StyleSheet.create({
   merchantName: { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: '#1C1C1C', letterSpacing: -0.2 },
   metaRow:      { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   dateLabel:    { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#9B9790' },
-  suggestPill:  { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: G + '14', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, alignSelf: 'flex-start' },
-  suggestText:  { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#1C1C1C' },
-  suggestBold:  { fontFamily: 'Montserrat_700Bold', color: '#1F8C4F' },
+  suggestPill:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: G + '14', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, alignSelf: 'flex-start' },
+  suggestText:       { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#1C1C1C' },
+  suggestBold:       { fontFamily: 'Montserrat_700Bold', color: '#1F8C4F' },
+  confidencePill:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 6, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' },
+  confidenceText:    { fontFamily: 'Montserrat_500Medium', fontSize: 9 },
   cardRight:    { alignItems: 'flex-end', gap: 3, flexShrink: 0 },
   amount:       { fontFamily: 'Montserrat_800ExtraBold', fontSize: 16, color: '#1C1C1C', letterSpacing: -0.4 },
 
@@ -869,4 +1018,16 @@ const st = StyleSheet.create({
 
   toast:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2], alignSelf: 'center', backgroundColor: '#FFFFFF', borderRadius: 999, paddingHorizontal: spacing[4], paddingVertical: spacing[2], shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 6, marginTop: spacing[2] },
   toastText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13 },
+
+  // Income cards
+  incomeCard:          { borderColor: '#27AE6040' },
+  incomeBtnConfirm:    { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#27AE60', borderRadius: 10, paddingVertical: 10 },
+  incomeBtnConfirmText:{ fontFamily: 'Montserrat_700Bold', fontSize: 13, color: '#FFFFFF' },
+  incomeBtnReject:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#F5F1E9', borderRadius: 10, paddingVertical: 10, borderWidth: 1, borderColor: '#E8E2D9' },
+  incomeBtnRejectText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#6D6A63' },
+
+  // Auto-classified badge
+  autoClassRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#D1F7E3', borderWidth: 1, borderColor: '#27AE6050', borderRadius: 12 },
+  autoClassText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#27AE60', flex: 1 },
+  autoClassEdit: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, color: '#27AE60', textDecorationLine: 'underline' },
 });
