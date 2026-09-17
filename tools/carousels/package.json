@@ -1,0 +1,12 @@
+{
+  "name": "nomi-carousels",
+  "private": true,
+  "type": "module",
+  "description": "Generador de carruseles de Instagram para Nomi: JSON -> PNG 1080x1350",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.56.0"
+  }
+}

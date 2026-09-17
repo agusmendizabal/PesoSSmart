@@ -1,0 +1,69 @@
+[
+  {
+    "slug": "dia-01",
+    "day": "1/10",
+    "title": "5 gastos que clasificás mal sin darte cuenta",
+    "aesthetic": "checklist",
+    "slides": [
+      { "type": "cover", "kicker": "Tips rápidos", "title": "5 gastos que estás clasificando mal", "sub": "Y por qué te arruinan el mes sin que los veas." },
+      { "type": "point", "n": "1", "title": "El delivery de vez en cuando", "body": "Si sumás los del mes, no es un prescindible chico: es uno de tus gastos más grandes." },
+      { "type": "point", "n": "2", "title": "Las cuotas sin interés", "body": "No cuestan $0 hoy: comprometen tu ingreso futuro, mes a mes." },
+      { "type": "point", "n": "3", "title": "Las suscripciones duplicadas", "body": "Dos plataformas que casi no usás son fuga, no entretenimiento." },
+      { "type": "point", "n": "4", "title": "El necesario que en realidad es prescindible", "body": "El upgrade de plan que no usás al máximo entra acá." },
+      { "type": "close", "title": "Nomi clasifica esto automático", "body": "Necesario, prescindible o invertible, sin que tengas que pensarlo.", "cta": "Guardá este carrusel y revisá tu mes" }
+    ]
+  },
+  {
+    "slug": "dia-02",
+    "day": "2/10",
+    "title": "66% de los argentinos no logra ahorrar",
+    "aesthetic": "dato",
+    "slides": [
+      { "type": "cover", "kicker": "Mitos & data", "title": "66% de los argentinos no logra ahorrar", "sub": "El número es incómodo. Lo que hay detrás, más." },
+      { "type": "stat", "figure": "66,4%", "label": "no logra ahorrar nada este mes", "source": "Pulso Research / El Cronista" },
+      { "type": "point", "title": "No es falta de disciplina", "body": "Con esta inflación, el ingreso se consume antes de llegar a fin de mes." },
+      { "type": "point", "title": "Qué hace distinto el tercio que sí ahorra", "body": "Aparta primero y gasta después. No espera a ver qué sobra." },
+      { "type": "close", "title": "Primero mirá cuánto te queda", "body": "Nomi te muestra el número antes de que se vaya, no en el resumen del mes siguiente.", "cta": "Guardá esto" }
+    ]
+  },
+  {
+    "slug": "dia-03",
+    "day": "3/10",
+    "title": "INDEC vs. vos: por qué son dos números distintos",
+    "aesthetic": "comparativa",
+    "slides": [
+      { "type": "cover", "kicker": "Inflación real", "title": "INDEC vs. vos", "sub": "Por qué son dos números distintos y los dos son correctos." },
+      { "type": "compare", "leftLabel": "El INDEC", "leftText": "Mide una canasta promedio de todo el país", "rightLabel": "Vos", "rightText": "Comprás tu canasta, en tu barrio, con tus marcas" },
+      { "type": "stat", "figure": "38,4%", "label": "de inflación percibida, contra 33,8% del IPC oficial", "source": "CIF-UTDT / INDEC" },
+      { "type": "point", "title": "Por eso sentís que no te alcanza", "body": "Tu inflación personal puede ser más alta que la oficial, y hasta ahora no tenías forma de saberlo." },
+      { "type": "close", "title": "Tu número, todos los meses", "body": "Nomi mide tu inflación personal y la compara con la del INDEC.", "cta": "Guardá esto" }
+    ]
+  },
+  {
+    "slug": "dia-05",
+    "day": "5/10",
+    "title": "Tu tarjeta puede cobrar hasta 90% anual",
+    "aesthetic": "dato",
+    "slides": [
+      { "type": "cover", "kicker": "Mitos & data", "title": "Tu tarjeta puede cobrar hasta 90% de interés anual", "sub": "Y casi nadie mira ese número." },
+      { "type": "stat", "figure": "70-100%", "label": "de TNA en tarjetas durante 2025, moderando a 80-90% en 2026", "source": "BCRA / El Cronista" },
+      { "type": "point", "title": "Cómo se acumula", "body": "El interés se aplica sobre el saldo impago, y el mes siguiente vuelve a aplicarse sobre el saldo nuevo." },
+      { "type": "point", "title": "Un ejemplo para dimensionar", "body": "Con $100.000 impagos al 90% anual, son unos $7.500 por mes solo de interés. El ejemplo es ilustrativo." },
+      { "type": "point", "title": "Qué se puede hacer", "body": "Pagar el total antes del vencimiento, o pasar el saldo a un préstamo con tasa más baja." },
+      { "type": "close", "title": "Antes de pasar la tarjeta", "body": "Nomi te avisa cuando la compra te saca del presupuesto del mes.", "cta": "Guardá esto antes de la próxima compra" }
+    ]
+  },
+  {
+    "slug": "dia-18",
+    "day": "18/10",
+    "title": "Día de la Madre sin romper el presupuesto",
+    "aesthetic": "story",
+    "slides": [
+      { "type": "quote", "text": "El regalo lindo no tiene que romper tu presupuesto del mes." },
+      { "type": "quote", "text": "Poné el número antes de entrar al shopping. No después." },
+      { "type": "stat", "figure": "$1.564.716", "label": "es la canasta básica familiar hoy. Ese es el contexto donde entra el regalo.", "source": "INDEC, julio 2026" },
+      { "type": "quote", "text": "Nadie mide el cariño en pesos. El presupuesto sí se mide." },
+      { "type": "close", "title": "Feliz día a todas", "body": "Etiquetá a alguien que este mes gastó de más buscando el regalo perfecto.", "cta": "Compartí esto" }
+    ]
+  }
+]
