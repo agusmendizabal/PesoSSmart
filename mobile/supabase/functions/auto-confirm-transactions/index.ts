@@ -88,8 +88,14 @@ serve(async (req) => {
       });
 
       if (expErr) {
-        console.error(`[auto-confirm] Error insertando expense para ${tx.id}:`, expErr);
-        continue;
+        // 23505 = violación de unicidad (idx_expenses_source_pending_unique): otra
+        // invocación concurrente ya insertó el gasto para este pending_transaction
+        // entre el SELECT de arriba y este INSERT — no es un error real, solo
+        // significa que ya está confirmado.
+        if ((expErr as any).code !== '23505') {
+          console.error(`[auto-confirm] Error insertando expense para ${tx.id}:`, expErr);
+          continue;
+        }
       }
 
       await supabase.from('pending_transactions').update({ status: 'confirmed' }).eq('id', tx.id);

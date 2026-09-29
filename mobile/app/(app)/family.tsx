@@ -259,87 +259,173 @@ function GroupCard({ group, onPress }: { group: Group; onPress: () => void }) {
 
 // ─── Modal Crear: tipo selector ───────────────────────────────────────────────
 
+const TYPE_INFO: Record<CreateKind, {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  desc: string;
+  chips: { icon: keyof typeof Ionicons.glyphMap; label: string }[];
+  footIcon: keyof typeof Ionicons.glyphMap;
+  footText: string;
+}> = {
+  familiar: {
+    icon: 'home-outline',
+    title: 'Familia',
+    desc: 'Ideal para hogar y gastos compartidos del día a día.',
+    chips: [
+      { icon: 'shield-checkmark-outline', label: 'Admin ve todo' },
+      { icon: 'person-outline',           label: 'Ven lo suyo' },
+      { icon: 'refresh-outline',          label: 'Automática' },
+    ],
+    footIcon: 'heart',
+    footText: 'Recomendado para familias o convivientes',
+  },
+  amigos: {
+    icon: 'people-outline',
+    title: 'Compartido',
+    desc: 'Todos ven los gastos del grupo y vos elegís qué subir.',
+    chips: [
+      { icon: 'airplane-outline',  label: 'Viajes' },
+      { icon: 'people-outline',    label: 'Ven todo el grupo' },
+      { icon: 'hand-left-outline', label: 'Manual' },
+    ],
+    footIcon: 'people',
+    footText: 'Perfecto para amigos, salidas o vacaciones',
+  },
+};
+
+function TypeCard({ kind, selected, onPress }: { kind: CreateKind; selected: boolean; onPress: () => void }) {
+  const info = TYPE_INFO[kind];
+  return (
+    <TouchableOpacity
+      style={[ts.card, selected ? ts.cardSelected : ts.cardUnselected]}
+      onPress={onPress}
+      activeOpacity={0.88}
+    >
+      <View style={ts.cardTop}>
+        <View style={ts.cardIcon}>
+          <Ionicons name={info.icon} size={26} color={selected ? C.green : C.text2} />
+        </View>
+        {selected ? (
+          <View style={ts.checkCircle}>
+            <Ionicons name="checkmark" size={14} color={C.white} />
+          </View>
+        ) : (
+          <View style={ts.radioCircle} />
+        )}
+      </View>
+
+      <Text style={ts.cardTitle}>{info.title}</Text>
+      <Text style={ts.cardDesc}>{info.desc}</Text>
+
+      <View style={ts.chipsRow}>
+        {info.chips.map(chip => (
+          <View key={chip.label} style={ts.miniChip}>
+            <Ionicons name={chip.icon} size={11} color={selected ? C.green : C.text2} />
+            <Text style={[ts.miniChipText, !selected && { color: C.text2 }]} numberOfLines={1}>{chip.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={ts.divider} />
+
+      <View style={ts.footRow}>
+        <Ionicons name={info.footIcon} size={13} color={selected ? C.green : C.muted} />
+        <Text style={[ts.footText, !selected && { color: C.muted }]}>{info.footText}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 function TypeSelectorStep({ onCreate }: { onCreate: (kind: CreateKind) => void }) {
+  const [selected, setSelected] = useState<CreateKind>('familiar');
+
   return (
     <View style={ts.wrap}>
+      <View style={ts.chip}>
+        <Ionicons name="people" size={13} color={C.green} />
+        <Text style={ts.chipText}>Grupos en Nomi</Text>
+      </View>
+
       <Text style={ts.title}>¿Qué tipo de grupo?</Text>
       <Text style={ts.subtitle}>Elegí cómo querés organizar los gastos</Text>
+      <Text style={ts.hint}>Podés cambiarlo más adelante si lo necesitás.</Text>
 
-      <TouchableOpacity style={ts.cardDark} onPress={() => onCreate('familiar')} activeOpacity={0.88}>
-        <View style={ts.cardIconDark}>
-          <Ionicons name="home-outline" size={28} color={C.white} />
-        </View>
-        <Text style={ts.cardTitleDark}>Familia</Text>
-        <Text style={ts.cardDescDark}>
-          El admin ve los gastos de todos. Los miembros solo ven los propios.
-        </Text>
-        <View style={ts.badgeDark}>
-          <Ionicons name="refresh-outline" size={11} color={C.green} />
-          <Text style={ts.badgeDarkText}>Gastos automáticos</Text>
-        </View>
-      </TouchableOpacity>
+      <TypeCard kind="familiar" selected={selected === 'familiar'} onPress={() => setSelected('familiar')} />
+      <TypeCard kind="amigos"   selected={selected === 'amigos'}   onPress={() => setSelected('amigos')} />
 
-      <TouchableOpacity style={ts.cardMint} onPress={() => onCreate('amigos')} activeOpacity={0.88}>
-        <View style={ts.cardIconMint}>
-          <Ionicons name="people-outline" size={28} color={C.green} />
-        </View>
-        <Text style={ts.cardTitleMint}>Compartido</Text>
-        <Text style={ts.cardDescMint}>
-          Todos ven los gastos del grupo. Vos elegís qué subir al grupo.
-        </Text>
-        <View style={ts.badgeMint}>
-          <Ionicons name="hand-left-outline" size={11} color={C.green} />
-          <Text style={ts.badgeMintText}>Gastos manuales</Text>
-        </View>
+      <TouchableOpacity style={ts.continueBtn} onPress={() => onCreate(selected)} activeOpacity={0.88}>
+        <Text style={ts.continueBtnText}>Continuar</Text>
+        <Ionicons name="arrow-forward" size={18} color={C.white} />
       </TouchableOpacity>
+      <Text style={ts.footerLink}>Podés crear más de un grupo cuando quieras</Text>
     </View>
   );
 }
 
 const ts = StyleSheet.create({
-  wrap:     { flex: 1, paddingHorizontal: sp.xl, paddingTop: sp.xxl, gap: sp.lg },
-  title:    { fontFamily: 'Montserrat_800ExtraBold', fontSize: 26, color: C.black, letterSpacing: -0.5 },
-  subtitle: { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.muted, lineHeight: 20, marginTop: -sp.sm },
+  wrap:     { flex: 1, paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: sp.xxl, gap: sp.lg },
 
-  cardDark: {
-    backgroundColor: C.green, borderRadius: 20, padding: sp.xl, gap: sp.md,
-    shadowColor: C.green, shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25, shadowRadius: 16, elevation: 6,
-  },
-  cardIconDark: {
-    width: 56, height: 56, borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start',
-  },
-  cardTitleDark:  { fontFamily: 'Montserrat_800ExtraBold', fontSize: 22, color: C.white, letterSpacing: -0.3 },
-  cardDescDark:   { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: 'rgba(255,255,255,0.78)', lineHeight: 21 },
-  badgeDark: {
+  chip: {
     flexDirection: 'row', alignItems: 'center', gap: sp.xs,
-    backgroundColor: C.cream, borderRadius: 20,
-    paddingHorizontal: sp.md, paddingVertical: 5, alignSelf: 'flex-start',
+    backgroundColor: C.accent, borderRadius: 20,
+    paddingHorizontal: sp.md, paddingVertical: 6, alignSelf: 'flex-start',
   },
-  badgeDarkText: { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: C.green },
+  chipText: { fontFamily: 'Montserrat_700Bold', fontSize: 12, color: C.green },
 
-  cardMint: {
-    backgroundColor: C.surface, borderRadius: 20, padding: sp.xl, gap: sp.md,
-    borderWidth: 1.5, borderColor: C.border,
+  title:    { fontFamily: 'Montserrat_800ExtraBold', fontSize: 24, lineHeight: 32, color: C.black, letterSpacing: -0.5 },
+  subtitle: { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.muted, lineHeight: 20 },
+  hint:     { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.muted },
+
+  card: { borderRadius: 18, padding: sp.lg, gap: sp.sm, borderWidth: 1.5 },
+  cardSelected:   { backgroundColor: C.accent, borderColor: C.green },
+  cardUnselected: { backgroundColor: C.cream, borderColor: C.border },
+
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  cardIcon: {
+    width: 44, height: 44, borderRadius: 13, backgroundColor: C.white,
+    alignItems: 'center', justifyContent: 'center',
   },
-  cardIconMint: {
-    width: 56, height: 56, borderRadius: 16,
-    backgroundColor: C.cream,
-    alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start',
+  checkCircle: {
+    width: 22, height: 22, borderRadius: 11, backgroundColor: C.green,
+    alignItems: 'center', justifyContent: 'center',
   },
-  cardTitleMint:  { fontFamily: 'Montserrat_800ExtraBold', fontSize: 22, color: C.black, letterSpacing: -0.3 },
-  cardDescMint:   { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.text2, lineHeight: 21 },
-  badgeMint: {
+  radioCircle: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 2, borderColor: C.border, backgroundColor: C.white,
+  },
+
+  cardTitle: { fontFamily: 'Montserrat_800ExtraBold', fontSize: 19, color: C.black, letterSpacing: -0.3 },
+  cardDesc:  { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.text2, lineHeight: 19 },
+
+  chipsRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: sp.xs },
+  miniChip: {
     flexDirection: 'row', alignItems: 'center', gap: sp.xs,
-    backgroundColor: C.cream, borderRadius: 20,
-    paddingHorizontal: sp.md, paddingVertical: 5, alignSelf: 'flex-start',
+    backgroundColor: C.white, borderRadius: 20, alignSelf: 'flex-start', flexShrink: 1,
+    paddingHorizontal: sp.sm + 2, paddingVertical: 6,
   },
-  badgeMintText: { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: C.green },
+  miniChipText: { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: C.green },
+
+  divider: { height: 1, backgroundColor: C.border },
+
+  footRow:  { flexDirection: 'row', alignItems: 'center', gap: sp.xs },
+  footText: { fontFamily: 'Montserrat_500Medium', fontSize: 12, color: C.green },
+
+  continueBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.sm,
+    backgroundColor: C.green, borderRadius: 14, height: 54,
+    shadowColor: C.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4,
+  },
+  continueBtnText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: C.white },
+
+  footerLink: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.muted, textAlign: 'center' },
 });
 
 // ─── Modal Crear: nombre ──────────────────────────────────────────────────────
+
+const KIND_LABEL: Record<CreateKind, { title: string; desc: string; badge: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  familiar: { title: 'Grupo familiar',   desc: 'Ideal para hogar y gastos compartidos',   badge: 'Gastos automáticos', icon: 'home-outline' },
+  amigos:   { title: 'Grupo compartido', desc: 'Ideal para viajes y salidas compartidas', badge: 'Gastos manuales',    icon: 'people-outline' },
+};
 
 function NameInputStep({
   kind, groupName, setGroupName, loading, onCreate, onBack,
@@ -348,9 +434,14 @@ function NameInputStep({
   loading: boolean; onCreate: () => void; onBack: () => void;
 }) {
   const placeholder = kind === 'amigos' ? 'Ej: Viaje a Bariloche' : 'Ej: Familia García';
+  const info = KIND_LABEL[kind];
+  const previewName = groupName.trim() || (kind === 'amigos' ? 'Tu grupo compartido' : 'Tu grupo familiar');
 
   return (
     <View style={ni.wrap}>
+      <Text style={ni.title}>Nombre del grupo</Text>
+      <Text style={ni.pageSubtitle}>Dale un nombre para identificarlo fácilmente</Text>
+
       <TouchableOpacity onPress={onBack} style={ni.backRow} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <Ionicons name="arrow-back" size={18} color={C.muted} />
         <Text style={ni.backText}>Elegir tipo</Text>
@@ -358,26 +449,53 @@ function NameInputStep({
 
       <View style={ni.titleRow}>
         <View style={ni.iconBox}>
-          <Ionicons name={kind === 'amigos' ? 'people-outline' : 'home-outline'} size={22} color={C.green} />
+          <Ionicons name={info.icon} size={22} color={C.green} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={ni.title}>{kind === 'amigos' ? 'Grupo compartido' : 'Grupo familiar'}</Text>
-          <Text style={ni.subtitle}>Dale un nombre</Text>
+          <Text style={ni.kindLabel}>TIPO ELEGIDO</Text>
+          <Text style={ni.kindTitle}>{info.title}</Text>
+          <Text style={ni.kindDesc}>{info.desc}</Text>
         </View>
       </View>
 
-      <Text style={ni.label}>NOMBRE DEL GRUPO</Text>
-      <TextInput
-        style={ni.input}
-        value={groupName}
-        onChangeText={setGroupName}
-        placeholder={placeholder}
-        placeholderTextColor={C.muted}
-        autoCapitalize="words"
-        autoFocus
-        returnKeyType="done"
-        onSubmitEditing={onCreate}
-      />
+      <View style={{ gap: sp.xs }}>
+        <Text style={ni.label}>NOMBRE DEL GRUPO</Text>
+        <TextInput
+          style={ni.input}
+          value={groupName}
+          onChangeText={setGroupName}
+          placeholder={placeholder}
+          placeholderTextColor={C.muted}
+          autoCapitalize="words"
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={onCreate}
+        />
+        <Text style={ni.helper}>Podés cambiarlo más adelante</Text>
+      </View>
+
+      <View style={{ gap: sp.sm }}>
+        <Text style={ni.previewLabel}>Vista previa</Text>
+        <View style={ni.previewCard}>
+          <View style={ni.previewTop}>
+            <View style={ni.previewIcon}>
+              <Ionicons name={info.icon} size={20} color={C.green} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={ni.previewName} numberOfLines={1}>{previewName}</Text>
+              <Text style={ni.previewMeta}>1 admin · 0 invitados</Text>
+            </View>
+            <View style={ni.previewBadge}>
+              <Text style={ni.previewBadgeText}>{info.badge}</Text>
+            </View>
+          </View>
+          <View style={ni.previewDivider} />
+          <View style={ni.previewFoot}>
+            <Ionicons name="people-outline" size={13} color={C.muted} />
+            <Text style={ni.previewFootText}>Después vas a poder invitar miembros</Text>
+          </View>
+        </View>
+      </View>
 
       <TouchableOpacity
         style={[ni.btn, (!groupName.trim() || loading) && ni.btnOff]}
@@ -389,24 +507,54 @@ function NameInputStep({
           ? <ActivityIndicator color={C.white} size="small" />
           : <Text style={ni.btnText}>Crear grupo</Text>}
       </TouchableOpacity>
+      <Text style={ni.footerLink}>Invitar miembros después</Text>
     </View>
   );
 }
 
 const ni = StyleSheet.create({
-  wrap:     { flex: 1, paddingHorizontal: sp.xl, paddingTop: sp.xl, gap: sp.lg },
+  wrap:         { flex: 1, paddingHorizontal: sp.lg, paddingTop: sp.md, paddingBottom: sp.xxl, gap: sp.lg },
+  title:        { fontFamily: 'Montserrat_800ExtraBold', fontSize: 24, lineHeight: 32, color: C.black, letterSpacing: -0.5 },
+  pageSubtitle: { fontFamily: 'Montserrat_400Regular', fontSize: 14, color: C.muted, lineHeight: 20 },
+
   backRow:  { flexDirection: 'row', alignItems: 'center', gap: sp.sm, alignSelf: 'flex-start' },
   backText: { fontFamily: 'Montserrat_500Medium', fontSize: 14, color: C.muted },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp.md, marginTop: sp.sm },
+
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
   iconBox:  { width: 52, height: 52, borderRadius: 16, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', flexShrink: 0, borderWidth: 1.5, borderColor: C.cream },
-  title:    { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: C.black, letterSpacing: -0.2 },
-  subtitle: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.muted },
-  label:    { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: C.muted, letterSpacing: 0.8 },
+  kindLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: C.muted, letterSpacing: 0.8 },
+  kindTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: C.black, letterSpacing: -0.2 },
+  kindDesc:  { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.muted },
+
+  label:  { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: C.muted, letterSpacing: 0.8 },
   input: {
     fontFamily: 'Montserrat_500Medium', fontSize: 16, color: C.black,
     borderWidth: 1.5, borderColor: C.border, borderRadius: 14,
     paddingHorizontal: sp.lg, paddingVertical: sp.md, backgroundColor: C.white,
   },
+  helper: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: C.muted },
+
+  previewLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: C.black },
+  previewCard: {
+    backgroundColor: C.accent, borderRadius: 16, borderWidth: 1, borderColor: C.border,
+    padding: sp.lg, gap: sp.md,
+  },
+  previewTop: { flexDirection: 'row', alignItems: 'center', gap: sp.md },
+  previewIcon: {
+    width: 40, height: 40, borderRadius: 12, backgroundColor: C.white,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  previewName: { fontFamily: 'Montserrat_700Bold', fontSize: 16, color: C.black },
+  previewMeta: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: C.text2 },
+  previewBadge: {
+    backgroundColor: C.white, borderRadius: 20,
+    paddingHorizontal: sp.md, paddingVertical: 5,
+  },
+  previewBadgeText: { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: C.green },
+  previewDivider: { height: 1, backgroundColor: C.border },
+  previewFoot: { flexDirection: 'row', alignItems: 'center', gap: sp.xs },
+  previewFootText: { fontFamily: 'Montserrat_500Medium', fontSize: 12, color: C.muted },
+
   btn: {
     backgroundColor: C.green, borderRadius: 14,
     paddingVertical: sp.md + 2, alignItems: 'center', justifyContent: 'center',
@@ -414,6 +562,8 @@ const ni = StyleSheet.create({
   },
   btnOff:  { opacity: 0.45 },
   btnText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: C.white },
+
+  footerLink: { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.muted, textAlign: 'center' },
 });
 
 // ─── Pantalla ─────────────────────────────────────────────────────────────────
@@ -652,7 +802,7 @@ export default function FamilyScreen() {
       {/* MODAL: Crear ───────────────────────────────────────────────────────── */}
       <FormSheetModal
         visible={showCreate}
-        title={createStep === 0 ? '' : 'Nombre del grupo'}
+        title=""
         onClose={() => setShowCreate(false)}
         presentationStyle="pageSheet"
         scrollable={false}

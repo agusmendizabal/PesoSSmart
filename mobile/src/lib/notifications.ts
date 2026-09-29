@@ -191,7 +191,7 @@ export async function scheduleDailyInactivityCheck() {
     await send(
       '📋 ¿Cómo vas este mes?',
       `Hace ${daysDiff} día${daysDiff > 1 ? 's' : ''} que no registrás nada. Tardás menos de un minuto.`,
-      { route: '/(app)/movimientos' },
+      { route: '/(app)/expenses?openMovimientos=1' },
     );
   } else {
     await schedule(
@@ -199,7 +199,7 @@ export async function scheduleDailyInactivityCheck() {
       '¿Ya cargaste tus gastos de hoy?',
       tomorrow,
       'daily_inactivity',
-      { route: '/(app)/movimientos' },
+      { route: '/(app)/expenses?openMovimientos=1' },
     );
   }
 }
@@ -223,7 +223,7 @@ export async function trackDeliveryExpense(amount: number) {
     await send(
       '🛵 Tercer delivery de la semana',
       `Llevás ${fmt(amount)} esta semana. ¿Lo tenías presupuestado?`,
-      { route: '/(app)/movimientos' },
+      { route: '/(app)/expenses?openMovimientos=1' },
     );
   }
 }
@@ -248,7 +248,7 @@ export async function notifyCategoryBudget80(
   await send(
     `🟡 80% del presupuesto de ${categoryName}`,
     `Usaste el 80% de tu presupuesto de ${categoryName}. Te quedan ${fmt(remaining)} para los próximos ${daysLeft} días.`,
-    { route: '/(app)/movimientos' },
+    { route: '/(app)/expenses?openMovimientos=1' },
   );
 }
 
@@ -295,7 +295,7 @@ export async function notifyNewSubscription(name: string, amount: number) {
   await send(
     '🔄 Nuevo débito recurrente',
     `Detectamos un nuevo débito de ${fmt(amount)} de "${name}". ¿Lo sumamos a tus gastos fijos?`,
-    { route: '/(app)/movimientos' },
+    { route: '/(app)/expenses?openMovimientos=1' },
   );
 }
 
@@ -352,6 +352,21 @@ export async function scheduleMonthlyReport() {
     9,
     0,
     'monthly_report',
+  );
+}
+
+// Aviso 3 días antes de que se registre un gasto fijo (alquiler, cuotas, suscripciones).
+export async function scheduleRecurringReminder(description: string, date: string) {
+  const dayOfMonth = Number(date.split('-')[2]);
+  const reminderDay = Math.max(1, dayOfMonth - 3);
+  const slug = description.toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').slice(0, 40);
+  await scheduleMonthly(
+    '📌 Gasto fijo por vencer',
+    `"${description}" se registra solo en 3 días.`,
+    reminderDay,
+    9,
+    0,
+    `recurring_${slug}`,
   );
 }
 

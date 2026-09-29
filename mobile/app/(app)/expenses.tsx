@@ -1,11 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Svg, { Path as SvgPath } from 'react-native-svg';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import {
   View,
   ScrollView,
-  FlatList,
-  Modal,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -23,6 +21,7 @@ import { InflationThermometer } from '@/components/InflationThermometer';
 import { DecisionHistorySection, buildOpportunities } from '@/components/DecisionHistory';
 import { fetchBudgetPlan, type BudgetPlan } from '@/lib/budgetPlan';
 import { computeFinancialDiagnosis } from '@/lib/financialDiagnosis';
+import { MovimientosSheet } from '@/components/MovimientosSheet';
 import {
   MONTH_NAMES, PALETTE, getCategoryColor, type CategoryRow, type MonthSummary,
   buildComparacion, buildAhorroSugerencias, buildPlanProximoMes, buildObjetivo,
@@ -99,7 +98,7 @@ const msStyles = StyleSheet.create({
 
 export default function ExpensesScreen() {
   const router = useRouter();
-  const { tab: initialTab } = useLocalSearchParams<{ tab?: string }>();
+  const { tab: initialTab, openMovimientos } = useLocalSearchParams<{ tab?: string; openMovimientos?: string }>();
   const { user } = useAuthStore();
   const {
     expenses,
@@ -114,6 +113,8 @@ export default function ExpensesScreen() {
     fetchSubscriptionsAndProjection,
     filter,
     setFilter,
+    analysisTab: reportTab,
+    setAnalysisTab: setReportTab,
   } = useExpensesStore();
 
   const { fetchAll: loadSavings } = useSavingsStore();
@@ -121,9 +122,10 @@ export default function ExpensesScreen() {
   // ── Análisis ──
   const now = new Date();
   const validTabs = ['resumen', 'categorias', 'salud', 'oportunidades'] as const;
-  const [reportTab, setReportTab] = useState<typeof validTabs[number]>(
-    validTabs.includes(initialTab as any) ? (initialTab as typeof validTabs[number]) : 'resumen'
-  );
+  // Si venimos de un deep link con ?tab=, forzamos esa pestaña una sola vez al montar.
+  useEffect(() => {
+    if (validTabs.includes(initialTab as any)) setReportTab(initialTab as typeof validTabs[number]);
+  }, []);
   const [reportRows,      setReportRows]      = useState<CategoryRow[]>([]);
   const [reportTotal,     setReportTotal]     = useState(0);
   const [history,         setHistory]         = useState<MonthSummary[]>([]);
@@ -132,8 +134,23 @@ export default function ExpensesScreen() {
   const [fciRate,         setFciRate]         = useState(0.03);
   const [pastOppData,     setPastOppData]     = useState<{ monthKey: string; disposable: number; categories: Record<string, number> }[]>([]);
   const [smartPlan,           setSmartPlan]           = useState<BudgetPlan | null>(null);
-  const [movimientosVisible,  setMovimientosVisible]  = useState(false);
   const [scoreExpanded,       setScoreExpanded]       = useState(false);
+
+  // ── Sheet de movimientos (lista del mes + clasificar + agregar/editar gasto) ──
+  const [movimientosVisible, setMovimientosVisible] = useState(false);
+  const [wantAutoClassify,   setWantAutoClassify]   = useState(false);
+
+  // Deep link (?openMovimientos=classify|1) desde Home / otras pantallas: abre el
+  // sheet de movimientos al llegar acá, sin que haga falta tocar ningún banner.
+  useFocusEffect(
+    useCallback(() => {
+      if (openMovimientos === 'classify' || openMovimientos === '1') {
+        setWantAutoClassify(openMovimientos === 'classify');
+        setMovimientosVisible(true);
+        router.setParams({ openMovimientos: undefined } as any);
+      }
+    }, [openMovimientos])
+  );
 
   useEffect(() => {
     if (user?.id) fetchBudgetPlan(user.id).then(setSmartPlan);
@@ -254,48 +271,6 @@ export default function ExpensesScreen() {
         />
       </View>
 
-        {/* ── Modal: Ver tus movimientos ── */}
-        <Modal visible={movimientosVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMovimientosVisible(false)}>
-          <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg.primary }} edges={['top']}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: layout.screenPadding, paddingVertical: spacing[4], borderBottomWidth: 1, borderBottomColor: colors.border.subtle }}>
-              <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 17, color: colors.text.primary }}>
-                Movimientos {MONTH_NAMES_SHORT[reportMonth - 1]}
-              </Text>
-              <TouchableOpacity onPress={() => setMovimientosVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <Ionicons name="close" size={22} color={colors.text.secondary} />
-              </TouchableOpacity>
-            </View>
-            {expenses.length === 0 ? (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[3] }}>
-                <Ionicons name="receipt-outline" size={48} color={colors.text.tertiary} />
-                <Text variant="body" color={colors.text.secondary} align="center">Sin movimientos este mes</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={expenses as any[]}
-                keyExtractor={item => item.id}
-                contentContainerStyle={{ paddingHorizontal: layout.screenPadding, paddingTop: spacing[3], paddingBottom: spacing[10], gap: spacing[2] }}
-                renderItem={({ item }) => {
-                  const catName = item.category?.name_es ?? 'Sin categoría';
-                  const dateStr = new Date(item.date + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
-                  return (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: colors.bg.card, paddingVertical: 12, paddingHorizontal: spacing[4], borderRadius: 12, borderWidth: 1, borderColor: colors.border.default }}>
-                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.bg.elevated, alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Text style={{ fontSize: 16 }}>{item.category?.icon ?? '💸'}</Text>
-                      </View>
-                      <View style={{ flex: 1, gap: 2 }}>
-                        <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: colors.text.primary }} numberOfLines={1}>{item.description}</Text>
-                        <Text style={{ fontFamily: 'Montserrat_400Regular', fontSize: 11, color: colors.text.tertiary }}>{catName} · {dateStr}</Text>
-                      </View>
-                      <Text style={{ fontFamily: 'Montserrat_700Bold', fontSize: 13, color: colors.text.primary }}>{formatCurrency(item.amount)}</Text>
-                    </View>
-                  );
-                }}
-              />
-            )}
-          </SafeAreaView>
-        </Modal>
-
         <ScrollView
           style={styles.flatList}
           contentContainerStyle={styles.analysisList}
@@ -329,7 +304,7 @@ export default function ExpensesScreen() {
             return (
               <TouchableOpacity
                 style={reportS.precisionNotice}
-                onPress={() => setMovimientosVisible(true)}
+                onPress={() => { setWantAutoClassify(true); setMovimientosVisible(true); }}
                 activeOpacity={0.75}
               >
                 <Ionicons name="warning-outline" size={14} color={colors.yellow} />
@@ -362,7 +337,7 @@ export default function ExpensesScreen() {
                     {/* Ver movimientos chip */}
                     <TouchableOpacity
                       style={reportS.movimientosChip}
-                      onPress={() => setMovimientosVisible(true)}
+                      onPress={() => { setWantAutoClassify(false); setMovimientosVisible(true); }}
                       activeOpacity={0.8}
                     >
                       <Ionicons name="list-outline" size={14} color={colors.primary} />
@@ -373,7 +348,14 @@ export default function ExpensesScreen() {
                     {donutRows.length > 0 && donutTotal > 0 && (
                       <View style={reportS.donutCard}>
                         <Text variant="label" color={colors.text.tertiary} style={{ marginBottom: 16 }}>DISTRIBUCIÓN POR CATEGORÍA</Text>
-                        <CategoryDonut rows={donutRows} total={donutTotal} />
+                        <CategoryDonut
+                          rows={donutRows}
+                          total={donutTotal}
+                          onSelectCategory={(row) => router.push({
+                            pathname: '/(app)/category-expenses',
+                            params: { categoryId: row.id ?? 'none', categoryName: row.name, color: row.color, month: String(reportMonth), year: String(reportYear) },
+                          } as any)}
+                        />
                       </View>
                     )}
                     <TouchableOpacity
@@ -430,7 +412,14 @@ export default function ExpensesScreen() {
                     {catRows.length > 0 && catTotal > 0 && (
                       <View style={reportS.donutCard}>
                         <Text variant="label" color={colors.text.tertiary} style={{ marginBottom: 16 }}>DISTRIBUCIÓN POR CATEGORÍA</Text>
-                        <CategoryDonut rows={catRows} total={catTotal} />
+                        <CategoryDonut
+                          rows={catRows}
+                          total={catTotal}
+                          onSelectCategory={(row) => router.push({
+                            pathname: '/(app)/category-expenses',
+                            params: { categoryId: row.id ?? 'none', categoryName: row.name, color: row.color, month: String(reportMonth), year: String(reportYear) },
+                          } as any)}
+                        />
                       </View>
                     )}
                     <CategoryBreakdown rows={catRows} total={catTotal} />
@@ -582,6 +571,11 @@ export default function ExpensesScreen() {
           )}
         </ScrollView>
 
+      <MovimientosSheet
+        visible={movimientosVisible}
+        onClose={() => { setMovimientosVisible(false); setWantAutoClassify(false); }}
+        autoOpenClassify={wantAutoClassify}
+      />
     </SafeAreaView>
   );
 }

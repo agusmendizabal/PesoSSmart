@@ -31,11 +31,14 @@ const INCOME_RANGE_MAP: Record<string, number> = {
 
 const PAGE_SIZE = 30;
 
+export type AnalysisTab = 'resumen' | 'categorias' | 'salud' | 'oportunidades';
+
 interface ExpensesState {
   expenses: Expense[];
   categories: ExpenseCategory[];
   selectedExpense: Expense | null;
   filter: ExpensesFilter;
+  analysisTab: AnalysisTab;
   isLoading: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
@@ -60,6 +63,7 @@ interface ExpensesState {
   updateExpense: (id: string, data: Partial<Expense>) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
   setFilter: (filter: Partial<ExpensesFilter>) => void;
+  setAnalysisTab: (tab: AnalysisTab) => void;
   setSelectedExpense: (expense: Expense | null) => void;
   clearError: () => void;
   fetchSubscriptionsAndProjection: (userId: string) => Promise<void>;
@@ -80,6 +84,7 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
     classification: null,
     search: '',
   },
+  analysisTab: 'resumen',
   isLoading: false,
   isLoadingMore: false,
   hasMore: false,
@@ -217,6 +222,7 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
           category_id: data.category_id ?? null,
           notes: data.notes ?? null,
           is_recurring: data.is_recurring ?? false,
+          recurring_frequency: data.recurring_frequency ?? null,
         })
         .select('*, category:expense_categories(*)')
         .single();
@@ -314,6 +320,7 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
   },
 
   setFilter: (filter) => set((s) => ({ filter: { ...s.filter, ...filter } })),
+  setAnalysisTab: (tab) => set({ analysisTab: tab }),
   setSelectedExpense: (expense) => set({ selectedExpense: expense }),
   clearError: () => set({ error: null }),
 

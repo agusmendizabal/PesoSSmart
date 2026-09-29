@@ -6,33 +6,6 @@ export type CategoryIconKey =
   | 'viajes' | 'alojamiento' | 'peajes' | 'impuestos'
   | 'regalos' | 'cuidado-personal' | 'seguros' | 'otros';
 
-export const CATEGORY_ICON_MAP: Record<CategoryIconKey, any> = {
-  'alimentacion':     require('../../assets/icons/categories/alimentacion.png'),
-  'restaurantes':     require('../../assets/icons/categories/restaurantes.png'),
-  'supermercado':     require('../../assets/icons/categories/supermercado.png'),
-  'cafe-bebidas':     require('../../assets/icons/categories/cafe-bebidas.png'),
-  'transporte':       require('../../assets/icons/categories/transporte.png'),
-  'combustible':      require('../../assets/icons/categories/combustible.png'),
-  'salud':            require('../../assets/icons/categories/salud.png'),
-  'deportes':         require('../../assets/icons/categories/deportes.png'),
-  'educacion':        require('../../assets/icons/categories/educacion.png'),
-  'entretenimiento':  require('../../assets/icons/categories/entretenimiento.png'),
-  'ocio-salidas':     require('../../assets/icons/categories/ocio-salidas.png'),
-  'suscripciones':    require('../../assets/icons/categories/suscripciones.png'),
-  'ropa-moda':        require('../../assets/icons/categories/ropa-moda.png'),
-  'hogar':            require('../../assets/icons/categories/hogar.png'),
-  'servicios':        require('../../assets/icons/categories/servicios.png'),
-  'bancos-finanzas':  require('../../assets/icons/categories/bancos-finanzas.png'),
-  'viajes':           require('../../assets/icons/categories/viajes.png'),
-  'alojamiento':      require('../../assets/icons/categories/alojamiento.png'),
-  'peajes':           require('../../assets/icons/categories/peajes.png'),
-  'impuestos':        require('../../assets/icons/categories/impuestos.png'),
-  'regalos':          require('../../assets/icons/categories/regalos.png'),
-  'cuidado-personal': require('../../assets/icons/categories/cuidado-personal.png'),
-  'seguros':          require('../../assets/icons/categories/seguros.png'),
-  'otros':            require('../../assets/icons/categories/otros.png'),
-};
-
 export function resolveCategoryIcon(categoryName: string, description?: string): CategoryIconKey {
   const n = (categoryName + ' ' + (description ?? '')).toLowerCase();
 

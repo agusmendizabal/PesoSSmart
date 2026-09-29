@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Image,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, layout } from '@/theme';
 import { Text } from '@/components/ui';
@@ -27,10 +27,11 @@ import { BudgetRingIndicator } from '@/components/BudgetCard';
 import { GoalsPreview } from '@/components/GoalsPreview';
 import { HomeAlertBanners } from '@/components/HomeAlertBanners';
 import { scheduleBudgetAlert } from '@/lib/notifications';
-import { getGreeting } from '@/utils/format';
+import { getGreeting, formatCurrency } from '@/utils/format';
 import { useFirstVisit } from '@/hooks/useFirstVisit';
 import { FirstVisitSheet } from '@/components/FirstVisitSheet';
 import { HomeSkeletonLoader } from '@/components/ui/SkeletonLoader';
+import { CategoryIcon } from '@/components/CategoryIcon';
 
 const INCOME_OPTIONS = [
   { label: 'Menos de $500.000',       value: 'under_150k'  },
@@ -47,6 +48,7 @@ export default function HomeScreen() {
     expenses, categories, totalThisMonth, totalNecessary, totalDisposable, totalInvestable,
     fetchExpenses, fetchCategories, fetchSubscriptionsAndProjection,
     estimatedIncome, isLoading,
+    filter, setFilter, analysisTab, setAnalysisTab,
   } = useExpensesStore();
   const { goals, fetchGoals } = useGoalsStore();
   const streakStore  = useStreakStore();
@@ -54,15 +56,32 @@ export default function HomeScreen() {
 
   const [gmailConnected,  setGmailConnected]  = useState(false);
   const [mpConnected,     setMpConnected]     = useState(false);
-  const [pendingCount,    setPendingCount]    = useState(0);
   const [budgetPlan,      setBudgetPlan]      = useState<BudgetPlan | null>(null);
   const [monthlyIncome,   setMonthlyIncome]   = useState<number | null>(null);
+  const [unclassified, setUnclassified] = useState<{
+    count: number;
+    total: number;
+    preview: { id: string; description: string | null }[];
+  }>({ count: 0, total: 0, preview: [] });
 
   const { isFirstVisit, markVisited } = useFirstVisit('home');
 
   const now       = new Date();
   const month     = now.getMonth() + 1;
   const year      = now.getFullYear();
+
+  const scrollRef = useRef<ScrollView>(null);
+  const navigation = useNavigation();
+
+  // Al re-tocar el tab de Inicio estando ya en foco, scrollea suavemente arriba
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('tabPress' as any, () => {
+      if (navigation.isFocused()) {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   // ── Carga inicial ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -78,14 +97,6 @@ export default function HomeScreen() {
     roundUpStore.checkReset();
 
     if (user?.id) {
-      (supabase as any)
-        .from('pending_transactions')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('status', 'pending')
-        .neq('direction', 'incoming')
-        .then(({ count }: { count: number | null }) => setPendingCount(count ?? 0));
-
       const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
       const monthEnd   = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-31`;
       (supabase as any)
@@ -121,6 +132,50 @@ export default function HomeScreen() {
         .maybeSingle()
         .then(({ data }: { data: { id: string } | null }) => setMpConnected(!!data));
     }, [user?.id])
+  );
+
+  // Gastos sin categoría (manuales, cualquier mes) + pendientes de Gmail sin confirmar —
+  // independiente del mes filtrado, para que el banner de Inicio nunca "desaparezca".
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id) return;
+      (async () => {
+        const [{ data: expData }, { data: pendData }] = await Promise.all([
+          (supabase as any)
+            .from('expenses')
+            .select('id, amount, description')
+            .eq('user_id', user.id)
+            .is('category_id', null)
+            .is('deleted_at', null)
+            .order('date', { ascending: false })
+            .limit(50),
+          (supabase as any)
+            .from('pending_transactions')
+            .select('id, amount')
+            .eq('user_id', user.id)
+            .eq('status', 'pending')
+            .neq('direction', 'incoming'),
+        ]);
+        const exp  = expData ?? [];
+        const pend = pendData ?? [];
+        const total = exp.reduce((s: number, e: any) => s + Number(e.amount), 0)
+          + pend.reduce((s: number, p: any) => s + Number(p.amount ?? 0), 0);
+        setUnclassified({ count: exp.length + pend.length, total, preview: exp.slice(0, 3) });
+      })();
+    }, [user?.id])
+  );
+
+  // Al volver a Inicio, resetea el mes de Gastos/Análisis y la sub-pestaña de Análisis
+  // (evita que queden "pegados" en un mes pasado o en una sub-pestaña no default)
+  useFocusEffect(
+    useCallback(() => {
+      if (filter.month !== month || filter.year !== year) {
+        setFilter({ month, year });
+      }
+      if (analysisTab !== 'resumen') {
+        setAnalysisTab('resumen');
+      }
+    }, [filter.month, filter.year, month, year, analysisTab, setFilter, setAnalysisTab])
   );
 
   // Muestra aviso si no hay gastos cargados en los últimos 3 días
@@ -190,6 +245,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -283,7 +339,14 @@ export default function HomeScreen() {
                 <Text variant="label" color={colors.text.tertiary} style={{ marginBottom: spacing[4] }}>
                   DISTRIBUCIÓN POR CATEGORÍA
                 </Text>
-                <CategoryDonut rows={categoryRows} total={totalThisMonth} />
+                <CategoryDonut
+                  rows={categoryRows}
+                  total={totalThisMonth}
+                  onSelectCategory={(row) => router.push({
+                    pathname: '/(app)/category-expenses',
+                    params: { categoryId: row.id ?? 'none', categoryName: row.name, color: row.color, month: String(month), year: String(year) },
+                  } as any)}
+                />
               </View>
             </View>
           </TouchableOpacity>
@@ -347,20 +410,35 @@ export default function HomeScreen() {
         <GoalsPreview goals={goals} />
 
         {/* ── 5. GASTOS SIN CLASIFICAR ─────────────────────────────────────────── */}
-        {pendingCount > 0 && (
+        {unclassified.count > 0 && (
           <TouchableOpacity
-            style={styles.pendingBanner}
-            onPress={() => router.push('/(app)/expenses' as any)}
+            style={styles.sinClasifCard}
+            onPress={() => router.push({ pathname: '/(app)/expenses', params: { openMovimientos: 'classify' } } as any)}
             activeOpacity={0.85}
           >
-            <Ionicons name="alert-circle-outline" size={20} color={colors.yellow} />
-            <View style={{ flex: 1 }}>
-              <Text variant="labelMd">
-                Tenés {pendingCount} gasto{pendingCount === 1 ? '' : 's'} sin clasificar
-              </Text>
-              <Text variant="caption" color={colors.text.secondary}>Tocá para revisarlos</Text>
+            <View style={{ flex: 1, gap: 3 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.sinClasifTitle}>Sin categoría</Text>
+                <View style={styles.sinClasifBadge}>
+                  <Text style={styles.sinClasifBadgeText}>{unclassified.count}</Text>
+                </View>
+              </View>
+              <Text variant="caption" color={colors.text.secondary}>Tenés gastos sin categoría</Text>
+              <View style={{ flexDirection: 'row', gap: 3, alignItems: 'center', marginTop: 1 }}>
+                {unclassified.preview.map(e => (
+                  <CategoryIcon key={e.id} description={e.description ?? ''} size={24} />
+                ))}
+                {unclassified.count > 3 && (
+                  <View style={styles.sinClasifMoreDot}>
+                    <Text style={styles.sinClasifMoreText}>···</Text>
+                  </View>
+                )}
+              </View>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.text.tertiary} />
+            <View style={{ alignItems: 'flex-end', gap: 4 }}>
+              <Text style={styles.sinClasifTotal}>{formatCurrency(unclassified.total)}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.yellow} />
+            </View>
           </TouchableOpacity>
         )}
 
@@ -525,16 +603,29 @@ const styles = StyleSheet.create({
     marginTop:  2,
   },
 
-  pendingBanner: {
+  sinClasifCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing[3],
-    backgroundColor: colors.yellow + '14',
+    backgroundColor: colors.yellow + '10',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.yellow + '40',
     padding: spacing[4],
   },
+  sinClasifTitle:     { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: colors.text.primary },
+  sinClasifBadge: {
+    backgroundColor: colors.yellow, borderRadius: 10,
+    paddingHorizontal: 7, paddingVertical: 1, minWidth: 20, alignItems: 'center',
+  },
+  sinClasifBadgeText: { fontFamily: 'Montserrat_700Bold', fontSize: 11, color: '#FFFFFF' },
+  sinClasifMoreDot: {
+    width: 24, height: 24, borderRadius: 12, backgroundColor: colors.bg.elevated,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  sinClasifMoreText: { fontFamily: 'Montserrat_700Bold', fontSize: 10, color: colors.text.tertiary },
+  sinClasifTotal:     { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: colors.text.primary },
 
   incomeOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   incomeSheet:         { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 34 },

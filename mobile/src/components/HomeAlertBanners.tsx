@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/theme';
 import { Text } from '@/components/ui';
 import { useMpConnect } from '@/hooks/useMpConnect';
+import { NomiMascot } from '@/components/NomiMascot';
 
 interface Props {
   userId: string | undefined;
@@ -39,12 +40,10 @@ export function HomeAlertBanners({
       {showExpensesWarning && (
         <TouchableOpacity
           style={[styles.banner, styles.warningBanner]}
-          onPress={() => router.push('/(app)/movimientos' as any)}
+          onPress={() => router.push({ pathname: '/(app)/expenses', params: { openMovimientos: '1' } } as any)}
           activeOpacity={0.82}
         >
-          <View style={[styles.iconWrap, styles.warningIconWrap]}>
-            <Ionicons name="calendar-outline" size={20} color={colors.yellow} />
-          </View>
+          <NomiMascot pose="alerta" size={44} />
           <View style={styles.texts}>
             <Text variant="labelMd">Hace más de 3 días sin registrar</Text>
             <Text variant="caption" color={colors.text.secondary}>
@@ -129,7 +128,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  warningIconWrap: { backgroundColor: colors.yellow + '22' },
   connectIconWrap: { backgroundColor: colors.neon + '18' },
 
   texts: { flex: 1, gap: 2 },

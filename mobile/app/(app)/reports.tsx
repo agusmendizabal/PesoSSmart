@@ -672,7 +672,7 @@ export default function ReportsScreen() {
             <Text variant="body" color={colors.text.secondary} align="center" style={{ lineHeight: 22 }}>
               Cargá gastos para ver tu análisis, salud financiera y oportunidades de ahorro.
             </Text>
-            <TouchableOpacity style={s.emptyBtn} onPress={() => router.push('/(app)/movimientos' as any)} activeOpacity={0.8}>
+            <TouchableOpacity style={s.emptyBtn} onPress={() => router.push({ pathname: '/(app)/expenses', params: { openMovimientos: '1' } } as any)} activeOpacity={0.8}>
               <Ionicons name="add" size={16} color={colors.white} />
               <Text style={{ fontFamily: 'Montserrat_600SemiBold', fontSize: 14, color: colors.white }}>
                 Ir a cargar gastos

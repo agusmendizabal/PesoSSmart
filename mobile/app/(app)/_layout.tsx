@@ -69,7 +69,6 @@ export default function AppLayout() {
       />
       <Tabs.Screen name="savings"                options={{ href: null }} />
       <Tabs.Screen name="profile"                options={{ href: null }} />
-      <Tabs.Screen name="movimientos"            options={{ href: null }} />
       <Tabs.Screen name="reports"                options={{ href: null }} />
       <Tabs.Screen name="advisor"                options={{ href: null }} />
       <Tabs.Screen name="group-detail"           options={{ href: null }} />
@@ -77,8 +76,10 @@ export default function AppLayout() {
       <Tabs.Screen name="member-detail"          options={{ href: null }} />
       <Tabs.Screen name="plans"                  options={{ href: null }} />
       <Tabs.Screen name="gmail-connect"          options={{ href: null }} />
+      <Tabs.Screen name="outlook-connect"        options={{ href: null }} />
       <Tabs.Screen name="savings-plan"           options={{ href: null }} />
       <Tabs.Screen name="category-detail"        options={{ href: null }} />
+      <Tabs.Screen name="category-expenses"      options={{ href: null }} />
       <Tabs.Screen name="savings-opportunities"  options={{ href: null }} />
       <Tabs.Screen name="savings-goal"           options={{ href: null }} />
       <Tabs.Screen name="help"                   options={{ href: null }} />

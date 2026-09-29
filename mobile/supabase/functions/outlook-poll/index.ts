@@ -356,18 +356,26 @@ serve(async (req) => {
         (txDate.getFullYear() === nowDate.getFullYear() && txDate.getMonth() < nowDate.getMonth());
 
       if (isPastMonth) {
-        await supabase.from('pending_transactions').upsert({
-          user_id: userId, source: 'outlook', amount: finalAmount,
-          currency: result.moneda ?? 'ARS', merchant: finalMerchant,
-          transaction_date: finalDate, raw_subject: rawSubject, status: 'confirmed',
-        }, { onConflict: 'user_id,raw_subject', ignoreDuplicates: true });
+        // ignoreDuplicates + select(): si el mail ya se había procesado (conflicto de
+        // raw_subject), el upsert no inserta nada — evita el insert duplicado en
+        // `expenses` cuando dos invocaciones (cron + polling manual) corren en paralelo.
+        const { data: upserted, error: upsertErr } = await supabase
+          .from('pending_transactions')
+          .upsert({
+            user_id: userId, source: 'outlook', amount: finalAmount,
+            currency: result.moneda ?? 'ARS', merchant: finalMerchant,
+            transaction_date: finalDate, raw_subject: rawSubject, status: 'confirmed',
+          }, { onConflict: 'user_id,raw_subject', ignoreDuplicates: true })
+          .select('id');
 
-        await supabase.from('expenses').insert({
-          user_id: userId, description: result.descripcion ?? finalMerchant,
-          amount: finalAmount, date: finalDate, payment_method: 'other',
-          category_id: null, is_recurring: false,
-        });
-        newPending++;
+        if (!upsertErr && upserted && upserted.length > 0) {
+          await supabase.from('expenses').insert({
+            user_id: userId, description: result.descripcion ?? finalMerchant,
+            amount: finalAmount, date: finalDate, payment_method: 'other',
+            category_id: null, is_recurring: false,
+          });
+          newPending++;
+        }
         continue;
       }
 

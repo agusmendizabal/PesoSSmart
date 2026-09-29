@@ -12,7 +12,7 @@ import {
   Animated,
   LayoutAnimation,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '@/theme';
 import { Text } from '@/components/ui';
@@ -172,6 +172,7 @@ function CategorizarSheet({
   const [description,   setDescription]  = useState(tx.merchant ?? tx.description ?? '');
   const looksLikeTransfer = /transfer/i.test((tx.merchant ?? '') + ' ' + (tx.description ?? ''));
 
+  const insets = useSafeAreaInsets();
   const canConfirm = !!selectedCat && !!selectedClass && !isSaving;
   const searchLow  = catSearch.toLowerCase();
   const filteredCats = catSearch.trim()
@@ -212,9 +213,7 @@ function CategorizarSheet({
           </View>
 
           <View style={sh.expenseCard}>
-            <View style={sh.expenseIconWrap}>
-              <CategoryIcon description={tx.merchant ?? tx.description ?? ''} size={44} />
-            </View>
+            <CategoryIcon description={tx.merchant ?? tx.description ?? ''} size={54} />
             <View style={{ flex: 1, gap: 4 }}>
               <Text style={sh.expenseName} numberOfLines={1}>{tx.merchant ?? 'Gasto detectado'}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -311,9 +310,7 @@ function CategorizarSheet({
                     onPress={() => { setSelectedCat(prev => prev === cat.id ? null : cat.id); hapticLight(); }}
                     activeOpacity={0.75}
                   >
-                    <View style={[sh.catIconWrap, { backgroundColor: (cat.color ?? '#27AE60') + '20' }]}>
-                      <CategoryIcon categoryName={cat.name_es} size={26} />
-                    </View>
+                    <CategoryIcon categoryName={cat.name_es} size={40} />
                     <Text style={[sh.catName, isActive && { color: '#1C1C1C', fontFamily: 'Montserrat_600SemiBold' }]} numberOfLines={1}>
                       {cat.name_es}
                     </Text>
@@ -330,7 +327,7 @@ function CategorizarSheet({
           <View style={{ height: 16 }} />
         </ScrollView>
 
-        <View style={sh.bottomBar}>
+        <View style={[sh.bottomBar, { paddingBottom: Math.max(16, insets.bottom) }]}>
           <TouchableOpacity
             style={[sh.ctaBtn, !canConfirm && { opacity: 0.45 }]}
             onPress={handleConfirm}
@@ -838,9 +835,7 @@ export function PendingTransactions({
                 )}
 
                 <View style={st.cardMain}>
-                  <View style={[st.iconCircle, suggestedCat?.color ? { backgroundColor: suggestedCat.color + '1A' } : null]}>
-                    <CategoryIcon description={tx.merchant ?? tx.description ?? ''} size={28} />
-                  </View>
+                  <CategoryIcon description={tx.merchant ?? tx.description ?? ''} size={48} />
                   <View style={st.cardInfo}>
                     <Text style={st.merchantName} numberOfLines={1}>
                       {tx.merchant ?? 'Comercio desconocido'}
@@ -918,7 +913,7 @@ export function PendingTransactions({
       )}
 
       {/* Modal categorización */}
-      <Modal visible={!!activeTx} transparent animationType="slide" onRequestClose={() => setActiveTxId(null)}>
+      <Modal visible={!!activeTx} transparent animationType="slide" presentationStyle="overFullScreen" onRequestClose={() => setActiveTxId(null)}>
         {activeTx && (
           <CategorizarSheet
             tx={activeTx}
