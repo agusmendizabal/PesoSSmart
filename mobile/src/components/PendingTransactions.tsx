@@ -130,11 +130,13 @@ function SourceBadge({ source }: { source: string | null }) {
     : source === 'gmail' ? 'Gmail'
     : source === 'outlook' ? 'Outlook'
     : source === 'whatsapp' ? 'WhatsApp'
+    : source === 'ios_shortcut' ? 'Atajos'
     : source;
   const color = source === 'mercadopago' ? '#009EE3'
     : source === 'gmail' ? '#EA4335'
     : source === 'outlook' ? '#0078D4'
     : source === 'whatsapp' ? '#25D366'
+    : source === 'ios_shortcut' ? '#7B61FF'
     : '#9B9790';
   return (
     <View style={[sbS.pill, { backgroundColor: color + '1A' }]}>

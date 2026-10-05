@@ -77,6 +77,7 @@ export default function AppLayout() {
       <Tabs.Screen name="plans"                  options={{ href: null }} />
       <Tabs.Screen name="gmail-connect"          options={{ href: null }} />
       <Tabs.Screen name="outlook-connect"        options={{ href: null }} />
+      <Tabs.Screen name="ios-shortcut"           options={{ href: null }} />
       <Tabs.Screen name="savings-plan"           options={{ href: null }} />
       <Tabs.Screen name="category-detail"        options={{ href: null }} />
       <Tabs.Screen name="category-expenses"      options={{ href: null }} />

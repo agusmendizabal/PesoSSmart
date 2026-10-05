@@ -8,12 +8,13 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import {
+  CaptureInput, MAX_IMAGE_BYTES, SOURCE_LABEL,
+  countRecentCaptures, extractExpense, formatARS, formatDate, loadCategories,
+  normalizeMerchant, saveCapturedExpense, sha256Hex, todayAR,
+} from '../_shared/expenseCapture.ts';
 
 const GRAPH_URL = 'https://graph.facebook.com/v21.0';
-const GROQ_URL  = 'https://api.groq.com/openai/v1/chat/completions';
-const VISION_MODEL = 'qwen/qwen3.8-27b';
-const TEXT_MODEL   = 'qwen/qwen3.8-27b';
-const MAX_IMAGE_BYTES = 3_500_000; // Groq rechaza imágenes base64 > 4MB
 const DAILY_LIMIT = 50;
 
 const APP_SECRET      = Deno.env.get('WHATSAPP_APP_SECRET');
@@ -22,25 +23,12 @@ const ACCESS_TOKEN    = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
 const PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
 const GROQ_API_KEY    = Deno.env.get('GROQ_API_KEY');
 
-const PAYMENT_METHODS = ['cash', 'debit', 'credit', 'transfer', 'digital_wallet', 'other'];
-const CLASSIFICATIONS = ['necessary', 'disposable', 'investable'];
 const YES = new Set(['si', 'sí', 's', 'ok', 'dale', 'confirmar', 'confirmo']);
 const NO  = new Set(['no', 'n', 'cancelar', 'descartar']);
 
 const HELP_TEXT =
   'Mandame una foto del ticket o escribime el gasto, por ejemplo: "gasté $5.000 en la verdulería". ' +
   'Yo lo cargo en PesoSSmart. 🧾';
-
-type Category = { id: string; name: string; name_es: string };
-type Extracted = {
-  es_gasto: boolean;
-  comercio: string | null;
-  monto: number | null;
-  fecha: string | null;
-  categoria: string | null;
-  clasificacion: string | null;
-  medio_pago: string | null;
-};
 
 // ── Firma ────────────────────────────────────────────────────────────────────
 
@@ -102,99 +90,6 @@ async function downloadMedia(mediaId: string): Promise<{ bytes: ArrayBuffer; mim
   if (bytes.byteLength > MAX_IMAGE_BYTES) return 'too_big';
   return { bytes, mime: meta.mime_type ?? 'image/jpeg' };
 }
-
-// ── Groq ─────────────────────────────────────────────────────────────────────
-
-function todayAR(): string {
-  return new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
-}
-
-function extractionPrompt(categories: Category[]): string {
-  const today = todayAR();
-  return `Sos un asistente que registra gastos de usuarios argentinos. Hoy es ${today}.
-Respondé SOLO con un JSON con esta forma:
-{"es_gasto":true,"comercio":"Coto","monto":15230.5,"fecha":"${today}","categoria":"groceries","clasificacion":"necessary","medio_pago":"debit"}
-
-Reglas:
-- es_gasto: false si no hay un gasto concreto con monto (saludos, preguntas, fotos que no son tickets).
-- monto: el TOTAL pagado, número sin separadores de miles ($15.230,50 → 15230.5).
-- fecha: YYYY-MM-DD. "hoy" → ${today}. Si no aparece, null.
-- comercio: nombre corto del comercio, sin razón social (S.A., S.R.L.) ni sucursal.
-- categoria: una de: ${categories.map(c => `${c.name} (${c.name_es})`).join(', ')}.
-- clasificacion: "necessary" (super, farmacia, transporte, servicios), "disposable" (salidas, ropa, ocio) o "investable" (ahorro/inversión).
-- medio_pago: "cash", "debit", "credit", "transfer", "digital_wallet" u "other" según lo que diga el ticket o el texto; si no se sabe, null.`;
-}
-
-async function callGroq(model: string, messages: unknown[]): Promise<Extracted | null> {
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages, temperature: 0, max_tokens: 400, response_format: { type: 'json_object' } }),
-  });
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error('[whatsapp-webhook] Groq error:', errText);
-    outbox.getStore()?.push({ groq_error: res.status, detail: errText.slice(0, 300) });
-    return null;
-  }
-  const data = await res.json();
-  const content: string | undefined = data.choices?.[0]?.message?.content;
-  const match = content?.match(/\{[\s\S]*\}/);
-  try {
-    return JSON.parse(match![0]);
-  } catch {
-    console.error('[whatsapp-webhook] Respuesta de Groq no parseable:', content);
-    return null;
-  }
-}
-
-const extractFromImage = (b64: string, mime: string, categories: Category[]) =>
-  callGroq(VISION_MODEL, [
-    { role: 'system', content: extractionPrompt(categories) },
-    { role: 'user', content: [
-      { type: 'image_url', image_url: { url: `data:${mime};base64,${b64}` } },
-      { type: 'text', text: 'Extraé el gasto de este ticket.' },
-    ] },
-  ]);
-
-const extractFromText = (text: string, categories: Category[]) =>
-  callGroq(TEXT_MODEL, [
-    { role: 'system', content: extractionPrompt(categories) },
-    { role: 'user', content: text },
-  ]);
-
-// ── Helpers de dominio ───────────────────────────────────────────────────────
-
-function normalizeMerchant(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/\b(s\.?a\.?l?|s\.?r\.?l\.?|s\.?a\.?s\.?)\b/gi, '')
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function formatARS(n: number): string {
-  return '$' + n.toLocaleString('es-AR', { maximumFractionDigits: 2 });
-}
-
-function formatDate(iso: string): string {
-  const [, m, d] = iso.split('-');
-  return `${d}/${m}`;
-}
-
-function sanitizeDate(raw: string | null): string {
-  const today = todayAR();
-  if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw) || isNaN(Date.parse(raw))) return today;
-  const ageDays = (Date.parse(today) - Date.parse(raw)) / 86_400_000;
-  return ageDays < -1 || ageDays > 120 ? today : raw;
-}
-
-const SOURCE_LABEL: Record<string, string> = {
-  gmail: 'Gmail', outlook: 'Outlook', mercadopago: 'Mercado Pago', whatsapp: 'WhatsApp',
-};
 
 // ── Acciones ─────────────────────────────────────────────────────────────────
 
@@ -333,84 +228,32 @@ async function latestWhatsAppPending(db: SupabaseClient, userId: string): Promis
   return data?.id ?? null;
 }
 
-async function registerExpense(
-  db: SupabaseClient,
-  phone: string,
-  userId: string,
-  rawSubject: string,
-  extracted: Extracted | null,
-  categories: Category[],
-) {
-  const amount = Number(extracted?.monto);
-  if (!extracted?.es_gasto || !Number.isFinite(amount) || amount <= 0 || amount > 100_000_000) {
-    console.warn('[whatsapp-webhook] Sin gasto identificable:', JSON.stringify(extracted));
-    outbox.getStore()?.push({ extracted });
-    await sendText(phone, `No pude identificar un gasto. ${HELP_TEXT}`);
-    return;
+async function registerExpense(db: SupabaseClient, phone: string, userId: string, rawSubject: string, input: CaptureInput) {
+  const categories = await loadCategories(db);
+  const { data: extracted, error: groqError } = await extractExpense(input, categories, GROQ_API_KEY!);
+  if (groqError) outbox.getStore()?.push({ groq_error: groqError });
+
+  const result = await saveCapturedExpense(db, { userId, source: 'whatsapp', rawSubject, extracted, categories });
+
+  switch (result.kind) {
+    case 'not_expense':
+      outbox.getStore()?.push({ extracted: result.extracted });
+      return sendText(phone, `No pude identificar un gasto. ${HELP_TEXT}`);
+    case 'error':
+      return sendText(phone, 'No pude guardar el gasto. Probá de nuevo en unos minutos.');
+    case 'already_exists':
+      return sendText(phone, `${'imageBase64' in input ? 'Este ticket' : 'Este gasto'} ya lo tenía registrado. 👍`);
+    case 'duplicate': {
+      const via = result.via ? ` (llegó por ${SOURCE_LABEL[result.via] ?? result.via})` : '';
+      return sendText(phone, `Este gasto ya lo tenía registrado${via}: ${result.merchant} · ${formatARS(result.amount)}. No lo cargo de nuevo.`);
+    }
+    case 'pending':
+      return sendConfirmButtons(
+        phone,
+        `🧾 ${result.merchant} · ${formatARS(result.amount)}\n📂 ${result.categoryLabel}\n📅 ${formatDate(result.date)}\n\n¿Lo registro?`,
+        result.id,
+      );
   }
-
-  const merchant = (extracted.comercio ?? '').trim().slice(0, 80) || 'Gasto';
-  const date = sanitizeDate(extracted.fecha);
-
-  const { data: hint } = await db
-    .from('merchant_category_hints')
-    .select('category, classification')
-    .eq('user_id', userId)
-    .eq('merchant_normalized', normalizeMerchant(merchant))
-    .maybeSingle();
-
-  const validNames = new Set(categories.map(c => c.name));
-  const category = hint?.category
-    ?? (extracted.categoria && validNames.has(extracted.categoria) ? extracted.categoria : 'other');
-  const classification = hint?.classification
-    ?? (CLASSIFICATIONS.includes(extracted.clasificacion ?? '') ? extracted.clasificacion : 'disposable');
-  const paymentMethod = PAYMENT_METHODS.includes(extracted.medio_pago ?? '') ? extracted.medio_pago : null;
-
-  const { data: inserted, error } = await db
-    .from('pending_transactions')
-    .upsert({
-      user_id:                  userId,
-      source:                   'whatsapp',
-      direction:                'outgoing',
-      amount,
-      currency:                 'ARS',
-      merchant,
-      description:              merchant,
-      transaction_date:         date,
-      suggested_category:       category,
-      suggested_classification: classification,
-      payment_method:           paymentMethod,
-      raw_subject:              rawSubject,
-      status:                   'pending',
-    }, { onConflict: 'user_id,raw_subject', ignoreDuplicates: true })
-    .select('id, status, dedup_of');
-
-  if (error) {
-    console.error('[whatsapp-webhook] Error guardando pendiente:', error);
-    await sendText(phone, 'No pude guardar el gasto. Probá de nuevo en unos minutos.');
-    return;
-  }
-  if (!inserted?.length) {
-    await sendText(phone, `${rawSubject.startsWith('wa_img_') ? 'Este ticket' : 'Este gasto'} ya lo tenía registrado. 👍`);
-    return;
-  }
-
-  const tx = inserted[0];
-  if (tx.status === 'duplicate') {
-    const { data: original } = tx.dedup_of
-      ? await db.from('pending_transactions').select('source').eq('id', tx.dedup_of).maybeSingle()
-      : { data: null };
-    const via = original?.source ? ` (llegó por ${SOURCE_LABEL[original.source] ?? original.source})` : '';
-    await sendText(phone, `Este gasto ya lo tenía registrado${via}: ${merchant} · ${formatARS(amount)}. No lo cargo de nuevo.`);
-    return;
-  }
-
-  const catLabel = categories.find(c => c.name === category)?.name_es ?? category;
-  await sendConfirmButtons(
-    phone,
-    `🧾 ${merchant} · ${formatARS(amount)}\n📂 ${catLabel}\n📅 ${formatDate(date)}\n\n¿Lo registro?`,
-    tx.id,
-  );
 }
 
 // ── Handler de mensaje ───────────────────────────────────────────────────────
@@ -456,19 +299,10 @@ async function handleMessage(db: SupabaseClient, msg: any) {
     return;
   }
 
-  const { count } = await db
-    .from('pending_transactions')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('source', 'whatsapp')
-    .gte('created_at', new Date(Date.now() - 24 * 3600 * 1000).toISOString());
-  if ((count ?? 0) >= DAILY_LIMIT) {
+  if ((await countRecentCaptures(db, userId, 'whatsapp')) >= DAILY_LIMIT) {
     await sendText(phone, 'Llegaste al límite de gastos por WhatsApp de hoy. Podés seguir cargándolos desde la app.');
     return;
   }
-
-  const { data: categories } = await db.from('expense_categories').select('id, name, name_es');
-  const cats: Category[] = categories ?? [];
 
   if (msg.type === 'image') {
     const media = await downloadMedia(msg.image.id);
@@ -480,15 +314,14 @@ async function handleMessage(db: SupabaseClient, msg: any) {
       await sendText(phone, 'No pude descargar la imagen. Probá de nuevo.');
       return;
     }
-    const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', media.bytes));
-    const hashHex = Array.from(hash).map(b => b.toString(16).padStart(2, '0')).join('');
-    const extracted = await extractFromImage(encodeBase64(media.bytes), media.mime, cats);
-    await registerExpense(db, phone, userId, `wa_img_${hashHex}`, extracted, cats);
+    await registerExpense(db, phone, userId, `wa_img_${await sha256Hex(media.bytes)}`, {
+      imageBase64: encodeBase64(media.bytes),
+      mime: media.mime,
+    });
     return;
   }
 
-  const extracted = await extractFromText(text.slice(0, 500), cats);
-  await registerExpense(db, phone, userId, `wa_${msg.id}`, extracted, cats);
+  await registerExpense(db, phone, userId, `wa_${msg.id}`, { text: text.slice(0, 500) });
 }
 
 // ── Entry point ──────────────────────────────────────────────────────────────

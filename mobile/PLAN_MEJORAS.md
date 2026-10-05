@@ -100,6 +100,30 @@ npx supabase functions deploy auto-confirm-transactions --no-verify-jwt
 
 ---
 
+## 🚧 FASE 2 — EN CURSO: Atajos de iOS (Problema 10)
+
+> **Cambio respecto del plan original:** Atajos de iOS no tiene disparador "al recibir una notificación de una app", así que no se pueden leer las push de los bancos. Se implementó un endpoint único que acepta texto o imagen y se usa de 3 formas: **compartir** (capturas, tickets o texto desde cualquier app — cubre gran parte del Problema 9 sin código nativo), **automatización por SMS** del banco y **Siri** (dictado).
+
+### Qué se implementó
+- `051_ios_shortcut.sql` — tabla `shortcut_tokens` (solo el SHA-256 del token) + RPC `create_shortcut_token()`.
+- `ios-shortcut-ingest` — auth por token personal, texto o imagen (JPEG/PNG) → pendiente con categoría sugerida; responde `{ status, message }` para que el atajo muestre una notificación. Límite 100/día.
+- `_shared/expenseCapture.ts` — extracción con Groq + guardado, compartido con `whatsapp-webhook` (refactorizado para usarlo).
+- `ios-shortcut.tsx` — pantalla para generar el token (se muestra una sola vez), instalar el atajo y guía de uso. Entrada en Perfil solo en iOS.
+
+### Pasos de deploy
+1. Correr `051_ios_shortcut.sql` en el SQL Editor.
+2. `npx supabase functions deploy ios-shortcut-ingest --no-verify-jwt` y `npx supabase functions deploy whatsapp-webhook --no-verify-jwt` (refactor).
+3. **Publicar el atajo** (una vez, desde un iPhone) y poner su link de iCloud en `EXPO_PUBLIC_IOS_SHORTCUT_URL`:
+   1. Atajos → nuevo atajo "PesoSSmart". En Detalles: activar "Mostrar en hoja de compartir" (tipos: Texto, Imágenes).
+   2. Acción "Recibir **texto e imágenes** desde **Hoja de compartir**; si no hay entrada: **Solicitar entrada**" (permite Siri/dictado).
+   3. Acción "Texto" con el valor del token y, en "Configurar importación", agregar la pregunta "Pegá tu token de PesoSSmart" sobre ese campo.
+   4. "Si **Entrada del atajo** es **imagen**": "Convertir imagen a **JPEG**" → "Redimensionar a ancho **1280**" → "Codificar en **Base64**" (saltos de línea: ninguno) → "Diccionario" `{ image: <Base64> }`. "De lo contrario": "Diccionario" `{ text: <Entrada del atajo> }`.
+   5. "Obtener contenido de URL": `POST https://gqflukmlaonkgxfdbedq.supabase.co/functions/v1/ios-shortcut-ingest`, encabezado `Authorization: Bearer <Texto del paso 3>`, cuerpo **JSON** = el Diccionario.
+   6. "Obtener valor de **message** en el diccionario" → "Mostrar notificación".
+   7. Compartir el atajo → "Copiar enlace de iCloud".
+
+---
+
 ## FASE 0 — Pulido de UI (TestFlight beta, PRIORIDAD ACTUAL)
 
 Antes de atacar las mejoras de producto, se necesita que la UI esté pulida para que los usuarios beta tengan una buena experiencia. Esta fase es corta y cubre detalles visuales, flujos rotos, y small bugs de interacción. Se trabaja primero en esta fase y luego se avanza a las fases siguientes.

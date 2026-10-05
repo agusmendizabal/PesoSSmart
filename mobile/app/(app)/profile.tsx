@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   AppState,
   Linking,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -650,6 +651,21 @@ export default function ProfileScreen() {
                   {!waLinking && <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />}
                 </TouchableOpacity>
               )}
+            </Card>
+          </View>
+        )}
+
+        {/* ── Atajos de iOS ──────────────────────────────────────────── */}
+        {Platform.OS === 'ios' && (
+          <View style={styles.section}>
+            <Text variant="label" color={colors.text.tertiary} style={styles.sectionTitle}>ATAJOS DE IOS</Text>
+            <Card style={styles.menuCard}>
+              <MenuItem
+                icon="flash-outline"
+                label="Registrar gastos con Atajos"
+                description="Capturas, tickets, SMS del banco o Siri"
+                onPress={() => router.push('/(app)/ios-shortcut' as any)}
+              />
             </Card>
           </View>
         )}
