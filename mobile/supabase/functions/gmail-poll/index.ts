@@ -171,7 +171,7 @@ async function parsePdfWithGroq(base64Data: string): Promise<Array<{ fecha: stri
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
       body: JSON.stringify({
-        model: 'llama-3.2-11b-vision-preview',
+        model: 'qwen/qwen3.8-27b',
         messages: [{
           role:    'user',
           content: [
@@ -284,7 +284,7 @@ Si no hay monto saliente claro, respondé: { "es_movimiento": false }`;
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
       body: JSON.stringify({
-        model:       'llama-3.3-70b-versatile',
+        model:       'qwen/qwen3.8-27b',
         messages:    [{ role: 'user', content: prompt }],
         max_tokens:  300,
         temperature: 0.1,
@@ -380,7 +380,7 @@ async function processTransaction(
         raw_subject:      rawSubject,
         status:           'confirmed',
       }, { onConflict: 'user_id,raw_subject', ignoreDuplicates: true })
-      .select('id');
+      .select('id, status');
 
     if (upsertErr) {
       console.error('[gmail-poll] Error upsert pending_transactions (mes anterior):', upsertErr);
@@ -390,15 +390,20 @@ async function processTransaction(
       console.log('[gmail-poll] Mes anterior ya procesado (duplicado evitado):', finalMerchant, finalDate);
       return true;
     }
+    if (upserted[0].status === 'duplicate') {
+      console.log('[gmail-poll] Mes anterior ya registrado por otro canal:', finalMerchant, finalDate);
+      return true;
+    }
 
     const { error: pastExpErr } = await supabase.from('expenses').insert({
-      user_id:        userId,
-      description:    result.descripcion ?? finalMerchant,
-      amount:         finalAmount,
-      date:           finalDate,
-      payment_method: 'other',
-      category_id:    null,
-      is_recurring:   false,
+      user_id:           userId,
+      description:       result.descripcion ?? finalMerchant,
+      amount:            finalAmount,
+      date:              finalDate,
+      payment_method:    'other',
+      category_id:       null,
+      is_recurring:      false,
+      source_pending_id: upserted[0].id,
     });
 
     if (pastExpErr) {

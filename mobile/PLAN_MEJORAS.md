@@ -64,6 +64,42 @@ npx supabase functions deploy auto-confirm-transactions --no-verify-jwt
 
 ---
 
+## 🚧 FASE 2 — EN CURSO: WhatsApp (Problema 7) + deduplicación cross-canal (Problema 11)
+
+**Fecha:** Oct 2026 — migraciones 049/050 corridas y funciones deployadas. Probado end-to-end con webhooks firmados simulados (vínculo por código, gasto por texto, confirmar/descartar por botón y por "sí"/"no", reintento del mismo mensaje, duplicado contra Gmail, firma inválida). **Falta solo la parte de Meta** (pasos 1, 3 con valores reales, 5 y 6) y probar la foto de ticket real. Hoy hay secrets de WhatsApp de prueba cargados: reemplazarlos con los reales.
+
+> **Hallazgos durante la implementación:**
+> - Groq dio de baja todos los modelos Llama → todas las funciones con IA (Nomi, inversiones, Gmail, Outlook, MP, capturas) fallaban. Se migraron a `qwen/qwen3.8-27b`.
+> - En producción existe el trigger `tr_auto_expense_from_pending` que no está versionado en ninguna migración (crea un gasto por cada pendiente nuevo). Conviene pasarlo a una migración y agregarle `AND direction = 'outgoing'` para que nunca registre ingresos como gasto.
+
+### Qué se implementó
+- `049_cross_channel_dedup.sql` — trigger `BEFORE INSERT` en `pending_transactions`: si el mismo gasto ya llegó por otro canal (fecha ±1 día, monto ±0,5%, comercio compatible), la fila se guarda con `status = 'duplicate'` y `dedup_of`. Cubre Gmail, Outlook, Mercado Pago y WhatsApp sin cambios en cada función. Reemplaza el `fingerprint` propuesto en el Problema 11 (un hash exacto no matchea "COTO C.I.C.S.A." contra "Coto").
+- `050_whatsapp.sql` — tablas `whatsapp_links` (número ↔ usuario, solo escribe el webhook) y `whatsapp_link_codes`, RPC `create_whatsapp_link_code()`, columna `payment_method` en `pending_transactions`.
+- `whatsapp-webhook` — firma HMAC de Meta, vínculo por código `PESOS-XXXXXX`, foto de ticket (Groq Vision `llama-4-scout`) o texto libre → pendiente con botones Confirmar / Descartar (también acepta "sí"/"no"). Límite 50 gastos/día por usuario.
+- `gmail-poll` / `outlook-poll` — el camino de "mes anterior" ya no inserta en `expenses` si la fila quedó como duplicada.
+- `auto-confirm-transactions` — fix: leía categorías de una tabla `categories` inexistente (los auto-confirmados quedaban sin categoría); ahora usa `expense_categories`.
+- `profile.tsx` — sección WhatsApp (vincular / desvincular), visible solo si `EXPO_PUBLIC_WHATSAPP_NUMBER` está seteada. `PendingTransactions.tsx` — badge "WhatsApp".
+
+### Pasos de deploy
+1. **Meta:** crear app en developers.facebook.com → producto WhatsApp → número de negocio. Anotar *Phone number ID*, *App secret* y generar un *token permanente* (System User en Business Manager).
+2. **Migraciones:** correr `049_cross_channel_dedup.sql` y `050_whatsapp.sql` en el SQL Editor.
+3. **Secrets:**
+   ```bash
+   cd mobile
+   npx supabase secrets set WHATSAPP_APP_SECRET=<app-secret> WHATSAPP_ACCESS_TOKEN=<token> WHATSAPP_PHONE_NUMBER_ID=<id> WHATSAPP_VERIFY_TOKEN=<string-random-propio>
+   ```
+4. **Deploy:**
+   ```bash
+   npx supabase functions deploy whatsapp-webhook --no-verify-jwt
+   npx supabase functions deploy gmail-poll
+   npx supabase functions deploy outlook-poll
+   npx supabase functions deploy auto-confirm-transactions --no-verify-jwt
+   ```
+5. **Webhook en Meta:** URL `https://gqflukmlaonkgxfdbedq.supabase.co/functions/v1/whatsapp-webhook`, verify token = `WHATSAPP_VERIFY_TOKEN`, suscribir el campo `messages`.
+6. **Cliente:** agregar `EXPO_PUBLIC_WHATSAPP_NUMBER=549XXXXXXXXXX` al `.env` de `mobile/` y al build de EAS.
+
+---
+
 ## FASE 0 — Pulido de UI (TestFlight beta, PRIORIDAD ACTUAL)
 
 Antes de atacar las mejoras de producto, se necesita que la UI esté pulida para que los usuarios beta tengan una buena experiencia. Esta fase es corta y cubre detalles visuales, flujos rotos, y small bugs de interacción. Se trabaja primero en esta fase y luego se avanza a las fases siguientes.

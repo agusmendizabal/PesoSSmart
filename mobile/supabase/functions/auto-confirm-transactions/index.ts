@@ -51,7 +51,7 @@ serve(async (req) => {
 
   for (const [userId, txList] of Object.entries(byUser)) {
     // Obtener categorías para mapear nombres
-    const { data: categories } = await supabase.from('categories').select('id, name');
+    const { data: categories } = await supabase.from('expense_categories').select('id, name');
     const catMap: Record<string, string> = {};
     for (const c of categories ?? []) catMap[c.name] = c.id;
 

@@ -133,7 +133,7 @@ Reglas categoria: cafe=cafeteria/starbucks/cafe/te/bebida; comida=restaurant/del
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'qwen/qwen3.8-27b',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 80,
         temperature: 0.1,

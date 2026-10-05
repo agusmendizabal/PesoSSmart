@@ -129,10 +129,12 @@ function SourceBadge({ source }: { source: string | null }) {
   const label = source === 'mercadopago' ? 'Mercado Pago'
     : source === 'gmail' ? 'Gmail'
     : source === 'outlook' ? 'Outlook'
+    : source === 'whatsapp' ? 'WhatsApp'
     : source;
   const color = source === 'mercadopago' ? '#009EE3'
     : source === 'gmail' ? '#EA4335'
     : source === 'outlook' ? '#0078D4'
+    : source === 'whatsapp' ? '#25D366'
     : '#9B9790';
   return (
     <View style={[sbS.pill, { backgroundColor: color + '1A' }]}>

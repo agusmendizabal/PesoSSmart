@@ -8,6 +8,8 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  AppState,
+  Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +32,9 @@ const editSchema = z.object({
 });
 
 type EditFormData = z.infer<typeof editSchema>;
+
+const WHATSAPP_NUMBER = process.env.EXPO_PUBLIC_WHATSAPP_NUMBER;
+const WHATSAPP_GREEN = '#25D366';
 
 interface MenuItemProps {
   icon: string;
@@ -76,6 +81,8 @@ export default function ProfileScreen() {
   const [gmailSyncing,  setGmailSyncing]  = useState(false);
   const [outlookEmail,  setOutlookEmail]  = useState<string | null>(null);
   const [outlookSyncing, setOutlookSyncing] = useState(false);
+  const [waPhone,       setWaPhone]       = useState<string | null>(null);
+  const [waLinking,     setWaLinking]     = useState(false);
   const [mpEmail,       setMpEmail]       = useState<string | null>(null);
   const [mpSyncing,     setMpSyncing]     = useState(false);
   const [mpLastSync,    setMpLastSync]    = useState<Date | null>(null);
@@ -95,6 +102,16 @@ export default function ProfileScreen() {
       setMpSyncCount(data.last_sync_count ?? 0);
       setMpSyncStatus(data.last_sync_status ?? 'never');
     }
+  };
+
+  const loadWhatsAppLink = async () => {
+    if (!user?.id || !WHATSAPP_NUMBER) return;
+    const { data } = await (supabase as any)
+      .from('whatsapp_links')
+      .select('phone')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    setWaPhone(data?.phone ?? null);
   };
 
   // Cargar estado de Gmail, Outlook y MP al entrar
@@ -117,6 +134,15 @@ export default function ProfileScreen() {
         if (data) setOutlookEmail(data.outlook_email);
       });
     loadMpStatus();
+    loadWhatsAppLink();
+  }, [user?.id]);
+
+  // Al volver de WhatsApp después de mandar el código, refrescar el estado del vínculo
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') loadWhatsAppLink();
+    });
+    return () => sub.remove();
   }, [user?.id]);
 
   // ── Foto de perfil ─────────────────────────────────────────────────────────
@@ -269,6 +295,42 @@ export default function ProfileScreen() {
     } finally {
       setOutlookSyncing(false);
     }
+  };
+
+  const linkWhatsApp = async () => {
+    setWaLinking(true);
+    try {
+      const { data: code, error } = await (supabase as any).rpc('create_whatsapp_link_code');
+      if (error || !code) throw error;
+      const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(code)}`;
+      Alert.alert(
+        'Vincular WhatsApp',
+        `Mandá este código a PesoSSmart por WhatsApp para vincular tu número:\n\n${code}\n\nVence en 15 minutos.`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Abrir WhatsApp', onPress: () => Linking.openURL(url) },
+        ],
+      );
+    } catch {
+      Alert.alert('Error', 'No se pudo generar el código. Intentá de nuevo.');
+    } finally {
+      setWaLinking(false);
+    }
+  };
+
+  const unlinkWhatsApp = () => {
+    Alert.alert('Desvincular WhatsApp', '¿Querés dejar de registrar gastos por WhatsApp desde este número?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Desvincular',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await (supabase as any).from('whatsapp_links').delete().eq('user_id', user?.id);
+          if (error) Alert.alert('Error', 'No se pudo desvincular. Intentá de nuevo.');
+          else setWaPhone(null);
+        },
+      },
+    ]);
   };
 
   const { connecting: mpConnecting, connect: connectMpFlow } = useMpConnect(user?.id);
@@ -553,6 +615,41 @@ export default function ProfileScreen() {
                 description="Detectá gastos desde Outlook o Hotmail"
                 onPress={() => router.push('/(app)/outlook-connect' as any)}
               />
+            </Card>
+          </View>
+        )}
+
+        {/* ── WhatsApp ───────────────────────────────────────────────── */}
+        {!!WHATSAPP_NUMBER && (
+          <View style={styles.section}>
+            <Text variant="label" color={colors.text.tertiary} style={styles.sectionTitle}>WHATSAPP</Text>
+            <Card style={styles.menuCard}>
+              {waPhone ? (
+                <TouchableOpacity style={styles.menuItem} onPress={unlinkWhatsApp}>
+                  <View style={styles.menuIcon}>
+                    <Ionicons name="logo-whatsapp" size={20} color={WHATSAPP_GREEN} />
+                  </View>
+                  <View style={styles.menuText}>
+                    <Text variant="bodySmall" color={colors.text.primary} style={{ fontFamily: 'Montserrat_600SemiBold' }}>WhatsApp vinculado</Text>
+                    <Text variant="caption" style={{ color: WHATSAPP_GREEN }}>+{waPhone}</Text>
+                    <Text variant="caption" color={colors.text.secondary}>Mandá fotos de tickets o escribí tus gastos</Text>
+                  </View>
+                  <Ionicons name="checkmark-circle" size={20} color={WHATSAPP_GREEN} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.menuItem} onPress={linkWhatsApp} disabled={waLinking}>
+                  <View style={styles.menuIcon}>
+                    {waLinking
+                      ? <ActivityIndicator size="small" color={WHATSAPP_GREEN} />
+                      : <Ionicons name="logo-whatsapp" size={20} color={colors.text.secondary} />}
+                  </View>
+                  <View style={styles.menuText}>
+                    <Text variant="bodySmall" color={colors.text.primary}>Vincular WhatsApp</Text>
+                    <Text variant="caption" color={colors.text.secondary}>Registrá gastos mandando la foto del ticket</Text>
+                  </View>
+                  {!waLinking && <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />}
+                </TouchableOpacity>
+              )}
             </Card>
           </View>
         )}
