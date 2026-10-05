@@ -305,7 +305,7 @@ serve(async (req) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${groqApiKey}` },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'qwen/qwen3.8-27b',
         messages,
         max_tokens: mode === 'explain' ? 400 : 500,
         temperature: 0.5,

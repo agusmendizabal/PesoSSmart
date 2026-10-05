@@ -62,7 +62,7 @@ serve(async (req) => {
 
     // ── PASO 1: Extraer texto crudo con visión ──────────────────
     const ocrData = await callGroq({
-      model: 'llama-3.2-11b-vision-preview',
+      model: 'qwen/qwen3.8-27b',
       messages: [{
         role: 'user',
         content: [
@@ -89,7 +89,7 @@ serve(async (req) => {
     const currentYear = new Date().getFullYear();
 
     const parseData = await callGroq({
-      model: 'llama-3.3-70b-versatile',
+      model: 'qwen/qwen3.8-27b',
       messages: [{
         role: 'user',
         content: `Este es texto extraído de una app de pagos argentina (Mercado Pago, Ualá, etc):

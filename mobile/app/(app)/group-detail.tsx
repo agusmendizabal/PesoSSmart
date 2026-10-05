@@ -424,19 +424,21 @@ async function fetchGroupDetail(groupId: string, userId: string): Promise<FetchR
   const nonAdminIds: string[] = !isFriends
     ? membersRaw.filter((m: any) => !adminRoles.includes(m.role)).map((m: any) => m.user_id as string)
     : [];
+  // El admin siempre debe incluirse a sí mismo: ve sus propios gastos + los de los no-admin.
+  const queryUserIds: string[] = !isFriends
+    ? (isAdmin ? [...nonAdminIds, userId] : [userId])
+    : [];
 
   const [membersInfoResult, expResult, groupExpResult] = await Promise.all([
     db.rpc('get_group_members', { p_group_id: groupId }),
     !isFriends
-      ? nonAdminIds.length > 0
-        ? supabase.from('expenses')
-            .select('id, user_id, amount, date, description, category_id, category:expense_categories(name_es, icon, color)')
-            .in('user_id', isAdmin ? nonAdminIds : [userId])
-            .gte('date', currentMonthStart())
-            .is('deleted_at', null)
-            .order('date', { ascending: false })
-            .limit(100)
-        : Promise.resolve({ data: [] })
+      ? supabase.from('expenses')
+          .select('id, user_id, amount, date, description, category_id, category:expense_categories(name_es, icon, color)')
+          .in('user_id', queryUserIds)
+          .gte('date', currentMonthStart())
+          .is('deleted_at', null)
+          .order('date', { ascending: false })
+          .limit(100)
       : Promise.resolve({ data: [] }),
     isFriends
       ? db.from('group_expenses')
@@ -1275,9 +1277,7 @@ function ExpenseDetailModal({
         <>
           {/* Hero */}
           <View style={{ backgroundColor: C.white, alignItems: 'center', paddingVertical: sp.xxl, paddingHorizontal: sp.xl, gap: sp.md }}>
-            <View style={s.expEmojiBox}>
-              <CategoryIcon description={expense.description} size={64} />
-            </View>
+            <CategoryIcon description={expense.description} size={80} />
             <Text style={s.detailTitle} numberOfLines={2}>{expense.description}</Text>
             <Text style={s.detailAmount}>{formatCurrency(expense.amount)}</Text>
             <Text style={s.detailDate}>{dateLabel(expense.date)}</Text>
@@ -3204,7 +3204,6 @@ const s = StyleSheet.create({
   expAmt:    { fontFamily: 'Montserrat_700Bold', fontSize: 14, color: C.text, flexShrink: 0 },
   expIconSm: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
-  expEmojiBox: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#D1F7E3', alignItems: 'center', justifyContent: 'center' },
   detailTitle:  { fontFamily: 'Montserrat_700Bold', fontSize: 20, color: C.text, textAlign: 'center', lineHeight: 26 },
   detailAmount: { fontFamily: 'Montserrat_700Bold', fontSize: 32, color: C.green, letterSpacing: -1, lineHeight: 40 },
   detailDate:   { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: C.muted },

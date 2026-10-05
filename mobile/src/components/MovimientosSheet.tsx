@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ExpensesSkeletonLoader, SmartLoadingState } from '@/components/ui/SkeletonLoader';
-import { useRouter } from 'expo-router';
 import {
   View,
   ScrollView,
@@ -41,6 +40,7 @@ import { BudgetRingIndicator } from '@/components/BudgetCard';
 import { useFirstVisit } from '@/hooks/useFirstVisit';
 import { FirstVisitSheet } from '@/components/FirstVisitSheet';
 import { useSavingsStore } from '@/store/savingsStore';
+import { scheduleRecurringReminder } from '@/lib/notifications';
 import {
   MONTH_NAMES, PALETTE, getCategoryColor, type CategoryRow, type MonthSummary,
   buildComparacion, buildAhorroSugerencias,
@@ -805,9 +805,7 @@ function SinClasifInbox({ expenses, pendingTxs, categories, userId, onClassify, 
         >
           <View style={scModalS.cardBody}>
             <View style={scModalS.cardMain}>
-              <View style={scModalS.iconCircle}>
-                <CategoryIcon description={item.description} size={28} />
-              </View>
+              <CategoryIcon description={item.description} size={48} />
               <View style={scModalS.cardInfo}>
                 <Text style={scModalS.merchantName} numberOfLines={1}>{item.description || 'Sin descripción'}</Text>
                 <Text style={scModalS.dateLbl}>
@@ -851,8 +849,11 @@ function SinClasifInbox({ expenses, pendingTxs, categories, userId, onClassify, 
 
 // ─── Screen ────────────────────────────────────────────────────────────────────
 
-export default function ExpensesScreen() {
-  const router = useRouter();
+export function MovimientosSheet({ visible, onClose, autoOpenClassify }: {
+  visible: boolean;
+  onClose: () => void;
+  autoOpenClassify?: boolean;
+}) {
   const { isFirstVisit, markVisited } = useFirstVisit('expenses');
   const { user } = useAuthStore();
   const {
@@ -920,6 +921,7 @@ export default function ExpensesScreen() {
     date: string;
     classification: ExpenseClassification;
     category_id: string | null;
+    is_recurring: boolean;
   } | null>(null);
   const [isSavingEdit,       setIsSavingEdit]       = useState(false);
 
@@ -1010,6 +1012,7 @@ export default function ExpensesScreen() {
       date:           expense.date,
       classification: expense.classification ?? 'necessary',
       category_id:    expense.category_id,
+      is_recurring:   expense.is_recurring ?? false,
     });
   };
 
@@ -1028,9 +1031,15 @@ export default function ExpensesScreen() {
         date:           editExpenseValues.date,
         classification: editExpenseValues.classification,
         category_id:    editExpenseValues.category_id,
+        is_recurring:   editExpenseValues.is_recurring,
+        recurring_frequency: editExpenseValues.is_recurring ? 'monthly' : null,
       });
+      if (editExpenseValues.is_recurring) {
+        scheduleRecurringReminder(editExpenseValues.description, editExpenseValues.date).catch(() => {});
+      }
       setEditingExpense(null);
       setEditExpenseValues(null);
+      loadAllUnclassified();
     } catch {
       Alert.alert('Error', 'No se pudo guardar el cambio.');
     } finally {
@@ -1049,6 +1058,7 @@ export default function ExpensesScreen() {
             await deleteExpense(id);
             setEditingExpense(null);
             setEditExpenseValues(null);
+            loadAllUnclassified();
           } catch (err: any) {
             if (err?.code === 'GROUP_LINKED') {
               Alert.alert(
@@ -1108,6 +1118,7 @@ export default function ExpensesScreen() {
   const [inCoupleMode,  setInCoupleMode]  = useState(false);
   const [showSinClasifModal, setShowSinClasifModal] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
+  const [allUnclassified, setAllUnclassified] = useState<Expense[]>([]);
 
   const loadPendingTxs = async () => {
     if (!user?.id) return;
@@ -1119,7 +1130,39 @@ export default function ExpensesScreen() {
       .order('transaction_date', { ascending: false });
     setPendingTxs(data ?? []);
   };
+
+  // Gastos sin categoría, sin importar el mes que esté navegando el usuario en el store
+  // global (evita que el banner/modal de clasificar "desaparezca" cuando el filtro
+  // compartido quedó apuntando a un mes pasado).
+  const loadAllUnclassified = async () => {
+    if (!user?.id) return;
+    const { data } = await (supabase as any)
+      .from('expenses')
+      .select('id, user_id, amount, date, description, category_id, payment_method, currency, is_shared, category:expense_categories(name_es, icon, color)')
+      .eq('user_id', user.id)
+      .is('category_id', null)
+      .is('deleted_at', null)
+      .order('date', { ascending: false })
+      .limit(200);
+    setAllUnclassified((data ?? []) as Expense[]);
+  };
+
+  useEffect(() => {
+    if (visible) {
+      loadAllUnclassified();
+    }
+  }, [visible]);
+
+  // Abre el inbox de clasificación directo al abrirse el sheet (viene del banner
+  // "sin categoría" de Análisis / Home), sin que haga falta tocar el banner de nuevo.
+  useEffect(() => {
+    if (visible && autoOpenClassify) {
+      setShowSinClasifModal(true);
+    }
+  }, [visible, autoOpenClassify]);
+
   const [isShared,      setIsShared]      = useState(false);
+  const [isRecurringExpense, setIsRecurringExpense] = useState(false);
 
   // ── Datos para el resumen del mes y el teaser de análisis ──
   const now = new Date();
@@ -1220,6 +1263,7 @@ export default function ExpensesScreen() {
   };
 
   const pollGmail = async () => {
+    if (isPolling) return; // evita que el efecto dispare un poll en paralelo con otro ya en curso
     setIsPolling(true);
     const { data: { session: cachedSession } } = await supabase.auth.getSession();
     const token = cachedSession?.access_token;
@@ -1331,8 +1375,13 @@ export default function ExpensesScreen() {
         payment_method: selectedPayment,
         category_id:    selectedCategory ?? undefined,
         notes:          notesWithFx,
-        is_recurring:   false,
+        is_recurring:   isRecurringExpense,
+        recurring_frequency: isRecurringExpense ? 'monthly' : null,
       });
+
+      if (isRecurringExpense) {
+        scheduleRecurringReminder(data.description, data.date).catch(() => {});
+      }
 
       // Gamificación — racha
       const classification = (savedExpense as any).classification ?? 'necessary';
@@ -1363,6 +1412,7 @@ export default function ExpensesScreen() {
       setSelectedCategory(null);
       setCurrency('ARS');
       setIsShared(false);
+      setIsRecurringExpense(false);
       // Si el filtro activo no coincide con el mes del nuevo gasto, sincronizarlo
       // para que el gasto recién agregado sea visible inmediatamente.
       const [ey, em] = data.date.split('-').map(Number);
@@ -1477,7 +1527,7 @@ export default function ExpensesScreen() {
 
       {/* Card compacto: gastos por clasificar (unclassified + pending Gmail) */}
       {(() => {
-        const sinClasifExpenses = expenses.filter(e => e.category_id === null);
+        const sinClasifExpenses = allUnclassified;
         const totalPending = sinClasifExpenses.length + pendingTxs.length;
         if (totalPending === 0) return null;
         const totalSinClasif = sinClasifExpenses.reduce((s, e) => s + e.amount, 0)
@@ -1523,6 +1573,7 @@ export default function ExpensesScreen() {
   );
 
   return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* ── Top bar fijo ── */}
       <View style={styles.topBar}>
@@ -1591,7 +1642,7 @@ export default function ExpensesScreen() {
           <View>
             {isLoadingMore && <ActivityIndicator size="small" color={colors.primary} style={{ paddingVertical: spacing[4] }} />}
             {totalThisMonth > 0 && (
-              <AnalysisTeaser recuperable={totalRecuperable} onPress={() => router.push('/(app)/expenses')} />
+              <AnalysisTeaser recuperable={totalRecuperable} onPress={onClose} />
             )}
           </View>
         }
@@ -1814,6 +1865,27 @@ export default function ExpensesScreen() {
                 </TouchableOpacity>
               )}
 
+              {/* Toggle gasto fijo — se repite automáticamente cada mes */}
+              <TouchableOpacity
+                style={[styles.sharedToggle, isRecurringExpense && styles.sharedToggleActive]}
+                onPress={() => setIsRecurringExpense(!isRecurringExpense)}
+              >
+                <Ionicons
+                  name={isRecurringExpense ? 'repeat' : 'repeat-outline'}
+                  size={18}
+                  color={isRecurringExpense ? colors.neon : colors.text.secondary}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text variant="label" color={isRecurringExpense ? colors.neon : colors.text.primary}>
+                    GASTO FIJO
+                  </Text>
+                  <Text variant="caption" color={colors.text.secondary}>
+                    Se repite solo cada mes — alquiler, cuotas, suscripciones
+                  </Text>
+                </View>
+                <View style={[styles.toggleDot, isRecurringExpense && styles.toggleDotActive]} />
+              </TouchableOpacity>
+
               <Button
                 label="GUARDAR GASTO"
                 variant="neon"
@@ -1864,13 +1936,11 @@ export default function ExpensesScreen() {
 
                     {/* Expense Card */}
                     <View style={clsModal.expenseCard}>
-                      <View style={clsModal.expenseIconWrap}>
-                        <CategoryIcon
-                          categoryName={(editingExpense?.category as any)?.name_es ?? ''}
-                          description={editingExpense?.description ?? ''}
-                          size={44}
-                        />
-                      </View>
+                      <CategoryIcon
+                        categoryName={(editingExpense?.category as any)?.name_es ?? ''}
+                        description={editingExpense?.description ?? ''}
+                        size={56}
+                      />
                       <View style={{ flex: 1, gap: 3 }}>
                         <Text style={clsModal.expenseName} numberOfLines={1}>{editingExpense?.description}</Text>
                         <Text style={clsModal.expenseMeta}>
@@ -1961,9 +2031,7 @@ export default function ExpensesScreen() {
                               onPress={() => setEditExpenseValues(p => p ? { ...p, category_id: p.category_id === cat.id ? null : cat.id } : p)}
                               activeOpacity={0.75}
                             >
-                              <View style={[clsModal.catIconWrap, { backgroundColor: (cat.color ?? '#27AE60') + '20' }]}>
-                                <CategoryIcon categoryName={cat.name_es} size={26} />
-                              </View>
+                              <CategoryIcon categoryName={cat.name_es} size={40} />
                               <Text
                                 style={[clsModal.catName, isActive && { color: '#1C1C1C', fontFamily: 'Montserrat_600SemiBold' }]}
                                 numberOfLines={1}
@@ -1979,6 +2047,26 @@ export default function ExpensesScreen() {
                         })}
                       </View>
                     </View>
+
+                    <TouchableOpacity
+                      style={[styles.sharedToggle, editExpenseValues.is_recurring && styles.sharedToggleActive, { marginHorizontal: layout.screenPadding }]}
+                      onPress={() => setEditExpenseValues(p => p ? { ...p, is_recurring: !p.is_recurring } : p)}
+                    >
+                      <Ionicons
+                        name={editExpenseValues.is_recurring ? 'repeat' : 'repeat-outline'}
+                        size={18}
+                        color={editExpenseValues.is_recurring ? colors.neon : colors.text.secondary}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text variant="label" color={editExpenseValues.is_recurring ? colors.neon : colors.text.primary}>
+                          GASTO FIJO
+                        </Text>
+                        <Text variant="caption" color={colors.text.secondary}>
+                          Se repite solo cada mes — alquiler, cuotas, suscripciones
+                        </Text>
+                      </View>
+                      <View style={[styles.toggleDot, editExpenseValues.is_recurring && styles.toggleDotActive]} />
+                    </TouchableOpacity>
 
                     <View style={{ height: 20 }} />
                   </ScrollView>
@@ -2038,7 +2126,7 @@ export default function ExpensesScreen() {
             <View style={scModalS.countBadge}>
               <View style={scModalS.countDot} />
               <Text style={scModalS.countText}>
-                {expenses.filter(e => e.category_id === null).length + pendingTxs.length} SIN CATEGORÍA
+                {allUnclassified.length + pendingTxs.length} SIN CATEGORÍA
               </Text>
             </View>
             <Text style={scModalS.descText}>
@@ -2047,7 +2135,7 @@ export default function ExpensesScreen() {
           </View>
 
           <SinClasifInbox
-            expenses={expenses}
+            expenses={[...allUnclassified, ...expenses.filter(e => e.category_id !== null)]}
             pendingTxs={pendingTxs}
             categories={categories}
             userId={user?.id ?? ''}
@@ -2057,6 +2145,7 @@ export default function ExpensesScreen() {
             }}
             onConfirmedPending={() => {
               loadPendingTxs();
+              loadAllUnclassified();
               if (user?.id) fetchExpenses(user.id);
             }}
           />
@@ -2076,6 +2165,7 @@ export default function ExpensesScreen() {
         onDismiss={markVisited}
       />
     </SafeAreaView>
+    </Modal>
   );
 }
 
@@ -2381,9 +2471,9 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  expenseLeft:      { flex: 1, gap: 3 },
+  expenseLeft:      { flex: 1, minWidth: 0, gap: 3 },
   expenseMeta:      { flexDirection: 'row', alignItems: 'center' },
-  expenseRight:     { alignItems: 'flex-end', gap: 4 },
+  expenseRight:     { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
   expenseName: {
     fontFamily: 'Montserrat_600SemiBold',
     fontSize: 14,

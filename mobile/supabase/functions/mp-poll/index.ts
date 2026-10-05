@@ -133,7 +133,7 @@ Reglas categoria: cafe=cafeteria/starbucks/cafe/te/bebida; comida=restaurant/del
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model: 'qwen/qwen3.8-27b',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 80,
         temperature: 0.1,
@@ -419,7 +419,7 @@ serve(async (req) => {
           userId,
           title: `📲 ${newFound > 1 ? `${newFound} gastos nuevos` : '1 gasto nuevo'} de Mercado Pago`,
           body:  'Tu presupuesto se actualizó automáticamente.',
-          data:  { route: '/(app)/movimientos' },
+          data:  { route: '/(app)/expenses?openMovimientos=1' },
         }),
       }).catch(e => console.warn('[mp-poll] push error:', e));
     }

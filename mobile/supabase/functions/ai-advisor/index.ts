@@ -357,7 +357,7 @@ Generá el reporte en JSON.`;
         method:  'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${groqApiKey}` },
         body: JSON.stringify({
-          model:       'llama-3.3-70b-versatile',
+          model:       'qwen/qwen3.8-27b',
           messages:    [{ role: 'system', content: reportSystemPrompt }, { role: 'user', content: reportUserMsg }],
           max_tokens:  400,
           temperature: 0.5,
@@ -581,7 +581,7 @@ Generá el reporte en JSON.`;
       method:  'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${groqApiKey}` },
       body: JSON.stringify({
-        model:       'llama-3.3-70b-versatile',
+        model:       'qwen/qwen3.8-27b',
         messages,
         max_tokens:  maxTokens,
         temperature: generate_welcome ? 0.6 : 0.65,

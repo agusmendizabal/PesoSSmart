@@ -11,6 +11,7 @@ import { colors, spacing, layout } from '@/theme';
 import { Text, Card, MiniLineChart } from '@/components/ui';
 import { formatCurrency } from '@/utils/format';
 import { ADVISOR_ENABLED } from '@/lib/features';
+import { NomiMascot } from '@/components/NomiMascot';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -485,6 +486,15 @@ export function ResumenCard({ total, necessary, disposable, investable, estimate
           </Text>
         </View>
       )}
+      {incomePct !== null && incomePct > 100 && (
+        <View style={resStyles.stopBanner}>
+          <NomiMascot pose="stop" size={40} />
+          <View style={{ flex: 1, gap: 1 }}>
+            <Text variant="labelMd" color={colors.red}>Te pasaste del presupuesto</Text>
+            <Text variant="caption" color={colors.text.secondary}>Ya gastaste más de lo estimado este mes.</Text>
+          </View>
+        </View>
+      )}
       <View style={resStyles.breakdown}>
         {[
           { label: 'Esencial',      amount: necessary,  color: '#5B9EF9' },
@@ -507,6 +517,11 @@ const resStyles = StyleSheet.create({
   progressFill:  { height: '100%', borderRadius: 3 },
   breakdown:     { flexDirection: 'row', gap: spacing[4], flexWrap: 'wrap' },
   breakdownItem: { gap: 2 },
+  stopBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    backgroundColor: colors.red + '0D', borderWidth: 1, borderColor: colors.red + '30',
+    borderRadius: 14, padding: spacing[3],
+  },
 });
 
 // ─── CategoryDonut ────────────────────────────────────────────────────────────
@@ -520,8 +535,8 @@ function buildSegments(rows: CategoryRow[], total: number, maxCats = 8) {
   ] as CategoryRow[];
 }
 
-export function CategoryDonut({ rows, total, compact = false }: {
-  rows: CategoryRow[]; total: number; compact?: boolean;
+export function CategoryDonut({ rows, total, compact = false, onSelectCategory }: {
+  rows: CategoryRow[]; total: number; compact?: boolean; onSelectCategory?: (row: CategoryRow) => void;
 }) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
@@ -649,7 +664,10 @@ export function CategoryDonut({ rows, total, compact = false }: {
               <TouchableOpacity
                 key={i}
                 style={[cdS.legendItem, isSelected && { backgroundColor: seg.color + '18', borderRadius: 8 }]}
-                onPress={() => setSelectedIdx(isSelected ? null : i)}
+                onPress={() => {
+                  if (onSelectCategory && seg.id !== 'otros') onSelectCategory(seg);
+                  else setSelectedIdx(isSelected ? null : i);
+                }}
                 activeOpacity={0.7}
               >
                 <View style={[cdS.legendDot, { backgroundColor: seg.color, opacity: isDimmed ? 0.3 : 1 }]} />

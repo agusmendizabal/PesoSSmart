@@ -48,16 +48,20 @@ export function FormSheetModal({
   const body = (
     <>
       <View style={styles.handle} />
-      <View style={styles.header}>
+      <View style={[styles.header, !title && styles.headerCompact]}>
         {onBack && (
           <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginRight: spacing[2] }}>
             <Ionicons name="arrow-back" size={22} color={colors.text.secondary} />
           </TouchableOpacity>
         )}
-        <View style={{ gap: 2, flex: 1 }}>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle}
-        </View>
+        {title ? (
+          <View style={{ gap: 2, flex: 1 }}>
+            <Text style={styles.title}>{title}</Text>
+            {subtitle}
+          </View>
+        ) : (
+          <View style={{ flex: 1 }} />
+        )}
         <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="close" size={22} color={colors.text.secondary} />
         </TouchableOpacity>
@@ -142,6 +146,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     padding: spacing[5], paddingTop: spacing[3],
   },
+  headerCompact: { paddingTop: spacing[2], paddingBottom: spacing[2] },
   title:  { fontFamily: 'Montserrat_700Bold', fontSize: 18, color: colors.text.primary },
   body:   { padding: spacing[5], gap: spacing[3], paddingBottom: spacing[10] },
   btn: {

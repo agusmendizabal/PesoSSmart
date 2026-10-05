@@ -64,6 +64,66 @@ npx supabase functions deploy auto-confirm-transactions --no-verify-jwt
 
 ---
 
+## 🚧 FASE 2 — EN CURSO: WhatsApp (Problema 7) + deduplicación cross-canal (Problema 11)
+
+**Fecha:** Oct 2026 — migraciones 049/050 corridas y funciones deployadas. Probado end-to-end con webhooks firmados simulados (vínculo por código, gasto por texto, confirmar/descartar por botón y por "sí"/"no", reintento del mismo mensaje, duplicado contra Gmail, firma inválida). **Falta solo la parte de Meta** (pasos 1, 3 con valores reales, 5 y 6) y probar la foto de ticket real. Hoy hay secrets de WhatsApp de prueba cargados: reemplazarlos con los reales.
+
+> **Hallazgos durante la implementación:**
+> - Groq dio de baja todos los modelos Llama → todas las funciones con IA (Nomi, inversiones, Gmail, Outlook, MP, capturas) fallaban. Se migraron a `qwen/qwen3.8-27b`.
+> - En producción existe el trigger `tr_auto_expense_from_pending` que no está versionado en ninguna migración (crea un gasto por cada pendiente nuevo). Conviene pasarlo a una migración y agregarle `AND direction = 'outgoing'` para que nunca registre ingresos como gasto.
+
+### Qué se implementó
+- `049_cross_channel_dedup.sql` — trigger `BEFORE INSERT` en `pending_transactions`: si el mismo gasto ya llegó por otro canal (fecha ±1 día, monto ±0,5%, comercio compatible), la fila se guarda con `status = 'duplicate'` y `dedup_of`. Cubre Gmail, Outlook, Mercado Pago y WhatsApp sin cambios en cada función. Reemplaza el `fingerprint` propuesto en el Problema 11 (un hash exacto no matchea "COTO C.I.C.S.A." contra "Coto").
+- `050_whatsapp.sql` — tablas `whatsapp_links` (número ↔ usuario, solo escribe el webhook) y `whatsapp_link_codes`, RPC `create_whatsapp_link_code()`, columna `payment_method` en `pending_transactions`.
+- `whatsapp-webhook` — firma HMAC de Meta, vínculo por código `PESOS-XXXXXX`, foto de ticket (Groq Vision `llama-4-scout`) o texto libre → pendiente con botones Confirmar / Descartar (también acepta "sí"/"no"). Límite 50 gastos/día por usuario.
+- `gmail-poll` / `outlook-poll` — el camino de "mes anterior" ya no inserta en `expenses` si la fila quedó como duplicada.
+- `auto-confirm-transactions` — fix: leía categorías de una tabla `categories` inexistente (los auto-confirmados quedaban sin categoría); ahora usa `expense_categories`.
+- `profile.tsx` — sección WhatsApp (vincular / desvincular), visible solo si `EXPO_PUBLIC_WHATSAPP_NUMBER` está seteada. `PendingTransactions.tsx` — badge "WhatsApp".
+
+### Pasos de deploy
+1. **Meta:** crear app en developers.facebook.com → producto WhatsApp → número de negocio. Anotar *Phone number ID*, *App secret* y generar un *token permanente* (System User en Business Manager).
+2. **Migraciones:** correr `049_cross_channel_dedup.sql` y `050_whatsapp.sql` en el SQL Editor.
+3. **Secrets:**
+   ```bash
+   cd mobile
+   npx supabase secrets set WHATSAPP_APP_SECRET=<app-secret> WHATSAPP_ACCESS_TOKEN=<token> WHATSAPP_PHONE_NUMBER_ID=<id> WHATSAPP_VERIFY_TOKEN=<string-random-propio>
+   ```
+4. **Deploy:**
+   ```bash
+   npx supabase functions deploy whatsapp-webhook --no-verify-jwt
+   npx supabase functions deploy gmail-poll
+   npx supabase functions deploy outlook-poll
+   npx supabase functions deploy auto-confirm-transactions --no-verify-jwt
+   ```
+5. **Webhook en Meta:** URL `https://gqflukmlaonkgxfdbedq.supabase.co/functions/v1/whatsapp-webhook`, verify token = `WHATSAPP_VERIFY_TOKEN`, suscribir el campo `messages`.
+6. **Cliente:** agregar `EXPO_PUBLIC_WHATSAPP_NUMBER=549XXXXXXXXXX` al `.env` de `mobile/` y al build de EAS.
+
+---
+
+## 🚧 FASE 2 — EN CURSO: Atajos de iOS (Problema 10)
+
+> **Cambio respecto del plan original:** Atajos de iOS no tiene disparador "al recibir una notificación de una app", así que no se pueden leer las push de los bancos. Se implementó un endpoint único que acepta texto o imagen y se usa de 3 formas: **compartir** (capturas, tickets o texto desde cualquier app — cubre gran parte del Problema 9 sin código nativo), **automatización por SMS** del banco y **Siri** (dictado).
+
+### Qué se implementó
+- `051_ios_shortcut.sql` — tabla `shortcut_tokens` (solo el SHA-256 del token) + RPC `create_shortcut_token()`.
+- `ios-shortcut-ingest` — auth por token personal, texto o imagen (JPEG/PNG) → pendiente con categoría sugerida; responde `{ status, message }` para que el atajo muestre una notificación. Límite 100/día.
+- `_shared/expenseCapture.ts` — extracción con Groq + guardado, compartido con `whatsapp-webhook` (refactorizado para usarlo).
+- `ios-shortcut.tsx` — pantalla para generar el token (se muestra una sola vez), instalar el atajo y guía de uso. Entrada en Perfil solo en iOS.
+
+### Pasos de deploy
+1. Correr `051_ios_shortcut.sql` en el SQL Editor.
+2. `npx supabase functions deploy ios-shortcut-ingest --no-verify-jwt` y `npx supabase functions deploy whatsapp-webhook --no-verify-jwt` (refactor).
+3. **Publicar el atajo** (una vez, desde un iPhone) y poner su link de iCloud en `EXPO_PUBLIC_IOS_SHORTCUT_URL`:
+   1. Atajos → nuevo atajo "PesoSSmart". En Detalles: activar "Mostrar en hoja de compartir" (tipos: Texto, Imágenes).
+   2. Acción "Recibir **texto e imágenes** desde **Hoja de compartir**; si no hay entrada: **Solicitar entrada**" (permite Siri/dictado).
+   3. Acción "Texto" con el valor del token y, en "Configurar importación", agregar la pregunta "Pegá tu token de PesoSSmart" sobre ese campo.
+   4. "Si **Entrada del atajo** es **imagen**": "Convertir imagen a **JPEG**" → "Redimensionar a ancho **1280**" → "Codificar en **Base64**" (saltos de línea: ninguno) → "Diccionario" `{ image: <Base64> }`. "De lo contrario": "Diccionario" `{ text: <Entrada del atajo> }`.
+   5. "Obtener contenido de URL": `POST https://gqflukmlaonkgxfdbedq.supabase.co/functions/v1/ios-shortcut-ingest`, encabezado `Authorization: Bearer <Texto del paso 3>`, cuerpo **JSON** = el Diccionario.
+   6. "Obtener valor de **message** en el diccionario" → "Mostrar notificación".
+   7. Compartir el atajo → "Copiar enlace de iCloud".
+
+---
+
 ## FASE 0 — Pulido de UI (TestFlight beta, PRIORIDAD ACTUAL)
 
 Antes de atacar las mejoras de producto, se necesita que la UI esté pulida para que los usuarios beta tengan una buena experiencia. Esta fase es corta y cubre detalles visuales, flujos rotos, y small bugs de interacción. Se trabaja primero en esta fase y luego se avanza a las fases siguientes.

@@ -44,7 +44,7 @@ export function Badge({ label, variant = 'gray', classification, small = false, 
 
   return (
     <Animated.View style={[styles.base, { backgroundColor: bg }, small && styles.small, { transform: [{ scale }] }]}>
-      <Text variant="label" style={[styles.text, { color }, small && styles.textSmall]}>
+      <Text variant="label" numberOfLines={1} style={[styles.text, { color }, small && styles.textSmall]}>
         {text}
       </Text>
     </Animated.View>

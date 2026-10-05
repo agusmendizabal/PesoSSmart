@@ -35,9 +35,9 @@ export const colors = {
   // ── Fondos ────────────────────────────────────────────────────────────────
   bg: {
     primary:      '#FAFAF7',   // Fondo general — crema cálido
-    secondary:    '#F5F1E9',   // Superficie / cards
+    secondary:    '#F2E8D5',   // Superficie / cards — crema (mismo que Grupos)
     card:         '#FFFFFF',   // Cards blanco puro
-    elevated:     '#F5F1E9',   // Superficie elevada
+    elevated:     '#F2E8D5',   // Superficie elevada — crema (mismo que Grupos)
     input:        '#F5F1E9',
     inputFocused: '#F2E8D5',
   },
